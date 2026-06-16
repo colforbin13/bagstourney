@@ -1,0 +1,15 @@
+# deploy.ps1.example - Example deploy script (placeholders only)
+# Copy to deploy.ps1 and edit DEPLOY_PATH and DEPLOY_API_PATH for your environment.
+
+$ErrorActionPreference = "Stop"
+
+# Example UNC path or local path to web root
+$DEPLOY_PATH = if ($env:DEPLOY_PATH) { $env:DEPLOY_PATH } else { "\\\\your-server\\www\\bags" }
+$DEPLOY_API_PATH = if ($env:DEPLOY_API_PATH) { $env:DEPLOY_API_PATH } else { "\\\\your-server\\www\\bags\\api" }
+
+Write-Host "Deploying frontend to $DEPLOY_PATH"
+# Robocopy/rsync/scp commands go here — keep database.php excluded from copies.
+
+# Example: robocopy dist\browser $DEPLOY_PATH /E /XF api\config\database.php
+
+Write-Host "Deploy script placeholder. Copy and customize deploy.ps1 for your environment."

@@ -1,0 +1,12 @@
+# beanbag-bracket.conf
+#
+# Copy this file OUTSIDE your web root and source it, or copy the values
+# directly into api/config/database.php.
+#
+# ⚠️  Never commit real credentials to version control.
+
+BB_DB_HOST=localhost
+BB_DB_NAME=beanbag_tournament
+BB_DB_USER=bb_user
+BB_DB_PASS=replace-with-your-password
+BB_JWT_SECRET=replace-with-64-random-hex-chars

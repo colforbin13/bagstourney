@@ -1,0 +1,14 @@
+# Serve Angular SPA from /bags.
+
+Options -Indexes
+RewriteEngine On
+RewriteBase /bags/
+
+# Route API requests to the PHP front controller.
+RewriteCond %{REQUEST_URI} ^/bags/api/
+RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
+
+# For all other URLs, serve index.html for Angular routing.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [QSA,L]

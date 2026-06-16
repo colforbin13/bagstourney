@@ -1,0 +1,9 @@
+// src/environments/environment.ts.example
+// Example Angular environment file. Copy to src/environments/environment.ts and adjust as needed.
+
+export const environment = {
+  production: false,
+  // Base URL for API. For local dev with PHP built-in server: http://localhost:8000
+  // For deployed setups where API is served at /bags/api, use '/bags/api'
+  apiUrl: 'http://localhost:8000/bags/api',
+};

@@ -1,0 +1,183 @@
+/* src/assets/styles/global.scss */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg:        #f5f6f8;   /* off-white / light grey */
+  --surface:   #ffffff;   /* card background */
+  --border:    #e6e9ee;   /* subtle border */
+  --muted:     #6b7280;   /* muted text */
+  --text:      #0f1724;   /* near-black */
+  --text-dim:  #475569;   /* dim text */
+  --accent:    #2563eb;   /* calm blue */
+  --accent-dim:#1e40af;   /* darker blue */
+  --danger:    #e11d48;   /* subtle red */
+  --win:       #2563eb;   /* blue for win */
+  --lose:      #94a3b8;   /* grey for lose */
+  --radius:    6px;
+  --mono:      'DM Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100dvh;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+  white-space: nowrap;
+
+  &:hover { border-color: var(--muted); }
+  &:disabled { opacity: .4; cursor: not-allowed; }
+
+  &.btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    &:hover:not(:disabled) { background: var(--accent-dim); border-color: var(--accent-dim); }
+  }
+  &.btn-danger {
+    border-color: var(--danger);
+    color: var(--danger);
+    &:hover:not(:disabled) { background: var(--danger); color: #fff; }
+  }
+  &.btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+}
+
+/* ── Inputs ── */
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  outline: none;
+  transition: border-color .15s;
+  &:focus { border-color: var(--accent); }
+  &::placeholder { color: var(--muted); }
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+/* ── Badge ── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+
+  &.badge-setup    { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+  &.badge-active   { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+  &.badge-complete { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+}
+
+/* ── Layout ── */
+.page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 16px 80px;
+}
+
+.page-wide {
+  max-width: 100%;
+  padding: 24px 16px 80px;
+  overflow-x: auto;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+  h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -.01em;
+  }
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  font-size: 0.875rem;
+  z-index: 9999;
+  animation: fadeUp .2s ease;
+
+  &.toast-error { border-color: var(--danger); color: var(--danger); }
+  &.toast-success { border-color: var(--accent); color: var(--accent); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Spinner ── */
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Empty state ── */
+.empty {
+  text-align: center;
+  padding: 48px 0;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+}
