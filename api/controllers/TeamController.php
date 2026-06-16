@@ -150,12 +150,14 @@ class TeamController {
             $status = 'pending';
             $winnerId = null;
 
-            // Handle byes: if one team is null, the other auto-advances
+            // Handle byes: if one team is null, mark as a bye (auto-win) but don't mark as 'complete'
+            // We store winner_id so we can place the team into the next round, but use 'bye' to prevent
+            // cascading propagation beyond the immediate next round during bracket construction.
             if ($team1Id && !$team2Id) {
-                $status = 'complete';
+                $status = 'bye';
                 $winnerId = $team1Id;
             } elseif (!$team1Id && $team2Id) {
-                $status = 'complete';
+                $status = 'bye';
                 $winnerId = $team2Id;
             } elseif ($team1Id && $team2Id) {
                 $status = 'ready';
@@ -191,20 +193,34 @@ class TeamController {
                     ->execute([$currentRoundMatches[$nextMn], $slot, $matchId]);
             }
 
-            // Auto-advance byes from round 1 into later rounds
+            // Auto-advance winners and byes from previous round into this round.
+            // We allow propagation for matches marked 'complete' (played) and 'bye' (single-team auto-wins),
+            // but we only call maybeMarkReady automatically for genuinely 'complete' matches to avoid cascading
+            // byes multiple rounds ahead. 'bye' propagation will fill the slot; if both slots end up filled,
+            // the target match will be marked 'ready' but it will not be marked 'complete' automatically.
             foreach ($prevRoundMatches as $mn => $matchId) {
                 $stmt = $this->db->prepare('SELECT winner_id, status FROM matches WHERE id = ?');
                 $stmt->execute([$matchId]);
                 $m = $stmt->fetch();
-                if ($m && $m['status'] === 'complete' && $m['winner_id']) {
+                if ($m && in_array($m['status'], ['complete', 'bye']) && $m['winner_id']) {
                     $nextMn = (int)ceil($mn / 2);
                     $slot   = ($mn % 2 === 1) ? 1 : 2;
                     $nextMatchId = $currentRoundMatches[$nextMn];
                     $col = $slot === 1 ? 'team1_id' : 'team2_id';
                     $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
                         ->execute([$m['winner_id'], $nextMatchId]);
-                    // If both slots filled, mark ready
-                    $this->maybeMarkReady($nextMatchId);
+                    // If the source match was fully played, allow auto-marking the target as ready when both slots present.
+                    if ($m['status'] === 'complete') {
+                        $this->maybeMarkReady($nextMatchId);
+                    } else {
+                        // For byes, check if both slots are now filled; if so, mark ready.
+                        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
+                        $stmt2->execute([$nextMatchId]);
+                        $nm = $stmt2->fetch();
+                        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
+                            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextMatchId]);
+                        }
+                    }
                 }
             }
 
