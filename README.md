@@ -3,7 +3,7 @@
 A mobile-first, single-elimination tournament bracket manager.
 
 Technology
-- Frontend: Angular 17 (TypeScript, SCSS)
+- Frontend: Angular 21 (TypeScript, SCSS) — Node 20+ and TypeScript 5.9+ recommended
 - Backend: PHP (PDO) + MySQL
 - Deployment: Apache (recommended) or PHP built-in server for development
 
