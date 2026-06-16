@@ -36,7 +36,7 @@ export interface Match {
   winner_id: number | null;
   next_match_id: number | null;
   next_match_slot: 1 | 2 | null;
-  status: 'pending' | 'ready' | 'complete';
+  status: 'pending' | 'ready' | 'complete' | 'bye';
   team1_name: string | null;
   team2_name: string | null;
   winner_name: string | null;

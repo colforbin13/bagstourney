@@ -37,11 +37,11 @@ interface ScoreEntry { team1: string; team2: string; }
               </div>
               <div class="bracket-matches">
                 @for (match of round.matches; track match.id) {
-                  <div class="match-card" [class.match-complete]="match.status === 'complete'" [class.match-pending]="match.status === 'pending'">
+                  <div class="match-card" [class.match-complete]="match.status === 'complete'" [class.match-pending]="match.status === 'pending'" [class.match-bye]="match.status === 'bye'">
                     <!-- Team 1 -->
                     <div class="match-team" [class.winner]="match.winner_id === match.team1_id && match.status === 'complete'" [class.loser]="match.winner_id === match.team2_id && match.status === 'complete'">
                       <span class="team-name">
-                        {{ match.team1_name ?? 'TBD' }}
+                        {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
                         @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team1_id) {
                           <span class="champion-icon" aria-hidden="true">🏆</span>
                         }
@@ -60,7 +60,7 @@ interface ScoreEntry { team1: string; team2: string; }
                     <!-- Team 2 -->
                     <div class="match-team" [class.winner]="match.winner_id === match.team2_id && match.status === 'complete'" [class.loser]="match.winner_id === match.team1_id && match.status === 'complete'">
                       <span class="team-name">
-                        {{ match.team2_name ?? 'TBD' }}
+                        {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
                         @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team2_id) {
                           <span class="champion-icon" aria-hidden="true">🏆</span>
                         }
@@ -97,6 +97,9 @@ interface ScoreEntry { team1: string; team2: string; }
                           <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
                         }
                       </div>
+                    }
+                    @if (match.status === 'bye') {
+                      <div class="bye-note">Bye — auto-advanced</div>
                     }
                   </div>
                 }
