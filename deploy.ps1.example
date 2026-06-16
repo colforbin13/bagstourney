@@ -1,15 +1,73 @@
-# deploy.ps1.example - Example deploy script (placeholders only)
+# deploy.ps1.example - Example deploy script with real logic but ENV placeholders.
 # Copy to deploy.ps1 and edit DEPLOY_PATH and DEPLOY_API_PATH for your environment.
+# This example intentionally excludes the real database config and uses the example config when seeding.
 
 $ErrorActionPreference = "Stop"
 
-# Example UNC path or local path to web root
+# Set these to your deployment targets or set environment variables before invoking the script.
 $DEPLOY_PATH = if ($env:DEPLOY_PATH) { $env:DEPLOY_PATH } else { "\\\\your-server\\www\\bags" }
 $DEPLOY_API_PATH = if ($env:DEPLOY_API_PATH) { $env:DEPLOY_API_PATH } else { "\\\\your-server\\www\\bags\\api" }
 
-Write-Host "Deploying frontend to $DEPLOY_PATH"
-# Robocopy/rsync/scp commands go here — keep database.php excluded from copies.
+function Invoke-RobocopyCopy {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
 
-# Example: robocopy dist\browser $DEPLOY_PATH /E /XF api\config\database.php
+        [Parameter(Mandatory = $true)]
+        [string]$Destination,
 
-Write-Host "Deploy script placeholder. Copy and customize deploy.ps1 for your environment."
+        [switch]$Mirror,
+        [string[]]$ExtraArgs = @()
+    )
+
+    if (-not (Test-Path -LiteralPath $Source)) {
+        throw "Source path does not exist: $Source"
+    }
+
+    New-Item -ItemType Directory -Force -Path $Destination | Out-Null
+
+    $mode = if ($Mirror) { "/MIR" } else { "/E" }
+    & robocopy $Source $Destination $mode @ExtraArgs
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ge 8) {
+        throw "robocopy failed with exit code $exitCode"
+    }
+}
+
+Write-Host "==> Building frontend (production)..." -ForegroundColor Green
+Push-Location frontend
+npm.cmd ci --silent
+npm.cmd run build:prod
+Pop-Location
+
+Write-Host "==> Build complete: dist/browser/" -ForegroundColor Green
+
+Write-Host "==> Deploying frontend to $DEPLOY_PATH ..." -ForegroundColor Green
+# Mirror frontend (replace the remote files with current build). Remove -Mirror if you prefer incremental copy.
+Invoke-RobocopyCopy -Source "dist\browser" -Destination $DEPLOY_PATH -Mirror
+
+Write-Host "==> Deploying API to $DEPLOY_API_PATH ..." -ForegroundColor Green
+# Copy API files without mirroring; only update newer files and preserve existing files (don't delete).
+# Exclude the live config so secrets at the destination are preserved.
+Invoke-RobocopyCopy -Source "api" -Destination $DEPLOY_API_PATH -ExtraArgs @("/XO", "/COPY:DAT", "/R:2", "/W:2", "/XF", "config\\database.php")
+
+# If the target doesn't have a database config, seed it from the example file (not the real config).
+$sourceExampleConfig = "api\config\database.php.example"
+$destinationDatabaseConfig = Join-Path $DEPLOY_API_PATH "config\database.php"
+
+if (-not (Test-Path -LiteralPath $destinationDatabaseConfig)) {
+    if (Test-Path -LiteralPath $sourceExampleConfig) {
+        Write-Host "==> Seeding API database config at $destinationDatabaseConfig from example (edit to add credentials) ..." -ForegroundColor Yellow
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destinationDatabaseConfig) | Out-Null
+        Copy-Item -LiteralPath $sourceExampleConfig -Destination $destinationDatabaseConfig
+    } else {
+        Write-Host "==> Example config not found at $sourceExampleConfig — create a database.php at the destination manually." -ForegroundColor Red
+    }
+} else {
+    Write-Host "==> Preserving existing API database config at $destinationDatabaseConfig" -ForegroundColor Yellow
+}
+
+Write-Host "==> Deployment finished." -ForegroundColor Green
+Write-Host "    * Remember to set your credentials in $DEPLOY_API_PATH\config\database.php" -ForegroundColor Green
+Write-Host "    * Adjust DEPLOY_PATH and DEPLOY_API_PATH in deploy.ps1 for your environment, or set environment variables." -ForegroundColor Green
