@@ -48,7 +48,7 @@ Build & deploy
   npm ci
   npm run build:prod   # output → dist/browser/
   ```
-- Deploy with the provided PowerShell script (Windows): `.uild\deploy.ps1`.
+- Deploy with the provided PowerShell script (Windows): `.build\deploy.ps1`.
   - Override destinations with environment variables: `DEPLOY_PATH`, `DEPLOY_API_PATH`.
 
 API (key endpoints)
@@ -75,7 +75,7 @@ Notes
 - Ensure PHP has `pdo_mysql` enabled. Use HTTPS and a strong `JWT_SECRET` in production.
 
 License
-- Add your preferred license file (LICENSE) to the repo.
+- MIT License — see the included LICENSE file in the repository.
 
 Contact
 - Open issues for bugs or feature requests.
