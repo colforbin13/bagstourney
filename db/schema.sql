@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS matches (
   winner_id INT DEFAULT NULL,
   next_match_id INT DEFAULT NULL,   -- where winner advances to
   next_match_slot TINYINT DEFAULT NULL, -- 1 = team1 slot, 2 = team2 slot
-  status ENUM('pending', 'ready', 'complete') DEFAULT 'pending',
+  status ENUM('pending', 'ready', 'complete', 'bye') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE,
