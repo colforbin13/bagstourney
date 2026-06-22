@@ -1,5 +1,6 @@
 // src/app/admin/tournament-manage.component.ts
 import { Component, OnInit, signal } from '@angular/core';
+import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
@@ -255,8 +256,9 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  drawTeams() {
-    if (!confirm('Draw teams and start the tournament? This cannot be undone.')) return;
+  async drawTeams() {
+    const ok = await confirmService.confirm('Draw teams and start the tournament? This cannot be undone.');
+    if (!ok) return;
     this.drawing.set(true);
     this.drawError.set('');
     this.svc.drawTeams(this.tournamentId).subscribe({

@@ -193,39 +193,27 @@ class TeamController {
                     ->execute([$currentRoundMatches[$nextMn], $slot, $matchId]);
             }
 
-            // Auto-advance winners and byes from previous round into this round.
-            // We allow propagation for matches marked 'complete' (played) and 'bye' (single-team auto-wins),
-            // but we only call maybeMarkReady automatically for genuinely 'complete' matches to avoid cascading
-            // byes multiple rounds ahead. 'bye' propagation will fill the slot; if both slots end up filled,
-            // the target match will be marked 'ready' but it will not be marked 'complete' automatically.
+            // Place bye winners into the next round's slots only — no cascading.
             foreach ($prevRoundMatches as $mn => $matchId) {
-                $stmt = $this->db->prepare('SELECT winner_id, status FROM matches WHERE id = ?');
+                $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
                 $stmt->execute([$matchId]);
                 $m = $stmt->fetch();
-                if ($m && in_array($m['status'], ['complete', 'bye']) && $m['winner_id']) {
-                    $nextMn = (int)ceil($mn / 2);
-                    $slot   = ($mn % 2 === 1) ? 1 : 2;
-                    $nextMatchId = $currentRoundMatches[$nextMn];
-                    $col = $slot === 1 ? 'team1_id' : 'team2_id';
-                    $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
-                        ->execute([$m['winner_id'], $nextMatchId]);
-                    // If the source match was fully played, allow auto-marking the target as ready when both slots present.
-                    if ($m['status'] === 'complete') {
-                        $this->maybeMarkReady($nextMatchId);
-                    } else {
-                        // For byes, check if both slots are now filled; if so, mark ready.
-                        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
-                        $stmt2->execute([$nextMatchId]);
-                        $nm = $stmt2->fetch();
-                        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
-                            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextMatchId]);
-                        }
-                    }
-                }
+                if (!$m || !$m['next_match_id'] || !$m['winner_id']) continue;
+
+                $col = (int)$m['next_match_slot'] === 1 ? 'team1_id' : 'team2_id';
+                $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
+                    ->execute([$m['winner_id'], $m['next_match_id']]);
+
+                $this->maybeMarkReady((int)$m['next_match_id']);
             }
 
             $prevRoundMatches = $currentRoundMatches;
         }
+
+        // Safety: ensure final match is not auto-declared a winner due to chained byes.
+        // Clear any 'bye' status and winner_id on final matches so the championship must be played.
+        $this->db->prepare('UPDATE matches SET status = "pending", winner_id = NULL WHERE tournament_id = ? AND next_match_id IS NULL AND status = "bye"')
+            ->execute([$tournamentId]);
     }
 
     private function maybeMarkReady(int $matchId): void {
@@ -237,30 +225,48 @@ class TeamController {
         }
     }
 
-    /** Standard bracket seeding: 1 vs n, 2 vs n-1, etc., recursively halved */
+    /**
+     * Propagate the winner from a source match into its next match slot and cascade
+     * through subsequent rounds when the target match has only one team (a bye).
+     */
+    private function propagateWinnerFromMatchToNext(int $sourceMatchId): void {
+        $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
+        $stmt->execute([$sourceMatchId]);
+        $m = $stmt->fetch();
+        if (!$m || !$m['next_match_id'] || !$m['winner_id']) return;
+
+        $nextId = (int)$m['next_match_id'];
+        $slot   = (int)$m['next_match_slot'];
+        $col    = $slot === 1 ? 'team1_id' : 'team2_id';
+
+        $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
+            ->execute([$m['winner_id'], $nextId]);
+
+        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id, status FROM matches WHERE id = ?');
+        $stmt2->execute([$nextId]);
+        $nm = $stmt2->fetch();
+
+        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
+            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
+        } elseif ($nm && ($nm['team1_id'] || $nm['team2_id'])) {
+            // Only one team in the next match — it's itself a bye, keep cascading
+            $byeWinnerId = $nm['team1_id'] ?? $nm['team2_id'];
+            $this->db->prepare('UPDATE matches SET status = "bye", winner_id = ? WHERE id = ?')
+                ->execute([$byeWinnerId, $nextId]);
+            $this->propagateWinnerFromMatchToNext($nextId); // recurse
+        }
+    }
+
     private function buildSeededMatchups(array $seeds): array {
-        if (count($seeds) === 2) {
-            return [[$seeds[0], $seeds[1]]];
+        $lo = 0;
+        $hi = count($seeds) - 1;
+        $matchups = [];
+        while ($lo < $hi) {
+            $matchups[] = [$seeds[$lo], $seeds[$hi]];
+            $lo++;
+            $hi--;
         }
-        $half = count($seeds) / 2;
-        $top = array_slice($seeds, 0, $half);
-        $bottom = array_slice($seeds, $half);
-        $bottom = array_reverse($bottom);
-        $pairs = [];
-        for ($i = 0; $i < $half; $i++) {
-            $pairs[] = [$top[$i], $bottom[$i]];
-        }
-        // Interleave to maintain bracket order
-        $result = [];
-        $leftPairs  = $this->buildSeededMatchups(array_map(function($p) { return $p[0]; }, $pairs));
-        $rightPairs = $this->buildSeededMatchups(array_map(function($p) { return $p[1]; }, $pairs));
-        // Merge alternating so bracket halves are correct
-        $n = count($leftPairs);
-        for ($i = 0; $i < $n; $i++) {
-            $result[] = $leftPairs[$i];
-            $result[] = $rightPairs[$i];
-        }
-        return $result;
+        return $matchups;
     }
 }
 

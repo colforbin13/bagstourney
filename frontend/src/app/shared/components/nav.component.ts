@@ -11,7 +11,7 @@ import { AuthService } from '../services/auth.service';
     <nav class="nav">
       <a class="nav-brand" routerLink="/">
         <span class="nav-icon">◈</span>
-        <span class="nav-title">Bag&nbsp;Bracket</span>
+        <span class="nav-title">Apple Lane Bag Bracket</span>
       </a>
       <div class="nav-links">
         @if (auth.isLoggedIn()) {

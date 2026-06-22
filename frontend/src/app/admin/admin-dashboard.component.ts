@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament } from '../shared/models/tournament.models';
+import { confirmService } from '../shared/services/confirm.service';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -133,8 +134,9 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
-  delete(t: Tournament) {
-    if (!confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
+  async delete(t: Tournament) {
+    const ok = await confirmService.confirm(`Delete "${t.name}"? This cannot be undone.`);
+    if (!ok) return;
     this.svc.deleteTournament(t.id).subscribe({
       next: () => {
         this.tournaments.update(list => list.filter(x => x.id !== t.id));

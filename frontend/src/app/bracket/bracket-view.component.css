@@ -1,0 +1,194 @@
+/* ─────────────────────────────────────────
+Bracket outer shell: one flex column per round
+───────────────────────────────────────── */
+.bracket {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 16px;
+    min-width: min-content;
+    justify-content: center;
+}
+
+/* Each round is a normal block column — label on top, grid of matches below */
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    min-width: 200px;
+    flex-shrink: 0;
+}
+
+.round-label {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 12px;
+    padding-left: 2px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────
+    Per-round match grid.
+    --row-unit: the height of one "slot" — half a match card.
+    Each round has --total-rows rows.
+    Round 1 cards span 1 row, round 2 span 2, round N span 2^(N-1).
+    --total-rows is set inline from totalGridRows() so the grid
+    height stays consistent across all rounds.
+    ───────────────────────────────────────── */
+.bracket-matches {
+    --row-unit: 150px;
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(var(--total-rows), var(--row-unit));
+    gap: 0;
+}
+
+/* match-wrapper occupies the spanned rows and centres the card vertically */
+.match-wrapper {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+/* ─────────────────────────────────────────
+    Match card
+    ───────────────────────────────────────── */
+.match-card {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color .15s;
+
+    &.match-complete { border-color: #2a2a2a; }
+    &.match-pending  { opacity: .5; }
+    &.match-bye      { opacity: .75; }
+}
+
+.match-team {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    gap: 8px;
+
+    &.winner {
+    background: rgba(37,99,235,0.06);
+    .team-name  { color: var(--accent); font-weight: 600; }
+    .team-score { color: var(--accent); }
+    }
+    &.loser {
+    .team-name  { color: var(--lose); }
+    .team-score { color: var(--muted); }
+    }
+}
+
+.team-name {
+    font-size: 0.95rem;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.team-score {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 500;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.match-divider {
+    height: 1px;
+    background: var(--border);
+}
+
+/* ─────────────────────────────────────────
+    Score entry
+    ───────────────────────────────────────── */
+.score-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.score-input {
+    width: 54px;
+    padding: 5px 8px;
+    font-family: var(--mono);
+    font-size: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.bye-note {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    padding: 4px 12px 6px;
+    font-style: italic;
+}
+
+/* ─────────────────────────────────────────
+    Champion callout
+    ───────────────────────────────────────── */
+.champion {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+.champion-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.champion-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    color: var(--accent);
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* ─────────────────────────────────────────
+    Mobile: stack rounds vertically, drop grid
+    ───────────────────────────────────────── */
+@media (max-width: 600px) {
+    .bracket {
+    flex-direction: column;
+    overflow-x: visible;
+    }
+
+    .bracket-round {
+    min-width: unset;
+    width: 100%;
+    }
+
+    /* On mobile each round is just a plain flex column — no grid math needed */
+    .bracket-matches {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    }
+
+    .match-wrapper {
+    /* restore normal block flow — grid-row binding is irrelevant in flex mode */
+    display: block;
+    }
+
+    .champion { padding: 6px 8px; }
+    .champion-icon { font-size: 1rem; }
+}

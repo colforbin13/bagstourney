@@ -93,6 +93,9 @@ class MatchController {
                     $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')
                         ->execute([$match['next_match_id']]);
                 }
+
+                // Cascade-propagate winners through chained byes so a completed match advances properly.
+                $this->cascadePropagate($matchId);
             } else {
                 // No next match → this was the final, mark tournament complete
                 $stmt = $this->db->prepare('SELECT tournament_id FROM matches WHERE id = ?');
@@ -145,6 +148,35 @@ class MatchController {
 
         // Recurse to clear any further propagation from the next match
         $this->cascadeClearDownstream($nextId);
+    }
+
+    /**
+     * After a match completes, propagate its winner forward and cascade through
+     * subsequent rounds when target matches have only one team (byes). Do NOT
+     * auto-declare the final: final matches (next_match_id IS NULL) are left to play.
+     */
+    private function cascadePropagate(int $sourceMatchId): void {
+        // Propagate only one round after a match completes: place the winner into the immediate
+        // next match slot. Do NOT auto-declare winners or cascade through multiple rounds here.
+        $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
+        $stmt->execute([$sourceMatchId]);
+        $m = $stmt->fetch();
+        if (!$m || !$m['next_match_id'] || !$m['winner_id']) return;
+
+        $nextId = (int)$m['next_match_id'];
+        $slot = (int)$m['next_match_slot'];
+        $col = $slot === 1 ? 'team1_id' : 'team2_id';
+
+        // Place winner into next match slot
+        $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")->execute([$m['winner_id'], $nextId]);
+
+        // Check target match and mark ready only when both slots are present.
+        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
+        $stmt2->execute([$nextId]);
+        $nm = $stmt2->fetch();
+        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
+            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
+        }
     }
 }
 
