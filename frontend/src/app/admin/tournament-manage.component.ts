@@ -57,8 +57,19 @@ import { Tournament, Participant, Team } from '../shared/models/tournament.model
           <div class="participant-list">
             @for (p of participants(); track p.id) {
               <div class="participant-item">
-                <span>{{ p.name }}</span>
-                <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
+                @if (editingParticipantId === p.id) {
+                  <input class="input" type="text" [(ngModel)]="editingParticipantName" />
+                  <button class="btn btn-sm" (click)="saveParticipant(p)">Save</button>
+                  <button class="btn btn-sm" (click)="cancelEditParticipant()">Cancel</button>
+                } @else {
+                  <span style="flex:1">{{ p.name }}</span>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
+                    @if (tournament()?.status === 'setup') {
+                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
+                    }
+                  </div>
+                }
               </div>
             }
           </div>
@@ -90,6 +101,32 @@ import { Tournament, Participant, Team } from '../shared/models/tournament.model
 
       <!-- ── ACTIVE / COMPLETE PHASE ── -->
       @if (tournament()?.status !== 'setup') {
+        <div class="section-label" style="margin-bottom:10px">Participants</div>
+        @if (participants().length === 0) {
+          <div class="empty">No participants.</div>
+        } @else {
+          <div class="participant-list">
+            @for (p of participants(); track p.id) {
+              <div class="participant-item">
+                @if (editingParticipantId === p.id) {
+                  <input class="input" type="text" [(ngModel)]="editingParticipantName" />
+                  <button class="btn btn-sm" (click)="saveParticipant(p)">Save</button>
+                  <button class="btn btn-sm" (click)="cancelEditParticipant()">Cancel</button>
+                } @else {
+                  <span style="flex:1">{{ p.name }}</span>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
+                    @if (tournament()?.status === 'setup') {
+                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <hr class="divider" />
         <div class="section-label" style="margin-bottom:10px">Teams</div>
         @if (teams().length === 0) {
           <div class="empty">No teams.</div>
@@ -98,9 +135,21 @@ import { Tournament, Participant, Team } from '../shared/models/tournament.model
             @for (team of teams(); track team.id) {
               <div class="team-item">
                 <span class="seed">#{{ team.seed }}</span>
-                <div class="team-info">
-                  <div class="team-name">{{ team.name }}</div>
+                <div class="team-info" style="flex:1">
+                  @if (editingTeamId === team.id) {
+                    <input class="input" type="text" [(ngModel)]="editingTeamName" />
+                  } @else {
+                    <div class="team-name">{{ team.name }}</div>
+                  }
                   <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
+                </div>
+                <div style="display:flex;gap:8px">
+                  @if (editingTeamId === team.id) {
+                    <button class="btn btn-sm" (click)="saveTeam(team)">Save</button>
+                    <button class="btn btn-sm" (click)="cancelEditTeam()">Cancel</button>
+                  } @else {
+                    <button class="btn btn-sm" (click)="startEditTeam(team)">Edit</button>
+                  }
                 </div>
               </div>
             }
@@ -206,6 +255,13 @@ export class TournamentManageComponent implements OnInit {
   newParticipant = '';
   tournamentId!: number;
 
+  // Inline editing state
+  editingParticipantId: number | null = null;
+  editingParticipantName = '';
+
+  editingTeamId: number | null = null;
+  editingTeamName = '';
+
   constructor(private route: ActivatedRoute, private svc: TournamentService) {}
 
   ngOnInit() {
@@ -216,9 +272,10 @@ export class TournamentManageComponent implements OnInit {
   load() {
     this.svc.getTournament(this.tournamentId).subscribe(t => {
       this.tournament.set(t);
-      if (t.status === 'setup') {
-        this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
-      } else {
+      // Always load participants so names can be edited at any time
+      this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
+
+      if (t.status !== 'setup') {
         this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
         if (t.status === 'complete') {
           this.svc.getBracket(this.tournamentId).subscribe(data => {
@@ -250,9 +307,44 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  deleteParticipant(p: Participant) {
+  // Participant inline edit
+  startEditParticipant(p: Participant) {
+    this.editingParticipantId = p.id;
+    this.editingParticipantName = p.name;
+  }
+
+  cancelEditParticipant() {
+    this.editingParticipantId = null;
+    this.editingParticipantName = '';
+  }
+
+  saveParticipant(p: Participant) {
+    const name = this.editingParticipantName.trim();
+    if (!name) return;
+    this.svc.updateParticipant(p.id, name).subscribe({
+      next: updated => {
+        this.participants.update(list => list.map(item => item.id === p.id ? updated : item));
+        // Refresh teams display so team participant_name fields reflect the change
+        if (this.tournament()?.status !== 'setup') {
+          this.svc.getTeams(this.tournamentId).subscribe(t => this.teams.set(t));
+        }
+        this.cancelEditParticipant();
+      },
+      error: () => this.showToast('Failed to update participant.'),
+    });
+  }
+
+  async deleteParticipant(p: Participant) {
+    // Prevent deletes client-side if tournament not in setup
+    if (this.tournament()?.status !== 'setup') {
+      this.showToast('Cannot delete participants after teams have been drawn.');
+      return;
+    }
+    const ok = await confirmService.confirm(`Delete participant "${p.name}"? This cannot be undone.`);
+    if (!ok) return;
     this.svc.deleteParticipant(p.id).subscribe({
       next: () => this.participants.update(list => list.filter(x => x.id !== p.id)),
+      error: (err) => this.showToast(err?.error?.error ?? 'Failed to delete participant.'),
     });
   }
 
@@ -271,6 +363,29 @@ export class TournamentManageComponent implements OnInit {
         this.drawing.set(false);
         this.drawError.set(err?.error?.error ?? 'Failed to draw teams.');
       },
+    });
+  }
+
+  // Team inline edit
+  startEditTeam(t: Team) {
+    this.editingTeamId = t.id;
+    this.editingTeamName = t.name;
+  }
+
+  cancelEditTeam() {
+    this.editingTeamId = null;
+    this.editingTeamName = '';
+  }
+
+  saveTeam(t: Team) {
+    const name = this.editingTeamName.trim();
+    if (!name) return;
+    this.svc.updateTeam(t.id, { name }).subscribe({
+      next: updated => {
+        this.teams.set(this.teams().map(item => item.id === t.id ? updated : item));
+        this.cancelEditTeam();
+      },
+      error: () => this.showToast('Failed to update team.'),
     });
   }
 

@@ -44,6 +44,10 @@ export class TournamentService {
     return this.http.delete(`${this.api}/participants/${id}`);
   }
 
+  updateParticipant(id: number, name: string) {
+    return this.http.put<Participant>(`${this.api}/participants/${id}`, { name });
+  }
+
   // Teams
   getTeams(tournamentId: number) {
     return this.http.get<Team[]>(`${this.api}/teams/${tournamentId}`);
@@ -51,6 +55,10 @@ export class TournamentService {
 
   drawTeams(tournamentId: number) {
     return this.http.post<Team[]>(`${this.api}/teams`, { tournament_id: tournamentId });
+  }
+
+  updateTeam(id: number, data: Partial<Team>) {
+    return this.http.put<Team>(`${this.api}/teams/${id}`, data);
   }
 
   // Bracket / Matches

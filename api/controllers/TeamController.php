@@ -104,6 +104,19 @@ class TeamController {
         }
     }
 
+    public function update(int $id, array $body): void {
+        $name = trim($body['name'] ?? '');
+        if (!$name) {
+            http_response_code(400);
+            echo json_encode(['error' => 'name required']);
+            return;
+        }
+        $this->db->prepare('UPDATE teams SET name = ? WHERE id = ?')->execute([$name, $id]);
+        $stmt = $this->db->prepare('SELECT t.*, p1.name as participant1_name, p2.name as participant2_name FROM teams t JOIN participants p1 ON t.participant1_id = p1.id JOIN participants p2 ON t.participant2_id = p2.id WHERE t.id = ?');
+        $stmt->execute([$id]);
+        echo json_encode($stmt->fetch());
+    }
+
     /**
      * Build a standard single-elimination bracket.
      * Teams are seeded: 1v(last), 2v(last-1), etc.

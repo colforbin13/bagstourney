@@ -77,6 +77,9 @@ try {
             } elseif ($method === 'POST') {
                 requireAuth();
                 $ctrl->create($body);
+            } elseif ($method === 'PUT' && $id) {
+                requireAuth();
+                $ctrl->update($id, $body);
             } elseif ($method === 'DELETE' && $id) {
                 requireAuth();
                 $ctrl->delete($id);
@@ -94,6 +97,9 @@ try {
             } elseif ($method === 'POST' && !$id) {
                 requireAuth();
                 $ctrl->draw($body); // draw teams from participants
+            } elseif ($method === 'PUT' && $id) {
+                requireAuth();
+                $ctrl->update($id, $body);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
