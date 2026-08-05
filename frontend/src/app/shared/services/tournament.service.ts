@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, Team, BracketData } from '../models/tournament.models';
+import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -29,6 +29,38 @@ export class TournamentService {
 
   deleteTournament(id: number) {
     return this.http.delete(`${this.api}/tournaments/${id}`);
+  }
+
+  getTournamentMembers(tournamentId: number) {
+    return this.http.get<TournamentMember[]>(`${this.api}/tournament-members/${tournamentId}`);
+  }
+
+  addTournamentMember(tournamentId: number, userId: number, role: 'manager' | 'scorekeeper') {
+    return this.http.post(`${this.api}/tournament-members/${tournamentId}`, { user_id: userId, role });
+  }
+
+  updateTournamentMember(tournamentId: number, userId: number, role: 'manager' | 'scorekeeper') {
+    return this.http.put(`${this.api}/tournament-members/${tournamentId}/${userId}`, { role });
+  }
+
+  removeTournamentMember(tournamentId: number, userId: number) {
+    return this.http.delete(`${this.api}/tournament-members/${tournamentId}/${userId}`);
+  }
+
+  transferTournamentOwnership(tournamentId: number, userId: number) {
+    return this.http.put(`${this.api}/tournament-ownership/${tournamentId}`, { user_id: userId });
+  }
+
+  getUsers() {
+    return this.http.get<UserAccount[]>(`${this.api}/users`);
+  }
+
+  createUser(data: { username: string; email: string; password: string; role: 'organizer' | 'super_admin' }) {
+    return this.http.post<UserAccount>(`${this.api}/users`, data);
+  }
+
+  updateUser(id: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled' }) {
+    return this.http.put<UserAccount>(`${this.api}/users/${id}`, data);
   }
 
   // Participants

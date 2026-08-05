@@ -32,7 +32,7 @@ class MatchController {
         echo json_encode(['rounds' => $rounds]);
     }
 
-    public function updateScore(int $matchId, array $body): void {
+    public function updateScore(int $matchId, array $body, array $actor): void {
         $team1Score = $body['team1_score'] ?? null;
         $team2Score = $body['team2_score'] ?? null;
 
@@ -108,6 +108,18 @@ class MatchController {
             }
 
             $this->db->commit();
+
+            $isCorrection = $match['status'] === 'complete'
+                && ((int)$match['team1_score'] !== $team1Score || (int)$match['team2_score'] !== $team2Score);
+            writeAuditLog(
+                $this->db,
+                (int)$match['tournament_id'],
+                (int)$actor['id'],
+                $isCorrection ? 'match_score_corrected' : 'match_score_recorded',
+                'match',
+                (string)$matchId,
+                ['team1_score' => $team1Score, 'team2_score' => $team2Score]
+            );
 
             // Return updated match
             $stmt = $this->db->prepare('

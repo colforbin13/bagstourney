@@ -25,6 +25,7 @@ Getting started (local)
 1. Database
    - Create the DB and tables: `mysql -u root -p < db/schema.sql`
    - Edit `api/config/database.php` with your DB credentials and set a strong `JWT_SECRET`.
+   - Apply application migrations: `php db/migrate.php`. Back up production databases before applying migrations.
 
 2. Run the API
    - With PHP built-in server for quick local testing:
@@ -58,6 +59,20 @@ API (key endpoints)
 - GET /teams/:tournamentId, POST /teams (draw teams & generate bracket)
 - GET /matches/:tournamentId (bracket grouped by round)
 - PUT /matches/:id — submit or edit scores (payload: { team1_score, team2_score })
+
+Authorization
+- Existing `admins` are copied to active `super_admin` users by migration `001_access_control.sql`.
+- Migration `002_backfill_legacy_admins.sql` re-checks legacy admins, so apply migrations again after deploying this change if an existing account was missed.
+- New registrations create `organizer` accounts. An organizer becomes the `owner` of each tournament they create.
+- Tournament owners can grant `manager` and `scorekeeper` access. Managers can manage setup; scorekeepers can submit scores.
+- Existing tournaments have no inferred owner because the original schema did not record one; super admins retain access and can assign ownership.
+
+Role-management API
+- POST /auth/register creates an organizer account (username, email, password).
+- GET/POST /tournament-members/:tournamentId lists or adds tournament staff (owner only).
+- PUT/DELETE /tournament-members/:tournamentId/:userId updates or removes tournament staff (owner only).
+- PUT /tournament-ownership/:tournamentId transfers ownership with `{ user_id }`.
+- GET /users and PUT /users/:id list and manage organizer accounts (super admin only).
 
 Editing scores & consistency
 - The API allows editing completed matches. When an edited match had previously advanced a winner, downstream slots/results are cleared (recursively) so the bracket remains consistent. Re-enter downstream scores as needed.

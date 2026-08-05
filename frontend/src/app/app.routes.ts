@@ -1,6 +1,7 @@
 // src/app/app.routes.ts
 import { Routes } from '@angular/router';
 import { authGuard } from './shared/services/auth.guard';
+import { superAdminGuard } from './shared/services/superadmin.guard';
 
 export const routes: Routes = [
   {
@@ -16,9 +17,18 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/login.component').then(m => m.LoginComponent),
   },
   {
+    path: 'admin/register',
+    loadComponent: () => import('./admin/register.component').then(m => m.RegisterComponent),
+  },
+  {
     path: 'admin',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),
+  },
+  {
+    path: 'admin/users',
+    canActivate: [authGuard, superAdminGuard],
+    loadComponent: () => import('./admin/user-management.component').then(m => m.UserManagementComponent),
   },
   {
     path: 'admin/tournament/:id',

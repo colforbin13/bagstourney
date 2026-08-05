@@ -15,10 +15,13 @@ import { AuthService } from '../services/auth.service';
       </a>
       <div class="nav-links">
         @if (auth.isLoggedIn()) {
+          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Tournaments</a>
           <a routerLink="/admin" routerLinkActive="active">Admin</a>
+          <span class="nav-user">{{ auth.username() }}</span>
           <button class="btn btn-sm" (click)="auth.logout()">Sign out</button>
         } @else {
-          <a routerLink="/admin/login" routerLinkActive="active">Admin</a>
+          <a routerLink="/admin/login" routerLinkActive="active">Sign in</a>
+          <a routerLink="/admin/register" routerLinkActive="active">Create account</a>
         }
       </div>
     </nav>
@@ -63,6 +66,14 @@ import { AuthService } from '../services/auth.service';
       color: var(--text-dim);
       text-decoration: none;
       &:hover, &.active { color: var(--text); }
+    }
+    .nav-user {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      padding: 0 8px;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
     }
   `]
 })

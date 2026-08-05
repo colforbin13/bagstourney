@@ -19,12 +19,23 @@ class TournamentController {
         echo json_encode($t);
     }
 
-    public function create(array $body): void {
+    public function create(array $body, array $actor): void {
         $name = trim($body['name'] ?? '');
         if (!$name) { http_response_code(400); echo json_encode(['error' => 'Name required']); return; }
-        $stmt = $this->db->prepare('INSERT INTO tournaments (name) VALUES (?)');
-        $stmt->execute([$name]);
-        $this->get((int)$this->db->lastInsertId());
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare('INSERT INTO tournaments (name, created_by_user_id) VALUES (?, ?)');
+            $stmt->execute([$name, $actor['id']]);
+            $id = (int)$this->db->lastInsertId();
+            $this->db->prepare('INSERT INTO tournament_members (tournament_id, user_id, role, granted_by_user_id) VALUES (?, ?, "owner", ?)')
+                ->execute([$id, $actor['id'], $actor['id']]);
+            writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_created', 'tournament', (string)$id);
+            $this->db->commit();
+            $this->get($id);
+        } catch (Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function update(int $id, array $body): void {

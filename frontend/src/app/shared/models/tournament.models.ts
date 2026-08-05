@@ -7,6 +7,23 @@ export interface Tournament {
   created_at: string;
 }
 
+export interface TournamentMember {
+  user_id: number;
+  username: string | null;
+  email: string | null;
+  role: 'owner' | 'manager' | 'scorekeeper';
+  created_at: string;
+}
+
+export interface UserAccount {
+  id: number;
+  username: string;
+  email: string;
+  role: 'super_admin' | 'organizer';
+  status: 'active' | 'disabled';
+  created_at?: string;
+}
+
 export interface Participant {
   id: number;
   tournament_id: number;

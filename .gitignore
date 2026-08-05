@@ -3,6 +3,7 @@ dist/
 frontend/node_modules/
 frontend/.angular/
 frontend/dist/
+frontend/coverage/
 
 # PHP credentials — never commit these
 api/config/database.php
