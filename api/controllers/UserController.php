@@ -53,13 +53,14 @@ class UserController {
 
         $fields = [];
         $params = [];
+        $demotesOrDisablesSuperAdmin = false;
         if (isset($body['role'])) {
             if (!in_array($body['role'], ['super_admin', 'organizer'], true)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid global role']);
                 return;
             }
-            if ($target['role'] === 'super_admin' && $body['role'] !== 'super_admin') $this->ensureAnotherSuperAdmin($id);
+            if ($target['role'] === 'super_admin' && $body['role'] !== 'super_admin') $demotesOrDisablesSuperAdmin = true;
             $fields[] = 'role = ?';
             $params[] = $body['role'];
         }
@@ -69,7 +70,7 @@ class UserController {
                 echo json_encode(['error' => 'Invalid account status']);
                 return;
             }
-            if ($target['role'] === 'super_admin' && $body['status'] !== 'active') $this->ensureAnotherSuperAdmin($id);
+            if ($target['role'] === 'super_admin' && $body['status'] !== 'active') $demotesOrDisablesSuperAdmin = true;
             $fields[] = 'status = ?';
             $params[] = $body['status'];
         }
@@ -80,20 +81,35 @@ class UserController {
         }
 
         $params[] = $id;
-        $this->db->prepare('UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
-        writeAuditLog($this->db, null, (int)$actor['id'], 'user_account_updated', 'user', (string)$id, $body);
+
+        // Run the last-super-admin check and the update in the same transaction, with a
+        // locking read, so two concurrent demote/disable requests can't both pass the
+        // check before either commits and leave zero active super admins.
+        $this->db->beginTransaction();
+        try {
+            if ($demotesOrDisablesSuperAdmin) {
+                $this->ensureAnotherSuperAdmin($id);
+            }
+            $this->db->prepare('UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+            writeAuditLog($this->db, null, (int)$actor['id'], 'user_account_updated', 'user', (string)$id, $body);
+            $this->db->commit();
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
+
         $stmt = $this->db->prepare('SELECT id, username, email, role, status, created_at FROM users WHERE id = ?');
         $stmt->execute([$id]);
         echo json_encode($stmt->fetch());
     }
 
     private function ensureAnotherSuperAdmin(int $targetUserId): void {
-        $stmt = $this->db->prepare('SELECT COUNT(*) FROM users WHERE role = "super_admin" AND status = "active" AND id <> ?');
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM users WHERE role = "super_admin" AND status = "active" AND id <> ? FOR UPDATE');
         $stmt->execute([$targetUserId]);
         if ((int)$stmt->fetchColumn() === 0) {
-            http_response_code(400);
-            echo json_encode(['error' => 'At least one active super admin is required']);
-            exit;
+            throw new Exception('At least one active super admin is required');
         }
     }
 

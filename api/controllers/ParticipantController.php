@@ -81,7 +81,50 @@ class ParticipantController {
             echo json_encode(['error' => 'name required']);
             return;
         }
-        $this->db->prepare('UPDATE participants SET name = ? WHERE id = ?')->execute([$name, $id]);
+
+        $stmt = $this->db->prepare('SELECT id FROM participants WHERE id = ?');
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Participant not found']);
+            return;
+        }
+
+        // Participant names can be corrected even after teams are drawn. Capture any
+        // already-drawn team's current state first, so that once the rename happens below
+        // we can tell whether the team's name is still the auto-generated "P1 & P2" default
+        // (safe to refresh) or was manually customized by the organizer (left alone) —
+        // otherwise a post-draw rename silently diverges from the team/bracket display.
+        $stmt = $this->db->prepare('
+            SELECT t.id, t.name, t.participant1_id, t.participant2_id,
+                   p1.name AS participant1_name, p2.name AS participant2_name
+            FROM teams t
+            JOIN participants p1 ON t.participant1_id = p1.id
+            JOIN participants p2 ON t.participant2_id = p2.id
+            WHERE t.participant1_id = ? OR t.participant2_id = ?
+        ');
+        $stmt->execute([$id, $id]);
+        $teams = $stmt->fetchAll();
+
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('UPDATE participants SET name = ? WHERE id = ?')->execute([$name, $id]);
+
+            foreach ($teams as $team) {
+                $oldDefaultName = $team['participant1_name'] . ' & ' . $team['participant2_name'];
+                if ($team['name'] !== $oldDefaultName) continue; // organizer customized this team's name
+
+                $p1 = (int)$team['participant1_id'] === $id ? $name : $team['participant1_name'];
+                $p2 = (int)$team['participant2_id'] === $id ? $name : $team['participant2_name'];
+                $this->db->prepare('UPDATE teams SET name = ? WHERE id = ?')->execute([$p1 . ' & ' . $p2, $team['id']]);
+            }
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+
         $stmt = $this->db->prepare('SELECT * FROM participants WHERE id = ?');
         $stmt->execute([$id]);
         echo json_encode($stmt->fetch());

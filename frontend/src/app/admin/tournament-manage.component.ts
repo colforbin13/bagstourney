@@ -76,7 +76,7 @@ import { Tournament, Participant, Team } from '../shared/models/tournament.model
         }
 
         <!-- Draw button -->
-        @if (participants().length >= 2 && participants().length % 2 === 0) {
+        @if (participants().length >= 4 && participants().length % 2 === 0) {
           <hr class="divider" />
           <div class="draw-section">
             <div>

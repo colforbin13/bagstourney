@@ -29,9 +29,14 @@ $uri = preg_replace('#^/(?:bags/)?api#', '', $uri);
 $uri = trim($uri, '/');
 $segments = explode('/', $uri);
 
-$resource = $segments[0] ?? '';
-$id       = isset($segments[1]) ? (int)$segments[1] : null;
-$action   = $id > 0 ? $segments[2] : $segments[1] ?? null;
+$resource  = $segments[0] ?? '';
+$idSegment = $segments[1] ?? null;
+// A segment that's present but not a valid non-negative integer (e.g. a typo'd id like
+// "abc") must not silently become falsy like a genuinely absent id — otherwise routes
+// that treat "no id" as "list everything" would return a full list instead of a 404.
+$idInvalid = $idSegment !== null && !ctype_digit($idSegment);
+$id        = ($idSegment !== null && ctype_digit($idSegment)) ? (int)$idSegment : null;
+$action    = ($id !== null && $id > 0) ? ($segments[2] ?? null) : ($segments[1] ?? null);
 
 $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -59,18 +64,18 @@ try {
         case 'tournaments':
             $db = getDB();
             $ctrl = new TournamentController($db);
-            if ($method === 'GET' && !$id) {
+            if ($method === 'GET' && !$id && !$idInvalid) {
                 $ctrl->list();
             } elseif ($method === 'GET' && $id) {
                 $ctrl->get($id);
             } elseif ($method === 'POST' && !$id) {
                 $ctrl->create($body, requireCurrentUser($db));
             } elseif ($method === 'PUT' && $id) {
-                requireTournamentRole($db, $id, ['owner', 'manager']);
-                $ctrl->update($id, $body);
+                $actor = requireTournamentRole($db, $id, ['owner', 'manager']);
+                $ctrl->update($id, $body, $actor);
             } elseif ($method === 'DELETE' && $id) {
-                requireTournamentRole($db, $id, ['owner']);
-                $ctrl->delete($id);
+                $actor = requireTournamentRole($db, $id, ['owner']);
+                $ctrl->delete($id, $actor);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
@@ -171,7 +176,7 @@ try {
         // --- Super-admin user management ---
         case 'users':
             $ctrl = new UserController(getDB());
-            if ($method === 'GET' && !$id) {
+            if ($method === 'GET' && !$id && !$idInvalid) {
                 $ctrl->list();
             } elseif ($method === 'POST' && !$id) {
                 $ctrl->create($body);

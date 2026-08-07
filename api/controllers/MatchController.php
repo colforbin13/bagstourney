@@ -69,15 +69,24 @@ class MatchController {
         }
 
         $winnerId = $team1Score > $team2Score ? $match['team1_id'] : $match['team2_id'];
+        $wasComplete = $match['status'] === 'complete';
 
         $this->db->beginTransaction();
         try {
             // Update the match
             $this->db->prepare('
-                UPDATE matches 
+                UPDATE matches
                 SET team1_score = ?, team2_score = ?, winner_id = ?, status = "complete"
                 WHERE id = ?
             ')->execute([$team1Score, $team2Score, $winnerId, $matchId]);
+
+            if ($wasComplete) {
+                // Editing an already-completed match: clear any downstream results that
+                // were built on the previous winner before advancing the (possibly
+                // different) winner below, so the bracket doesn't show two teams as
+                // having won the same slot.
+                $this->cascadeClearDownstream($matchId);
+            }
 
             // Advance winner to next match
             if ($match['next_match_id']) {
@@ -134,7 +143,13 @@ class MatchController {
             echo json_encode($stmt->fetch());
 
         } catch (Exception $e) {
-            $this->db->rollBack();
+            // writeAuditLog() and the final SELECT above run after commit() succeeds but are
+            // still inside this try block; if either of them throws, there is no longer an
+            // active transaction, and calling rollBack() would itself throw and mask the
+            // real error. Only roll back if a transaction is actually still open.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
         }

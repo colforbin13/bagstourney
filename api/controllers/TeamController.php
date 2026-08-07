@@ -54,6 +54,12 @@ class TeamController {
             if (count($participants) % 2 !== 0) {
                 throw new Exception('Need an even number of participants to form teams');
             }
+            if (count($participants) < 4) {
+                // Exactly 2 participants form a single team with no opponent: generateBracket()
+                // creates zero matches for that case, so the tournament could never be played
+                // or reach 'complete'.
+                throw new Exception('Need at least 4 participants to form at least two teams');
+            }
 
             // Clear any existing teams/matches for this tournament
             $this->db->prepare('DELETE FROM matches WHERE tournament_id = ?')->execute([$tournamentId]);
@@ -271,15 +277,31 @@ class TeamController {
     }
 
     private function buildSeededMatchups(array $seeds): array {
-        $lo = 0;
-        $hi = count($seeds) - 1;
+        $size = count($seeds);
+        if ($size < 2) return [];
+        $order = $this->seedOrder($size);
         $matchups = [];
-        while ($lo < $hi) {
-            $matchups[] = [$seeds[$lo], $seeds[$hi]];
-            $lo++;
-            $hi--;
+        for ($i = 0; $i < $size; $i += 2) {
+            $matchups[] = [$seeds[$order[$i] - 1], $seeds[$order[$i + 1] - 1]];
         }
         return $matchups;
+    }
+
+    /**
+     * Standard single-elimination seeding order for a bracket of $size (a power of 2),
+     * as a permutation of positions 1..$size. Built recursively so that seed 1 and seed 2
+     * can only meet in the final, {1,2} and {3,4} can only meet in the semifinal, and so on —
+     * i.e. top seeds are placed in opposite bracket halves rather than paired sequentially.
+     */
+    private function seedOrder(int $size): array {
+        if ($size <= 1) return [1];
+        $prev = $this->seedOrder((int)($size / 2));
+        $order = [];
+        foreach ($prev as $s) {
+            $order[] = $s;
+            $order[] = $size + 1 - $s;
+        }
+        return $order;
     }
 }
 
