@@ -21,7 +21,7 @@ import { Tournament } from '../shared/models/tournament.models';
       } @else {
         <div class="list">
           @for (t of tournaments(); track t.id) {
-            <a class="list-item" [routerLink]="['/bracket', t.id]">
+            <a class="list-item" [routerLink]="['/bracket', t.uuid]">
               <div class="list-item-main">
                 <span class="list-item-name">{{ t.name }}</span>
                 <span class="badge badge-{{ t.status }}">{{ t.status }}</span>

@@ -65,7 +65,9 @@ try {
             $db = getDB();
             $ctrl = new TournamentController($db);
             if ($method === 'GET' && !$id && !$idInvalid) {
-                $ctrl->list();
+                $ctrl->list(currentUserOrNull($db));
+            } elseif ($method === 'GET' && !$id && $action === 'by-uuid' && isset($segments[2])) {
+                $ctrl->getByUuid($segments[2], currentUserOrNull($db));
             } elseif ($method === 'GET' && $id) {
                 $ctrl->get($id, currentUserOrNull($db));
             } elseif ($method === 'POST' && !$id) {
@@ -88,6 +90,7 @@ try {
             $ctrl = new ParticipantController($db);
             if ($method === 'GET' && $id) {
                 // GET /participants/{tournamentId}
+                requireTournamentVisible($db, $id, currentUserOrNull($db));
                 $ctrl->listByTournament($id);
             } elseif ($method === 'POST') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
@@ -113,6 +116,7 @@ try {
             $db = getDB();
             $ctrl = new TeamController($db);
             if ($method === 'GET' && $id) {
+                requireTournamentVisible($db, $id, currentUserOrNull($db));
                 $ctrl->listByTournament($id);
             } elseif ($method === 'POST' && !$id) {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
@@ -133,6 +137,7 @@ try {
             $db = getDB();
             $ctrl = new MatchController($db);
             if ($method === 'GET' && $id) {
+                requireTournamentVisible($db, $id, currentUserOrNull($db));
                 $ctrl->bracket($id); // GET /matches/{tournamentId}
             } elseif ($method === 'PUT' && $id) {
                 $stmt = $db->prepare('SELECT tournament_id FROM matches WHERE id = ?');

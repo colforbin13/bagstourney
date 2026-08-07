@@ -112,6 +112,25 @@ function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array
     ];
 }
 
+// Like requireTournamentRole() but for anonymous-allowed GET endpoints: public
+// tournaments are visible to everyone, private ones require a role on the tournament
+// (or super_admin) — the same gate that forces private tournaments to be reached via
+// their UUID rather than a guessed numeric id. Exits with 404 (not 403) to avoid
+// revealing that a private tournament exists at that id.
+function requireTournamentVisible(PDO $db, int $tournamentId, ?array $actor): array {
+    $stmt = $db->prepare('SELECT * FROM tournaments WHERE id = ?');
+    $stmt->execute([$tournamentId]);
+    $t = $stmt->fetch();
+    if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
+    if ($t['visibility'] === 'private') {
+        $caps = tournamentCapabilities($db, $tournamentId, $actor);
+        if (!$caps['role'] && !$caps['is_super_admin']) {
+            http_response_code(404); echo json_encode(['error' => 'Not found']); exit;
+        }
+    }
+    return $t;
+}
+
 function writeAuditLog(PDO $db, ?int $tournamentId, ?int $actorUserId, string $action, ?string $targetType = null, ?string $targetId = null, ?array $details = null): void {
     $stmt = $db->prepare('INSERT INTO audit_log (tournament_id, actor_user_id, action, target_type, target_id, details_json) VALUES (?, ?, ?, ?, ?, ?)');
     $stmt->execute([

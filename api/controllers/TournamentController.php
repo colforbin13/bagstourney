@@ -6,8 +6,12 @@ class TournamentController {
 		$this->db = $db;
 	}
 
-    public function list(): void {
-        $stmt = $this->db->query('SELECT * FROM tournaments ORDER BY created_at DESC');
+    public function list(?array $actor = null): void {
+        if ($actor) {
+            $stmt = $this->db->query('SELECT * FROM tournaments ORDER BY created_at DESC');
+        } else {
+            $stmt = $this->db->query("SELECT * FROM tournaments WHERE visibility = 'public' ORDER BY created_at DESC");
+        }
         echo json_encode($stmt->fetchAll());
     }
 
@@ -16,17 +20,36 @@ class TournamentController {
         $stmt->execute([$id]);
         $t = $stmt->fetch();
         if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
-        $t['capabilities'] = tournamentCapabilities($this->db, $id, $actor);
+
+        $capabilities = tournamentCapabilities($this->db, $id, $actor);
+        // A private tournament is only reachable by numeric id for staff/super_admin;
+        // everyone else must use its uuid (getByUuid()) — knowing the uuid is itself the
+        // access grant. 404 rather than 403 so the id doesn't reveal a private tournament exists.
+        if ($t['visibility'] === 'private' && !$capabilities['role'] && !$capabilities['is_super_admin']) {
+            http_response_code(404); echo json_encode(['error' => 'Not found']); return;
+        }
+
+        $t['capabilities'] = $capabilities;
+        echo json_encode($t);
+    }
+
+    public function getByUuid(string $uuid, ?array $actor = null): void {
+        $stmt = $this->db->prepare('SELECT * FROM tournaments WHERE uuid = ?');
+        $stmt->execute([$uuid]);
+        $t = $stmt->fetch();
+        if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
+        $t['capabilities'] = tournamentCapabilities($this->db, (int)$t['id'], $actor);
         echo json_encode($t);
     }
 
     public function create(array $body, array $actor): void {
         $name = trim($body['name'] ?? '');
         if (!$name) { http_response_code(400); echo json_encode(['error' => 'Name required']); return; }
+        $visibility = in_array($body['visibility'] ?? null, ['public', 'private'], true) ? $body['visibility'] : 'public';
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('INSERT INTO tournaments (name, created_by_user_id) VALUES (?, ?)');
-            $stmt->execute([$name, $actor['id']]);
+            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, created_by_user_id) VALUES (?, ?, ?, ?)');
+            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $actor['id']]);
             $id = (int)$this->db->lastInsertId();
             $this->db->prepare('INSERT INTO tournament_members (tournament_id, user_id, role, granted_by_user_id) VALUES (?, ?, "owner", ?)')
                 ->execute([$id, $actor['id'], $actor['id']]);
@@ -55,11 +78,29 @@ class TournamentController {
             $fields[] = 'status = ?';
             $params[] = $body['status'];
         }
+        if (isset($body['visibility'])) {
+            if (!in_array($body['visibility'], ['public', 'private'], true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid tournament visibility']);
+                return;
+            }
+            $fields[] = 'visibility = ?';
+            $params[] = $body['visibility'];
+        }
         if (!$fields) { http_response_code(400); echo json_encode(['error' => 'Nothing to update']); return; }
         $params[] = $id;
         $this->db->prepare('UPDATE tournaments SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_updated', 'tournament', (string)$id, $body);
         $this->get($id, $actor);
+    }
+
+    // Version-4 (random) UUID, same random_bytes()-based approach as the password-reset
+    // token in UserController::resetPassword() — no ext-uuid dependency needed.
+    private function generateUuidV4(): string {
+        $data = random_bytes(16);
+        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
     public function delete(int $id, array $actor): void {

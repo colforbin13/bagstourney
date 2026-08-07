@@ -20,8 +20,10 @@ describe('TournamentService', () => {
 
   const mockTournament: Tournament = {
     id: 1,
+    uuid: 'test-uuid-1234',
     name: 'Test Tournament',
     status: 'setup',
+    visibility: 'public',
     created_at: '2026-01-01'
   };
 
@@ -160,6 +162,14 @@ describe('TournamentService', () => {
       expect(req.request.body).toEqual({ name });
       req.flush(mockTournament);
     });
+
+    it('should include visibility in the request body when given', () => {
+      service.createTournament('New Tournament', 'private').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+      expect(req.request.body).toEqual({ name: 'New Tournament', visibility: 'private' });
+      req.flush(mockTournament);
+    });
   });
 
   describe('getTournament', () => {
@@ -169,6 +179,18 @@ describe('TournamentService', () => {
       });
 
       const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/1`);
+      expect(req.request.method).toBe('GET');
+      req.flush(mockTournament);
+    });
+  });
+
+  describe('getTournamentByUuid', () => {
+    it('should fetch a tournament by its uuid', () => {
+      service.getTournamentByUuid('test-uuid-1234').subscribe(tournament => {
+        expect(tournament).toEqual(mockTournament);
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/test-uuid-1234`);
       expect(req.request.method).toBe('GET');
       req.flush(mockTournament);
     });

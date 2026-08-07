@@ -96,8 +96,13 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
-    this.load();
+    const param = this.route.snapshot.paramMap.get('id')!;
+    if (/^\d+$/.test(param)) {
+      this.tournamentId = +param;
+      this.load();
+    } else {
+      this.loadByUuid(param);
+    }
   }
 
   ngAfterViewInit() {
@@ -118,6 +123,29 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
       next: t => this.tournament.set(t),
       error: () => this.showError('Tournament not found.'),
     });
+    this.loadBracket();
+  }
+
+  // Resolves a UUID route param (the public, non-guessable bracket link) to its
+  // underlying tournament — which carries the numeric id — before the bracket itself
+  // can be fetched. Unlike load(), this can't fire both requests in parallel: the
+  // bracket fetch depends on the numeric id this call resolves.
+  private loadByUuid(uuid: string) {
+    this.loading.set(true);
+    this.svc.getTournamentByUuid(uuid).subscribe({
+      next: t => {
+        this.tournament.set(t);
+        this.tournamentId = t.id;
+        this.loadBracket();
+      },
+      error: () => {
+        this.showError('Tournament not found.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  private loadBracket() {
     this.svc.getBracket(this.tournamentId).subscribe({
       next: data => {
         this.bracketData.set(data);

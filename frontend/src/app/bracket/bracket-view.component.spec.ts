@@ -17,7 +17,10 @@ describe('BracketViewComponent', () => {
   const emptyBracket: BracketData = { rounds: {} };
 
   function tournamentWith(capabilities?: TournamentCapabilities): Tournament {
-    return { id: tournamentId, name: 'Test Tournament', status: 'active', created_at: '2026-01-01', capabilities };
+    return {
+      id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'active',
+      visibility: 'public', created_at: '2026-01-01', capabilities,
+    };
   }
 
   beforeEach(async () => {
@@ -125,5 +128,49 @@ describe('BracketViewComponent', () => {
     const labels = Array.from(fixture.nativeElement.querySelectorAll('.team-participants'))
       .map((el: any) => el.textContent.trim());
     expect(labels).toEqual(['Alice · Bob']);
+  });
+
+  describe('when the route param is a uuid (public bracket link)', () => {
+    const uuid = 'abc-123-def-456';
+
+    beforeEach(async () => {
+      await TestBed.resetTestingModule().configureTestingModule({
+        imports: [BracketViewComponent, HttpClientTestingModule],
+        providers: [
+          TournamentService,
+          AuthService,
+          Router,
+          { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: uuid }) } } },
+        ],
+      }).compileComponents();
+
+      fixture = TestBed.createComponent(BracketViewComponent);
+      component = fixture.componentInstance;
+      httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    it('resolves the tournament by uuid first, then fetches the bracket by the resolved numeric id', () => {
+      fixture.detectChanges();
+
+      const uuidReq = httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/${uuid}`);
+      expect(uuidReq.request.method).toBe('GET');
+      uuidReq.flush(tournamentWith());
+
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(emptyBracket);
+
+      expect(component.tournament()?.id).toBe(tournamentId);
+      expect(component.loading()).toBe(false);
+    });
+
+    it('shows an error and stops loading if the uuid does not resolve to a tournament', () => {
+      fixture.detectChanges();
+
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/${uuid}`)
+        .flush({ error: 'Not found' }, { status: 404, statusText: 'Not Found' });
+
+      expect(component.error()).toBe('Tournament not found.');
+      expect(component.loading()).toBe(false);
+      httpMock.expectNone(`${environment.apiUrl}/matches/${tournamentId}`);
+    });
   });
 });

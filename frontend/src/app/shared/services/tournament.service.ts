@@ -19,8 +19,12 @@ export class TournamentService {
     return this.http.get<Tournament>(`${this.api}/tournaments/${id}`);
   }
 
-  createTournament(name: string) {
-    return this.http.post<Tournament>(`${this.api}/tournaments`, { name });
+  getTournamentByUuid(uuid: string) {
+    return this.http.get<Tournament>(`${this.api}/tournaments/by-uuid/${uuid}`);
+  }
+
+  createTournament(name: string, visibility?: 'public' | 'private') {
+    return this.http.post<Tournament>(`${this.api}/tournaments`, visibility ? { name, visibility } : { name });
   }
 
   updateTournament(id: number, data: Partial<Tournament>) {

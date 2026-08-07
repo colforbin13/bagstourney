@@ -58,10 +58,13 @@ describe('TournamentManageComponent', () => {
   // minimal 'setup' tournament. loadMembers() is only invoked by load() itself when the
   // returned capabilities allow it (see tournament-manage.component.ts), so callers that
   // expect it to fire must also flush the tournament-members request afterward.
-  function bootstrapCore(capabilities: TournamentCapabilities = ownerCapabilities) {
+  function bootstrapCore(capabilities: TournamentCapabilities = ownerCapabilities, visibility: 'public' | 'private' = 'public') {
     fixture.detectChanges();
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
-      .flush({ id: tournamentId, name: 'Test Tournament', status: 'setup', created_at: '2026-01-01', capabilities });
+      .flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility, created_at: '2026-01-01', capabilities,
+      });
     httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
   }
 
@@ -239,5 +242,34 @@ describe('TournamentManageComponent', () => {
 
     httpMock.expectNone(`${environment.apiUrl}/tournament-ownership/${tournamentId}`);
     expect(component.selectedStaffUser()).toEqual(mockSearchResults[0]);
+  });
+
+  it('should toggle visibility from public to private', () => {
+    bootstrapCore(ownerCapabilities, 'public');
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+    component.toggleVisibility();
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ visibility: 'private' });
+    req.flush({
+      id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+      visibility: 'private', created_at: '2026-01-01', capabilities: ownerCapabilities,
+    });
+
+    expect(component.tournament()?.visibility).toBe('private');
+    expect(component.visibilityBusy()).toBe(false);
+  });
+
+  it('should copy the public bracket link to the clipboard', async () => {
+    bootstrapCore();
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+
+    component.copyPublicLink();
+    await Promise.resolve();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${location.origin}/bracket/test-uuid-1234`);
   });
 });

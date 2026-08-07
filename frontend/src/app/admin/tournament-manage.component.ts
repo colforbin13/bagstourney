@@ -27,6 +27,13 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
         <div style="display:flex;gap:8px;align-items:center;">
           @if (tournament()) {
             <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
+            <span class="badge badge-visibility-{{ tournament()!.visibility }}">{{ tournament()!.visibility }}</span>
+            @if (canManageSetup()) {
+              <button class="btn btn-sm" [disabled]="visibilityBusy()" (click)="toggleVisibility()">
+                Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
+              </button>
+              <button class="btn btn-sm" (click)="copyPublicLink()">Copy link</button>
+            }
           }
           <a class="btn btn-sm" [routerLink]="['/bracket', tournamentId]">View bracket</a>
         </div>
@@ -325,6 +332,8 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
     .member-name { font-weight: 500; font-size: .875rem; }
     .member-meta { font-size: .75rem; color: var(--text-dim); }
     .badge-owner { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+    .badge-visibility-public  { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+    .badge-visibility-private { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
     .user-search { position: relative; }
     .search-results {
       position: absolute;
@@ -362,6 +371,7 @@ export class TournamentManageComponent implements OnInit {
   teams = signal<Team[]>([]);
   champion = signal<string | null>(null);
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
+  visibilityBusy = signal(false);
 
   loading = signal(true);
   loadError = signal('');
@@ -432,6 +442,33 @@ export class TournamentManageComponent implements OnInit {
         this.loadError.set('This tournament could not be found, or you do not have access to it.');
       },
     });
+  }
+
+  toggleVisibility() {
+    const t = this.tournament();
+    if (!t) return;
+    const next: 'public' | 'private' = t.visibility === 'private' ? 'public' : 'private';
+    this.visibilityBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { visibility: next }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.visibilityBusy.set(false);
+        this.showToast(next === 'private' ? 'Tournament is now private.' : 'Tournament is now public.');
+      },
+      error: () => {
+        this.visibilityBusy.set(false);
+        this.showToast('Failed to update visibility.');
+      },
+    });
+  }
+
+  copyPublicLink() {
+    const uuid = this.tournament()?.uuid;
+    if (!uuid) return;
+    navigator.clipboard.writeText(`${location.origin}/bracket/${uuid}`).then(
+      () => this.showToast('Link copied!'),
+      () => this.showToast('Could not copy link.'),
+    );
   }
 
   loadMembers() {

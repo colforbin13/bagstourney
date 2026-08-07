@@ -11,8 +11,10 @@ export interface TournamentCapabilities {
 
 export interface Tournament {
   id: number;
+  uuid: string;
   name: string;
   status: 'setup' | 'active' | 'complete';
+  visibility: 'public' | 'private';
   created_at: string;
   // Only present when GET /tournaments/:id is called with a valid session — omitted for
   // anonymous public bracket views, and never persisted (always read fresh per request).

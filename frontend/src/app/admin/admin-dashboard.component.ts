@@ -23,6 +23,10 @@ import { confirmService } from '../shared/services/confirm.service';
           <input class="input" type="text" [(ngModel)]="newName"
             placeholder="Tournament name"
             (keyup.enter)="create()" />
+          <select class="input" style="width:auto" [(ngModel)]="newVisibility">
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
           <button class="btn btn-primary" [disabled]="creating()" (click)="create()">
             @if (creating()) { <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> }
             Create
@@ -106,6 +110,7 @@ export class AdminDashboardComponent implements OnInit {
   createError = signal('');
   toast = signal('');
   newName = '';
+  newVisibility: 'public' | 'private' = 'public';
 
   constructor(private svc: TournamentService) {}
 
@@ -123,9 +128,10 @@ export class AdminDashboardComponent implements OnInit {
     if (!name) { this.createError.set('Enter a tournament name.'); return; }
     this.creating.set(true);
     this.createError.set('');
-    this.svc.createTournament(name).subscribe({
+    this.svc.createTournament(name, this.newVisibility).subscribe({
       next: t => {
         this.newName = '';
+        this.newVisibility = 'public';
         this.creating.set(false);
         this.tournaments.update(list => [t, ...list]);
         this.showToast('Tournament created!');
