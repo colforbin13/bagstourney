@@ -4,7 +4,7 @@ import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
-import { Tournament, Participant, Team } from '../shared/models/tournament.models';
+import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
 
 @Component({
   selector: 'app-tournament-manage',
@@ -25,6 +25,68 @@ import { Tournament, Participant, Team } from '../shared/models/tournament.model
           <a class="btn btn-sm" [routerLink]="['/bracket', tournamentId]">View bracket</a>
         </div>
       </div>
+
+      <!-- ── STAFF & ACCESS ── -->
+      @if (staffVisible()) {
+        <div class="card" style="margin-bottom:24px">
+          <div class="section-label">Staff &amp; Access</div>
+
+          <div class="member-list">
+            @for (m of members(); track m.user_id) {
+              <div class="member-item">
+                <div class="member-info">
+                  <span class="member-name">{{ m.username ?? m.email }}</span>
+                  <span class="member-meta">{{ m.email }} · {{ m.global_role }}</span>
+                </div>
+                @if (m.role === 'owner') {
+                  <span class="badge badge-owner">Owner</span>
+                } @else {
+                  <select class="input" style="width:auto"
+                    [ngModel]="m.role"
+                    (ngModelChange)="changeMemberRole(m, $event)"
+                    [disabled]="memberBusyUserId() === m.user_id">
+                    <option value="manager">Manager</option>
+                    <option value="scorekeeper">Scorekeeper</option>
+                  </select>
+                  <button class="btn btn-sm btn-danger"
+                    [disabled]="memberBusyUserId() === m.user_id"
+                    (click)="removeMember(m)">Remove</button>
+                }
+              </div>
+            }
+          </div>
+
+          @if (memberError()) { <div class="form-error">{{ memberError() }}</div> }
+
+          <hr class="divider" />
+
+          <div class="section-label">Add or Transfer Staff</div>
+          <div class="user-search">
+            <input class="input" type="text" [(ngModel)]="staffSearchQuery"
+              (ngModelChange)="onStaffSearchInput()"
+              placeholder="Search by username or email (2+ characters)" />
+            @if (staffSearchResults().length > 0) {
+              <div class="search-results">
+                @for (u of staffSearchResults(); track u.id) {
+                  <button type="button" class="search-result" (click)="selectStaffUser(u)">
+                    {{ u.username }} <span class="dim">({{ u.email }} · {{ u.role }})</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          @if (selectedStaffUser()) {
+            <div class="row" style="margin-top:8px;align-items:center;flex-wrap:wrap">
+              <span>Selected: <strong>{{ selectedStaffUser()!.username }}</strong></span>
+              <button class="btn btn-sm btn-primary" [disabled]="staffActionBusy()" (click)="addStaffMember('manager')">Add as Manager</button>
+              <button class="btn btn-sm btn-primary" [disabled]="staffActionBusy()" (click)="addStaffMember('scorekeeper')">Add as Scorekeeper</button>
+              <button class="btn btn-sm btn-danger" [disabled]="staffActionBusy()" (click)="transferOwnershipTo()">Transfer Ownership</button>
+              <button class="btn btn-sm" [disabled]="staffActionBusy()" (click)="cancelStaffSelection()">Cancel</button>
+            </div>
+          }
+        </div>
+      }
 
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
@@ -237,6 +299,51 @@ import { Tournament, Participant, Team } from '../shared/models/tournament.model
     .team-info { display: flex; flex-direction: column; gap: 2px; }
     .team-name { font-weight: 500; font-size: .875rem; }
     .team-players { font-size: .75rem; color: var(--text-dim); }
+
+    /* Staff & Access */
+    .member-list { display: flex; flex-direction: column; gap: 6px; }
+    .member-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .member-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .member-name { font-weight: 500; font-size: .875rem; }
+    .member-meta { font-size: .75rem; color: var(--text-dim); }
+    .badge-owner { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+    .user-search { position: relative; }
+    .search-results {
+      position: absolute;
+      z-index: 5;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .search-result {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 12px;
+      font-size: .85rem;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--text);
+      &:last-child { border-bottom: none; }
+      &:hover { background: var(--bg); }
+    }
+    .dim { color: var(--text-dim); }
   `]
 })
 export class TournamentManageComponent implements OnInit {
@@ -262,11 +369,24 @@ export class TournamentManageComponent implements OnInit {
   editingTeamId: number | null = null;
   editingTeamName = '';
 
+  // Staff & Access
+  members = signal<TournamentMember[]>([]);
+  staffVisible = signal(false);
+  memberBusyUserId = signal<number | null>(null);
+  memberError = signal('');
+
+  staffSearchQuery = '';
+  staffSearchResults = signal<UserSearchResult[]>([]);
+  selectedStaffUser = signal<UserSearchResult | null>(null);
+  staffActionBusy = signal(false);
+  private staffSearchDebounce?: ReturnType<typeof setTimeout>;
+
   constructor(private route: ActivatedRoute, private svc: TournamentService) {}
 
   ngOnInit() {
     this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
     this.load();
+    this.loadMembers();
   }
 
   load() {
@@ -286,6 +406,125 @@ export class TournamentManageComponent implements OnInit {
         }
       }
       this.loading.set(false);
+    });
+  }
+
+  // GET /tournament-members/:id is itself restricted to the tournament owner and super
+  // admins, so whether this call succeeds is used directly to decide whether to show the
+  // staff panel at all, rather than duplicating that role check on the frontend.
+  loadMembers() {
+    this.svc.getTournamentMembers(this.tournamentId).subscribe({
+      next: members => {
+        this.members.set(members);
+        this.staffVisible.set(true);
+      },
+      error: () => {
+        this.members.set([]);
+        this.staffVisible.set(false);
+      },
+    });
+  }
+
+  onStaffSearchInput() {
+    clearTimeout(this.staffSearchDebounce);
+    const q = this.staffSearchQuery.trim();
+    if (q.length < 2) {
+      this.staffSearchResults.set([]);
+      return;
+    }
+    this.staffSearchDebounce = setTimeout(() => {
+      this.svc.searchUsers(q).subscribe({
+        next: results => this.staffSearchResults.set(results),
+        error: () => this.staffSearchResults.set([]),
+      });
+    }, 250);
+  }
+
+  selectStaffUser(u: UserSearchResult) {
+    this.selectedStaffUser.set(u);
+    this.staffSearchResults.set([]);
+    this.staffSearchQuery = '';
+  }
+
+  cancelStaffSelection() {
+    this.selectedStaffUser.set(null);
+  }
+
+  addStaffMember(role: 'manager' | 'scorekeeper') {
+    const user = this.selectedStaffUser();
+    if (!user) return;
+    this.staffActionBusy.set(true);
+    this.memberError.set('');
+    this.svc.addTournamentMember(this.tournamentId, user.id, role).subscribe({
+      next: () => {
+        this.staffActionBusy.set(false);
+        this.selectedStaffUser.set(null);
+        this.showToast(`${user.username} added as ${role}.`);
+        this.loadMembers();
+      },
+      error: err => {
+        this.staffActionBusy.set(false);
+        this.memberError.set(err?.error?.error ?? 'Failed to add staff member.');
+      },
+    });
+  }
+
+  async transferOwnershipTo() {
+    const user = this.selectedStaffUser();
+    if (!user) return;
+    const ok = await confirmService.confirm(
+      `Transfer ownership of this tournament to ${user.username}? You will become a manager.`
+    );
+    if (!ok) return;
+    this.staffActionBusy.set(true);
+    this.memberError.set('');
+    this.svc.transferTournamentOwnership(this.tournamentId, user.id).subscribe({
+      next: () => {
+        this.staffActionBusy.set(false);
+        this.selectedStaffUser.set(null);
+        this.showToast(`Ownership transferred to ${user.username}.`);
+        this.loadMembers();
+      },
+      error: err => {
+        this.staffActionBusy.set(false);
+        this.memberError.set(err?.error?.error ?? 'Failed to transfer ownership.');
+      },
+    });
+  }
+
+  changeMemberRole(m: TournamentMember, newRole: 'manager' | 'scorekeeper') {
+    if (newRole === m.role) return;
+    this.memberBusyUserId.set(m.user_id);
+    this.memberError.set('');
+    this.svc.updateTournamentMember(this.tournamentId, m.user_id, newRole).subscribe({
+      next: () => {
+        this.memberBusyUserId.set(null);
+        this.showToast('Role updated.');
+        this.loadMembers();
+      },
+      error: err => {
+        this.memberBusyUserId.set(null);
+        this.memberError.set(err?.error?.error ?? 'Failed to update role.');
+        this.loadMembers(); // revert the select back to the actual role
+      },
+    });
+  }
+
+  async removeMember(m: TournamentMember) {
+    const ok = await confirmService.confirm(`Remove ${m.username} from this tournament's staff?`);
+    if (!ok) return;
+    this.memberBusyUserId.set(m.user_id);
+    this.memberError.set('');
+    this.svc.removeTournamentMember(this.tournamentId, m.user_id).subscribe({
+      next: () => {
+        this.memberBusyUserId.set(null);
+        this.members.update(list => list.filter(x => x.user_id !== m.user_id));
+        this.showToast('Removed.');
+      },
+      error: err => {
+        this.memberBusyUserId.set(null);
+        this.memberError.set(err?.error?.error ?? 'Failed to remove member.');
+      },
     });
   }
 

@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount } from '../models/tournament.models';
+import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -49,6 +49,10 @@ export class TournamentService {
 
   transferTournamentOwnership(tournamentId: number, userId: number) {
     return this.http.put(`${this.api}/tournament-ownership/${tournamentId}`, { user_id: userId });
+  }
+
+  searchUsers(query: string) {
+    return this.http.get<UserSearchResult[]>(`${this.api}/users/search`, { params: { q: query } });
   }
 
   getUsers() {

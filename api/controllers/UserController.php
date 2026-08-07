@@ -14,6 +14,32 @@ class UserController {
         echo json_encode($stmt->fetchAll());
     }
 
+    // Any authenticated user can look up an existing account by username/email — used by
+    // tournament owners (who are not necessarily super admins) to find a user to add as
+    // tournament staff. Deliberately minimal: no status/created_at, only active accounts,
+    // and a short result cap so it can't be used to enumerate the full user directory.
+    public function search(string $query): void {
+        requireCurrentUser($this->db);
+        $query = trim($query);
+        if (strlen($query) < 2) {
+            echo json_encode([]);
+            return;
+        }
+        // Escape LIKE wildcards in the user-supplied text so e.g. searching "%" doesn't
+        // match every active user.
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query);
+        $like = '%' . $escaped . '%';
+        $stmt = $this->db->prepare("
+            SELECT id, username, email, role
+            FROM users
+            WHERE status = 'active' AND (username LIKE ? OR email LIKE ?)
+            ORDER BY username
+            LIMIT 10
+        ");
+        $stmt->execute([$like, $like]);
+        echo json_encode($stmt->fetchAll());
+    }
+
     public function create(array $body): void {
         $actor = requireSuperAdmin($this->db);
         $username = trim($body['username'] ?? '');

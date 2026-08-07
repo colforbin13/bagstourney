@@ -178,6 +178,8 @@ try {
             $ctrl = new UserController(getDB());
             if ($method === 'GET' && !$id && !$idInvalid) {
                 $ctrl->list();
+            } elseif ($method === 'GET' && !$id && $action === 'search') {
+                $ctrl->search($_GET['q'] ?? '');
             } elseif ($method === 'POST' && !$id) {
                 $ctrl->create($body);
             } elseif ($method === 'PUT' && $id) {

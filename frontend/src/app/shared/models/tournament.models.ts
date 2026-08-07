@@ -12,7 +12,15 @@ export interface TournamentMember {
   username: string | null;
   email: string | null;
   role: 'owner' | 'manager' | 'scorekeeper';
+  global_role: 'super_admin' | 'organizer';
   created_at: string;
+}
+
+export interface UserSearchResult {
+  id: number;
+  username: string;
+  email: string;
+  role: 'super_admin' | 'organizer';
 }
 
 export interface UserAccount {

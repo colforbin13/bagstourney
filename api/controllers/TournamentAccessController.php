@@ -11,7 +11,7 @@ class TournamentAccessController {
     public function listMembers(int $tournamentId): void {
         requireTournamentRole($this->db, $tournamentId, ['owner']);
         $stmt = $this->db->prepare('
-            SELECT tm.user_id, tm.role, tm.created_at, u.username, u.email
+            SELECT tm.user_id, tm.role, tm.created_at, u.username, u.email, u.role AS global_role
             FROM tournament_members tm
             JOIN users u ON u.id = tm.user_id
             WHERE tm.tournament_id = ?
@@ -30,7 +30,13 @@ class TournamentAccessController {
             echo json_encode(['error' => 'An existing user_id and a manager or scorekeeper role are required']);
             return;
         }
-        $this->upsertMember($tournamentId, $userId, $role, (int)$actor['id']);
+        try {
+            $this->upsertMember($tournamentId, $userId, $role, (int)$actor['id']);
+        } catch (InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
         writeAuditLog($this->db, $tournamentId, (int)$actor['id'], 'tournament_member_granted', 'user', (string)$userId, ['role' => $role]);
         http_response_code(201);
         echo json_encode(['success' => true]);
@@ -44,7 +50,24 @@ class TournamentAccessController {
             echo json_encode(['error' => 'Role must be manager or scorekeeper']);
             return;
         }
-        $this->upsertMember($tournamentId, $userId, $role, (int)$actor['id']);
+
+        // A role-change PUT must not be able to demote the current owner — that must go
+        // through transferOwnership() instead, same as removeMember() already requires below.
+        $stmt = $this->db->prepare('SELECT role FROM tournament_members WHERE tournament_id = ? AND user_id = ?');
+        $stmt->execute([$tournamentId, $userId]);
+        if (($stmt->fetch()['role'] ?? null) === 'owner') {
+            http_response_code(400);
+            echo json_encode(['error' => "Transfer ownership before changing the owner's role"]);
+            return;
+        }
+
+        try {
+            $this->upsertMember($tournamentId, $userId, $role, (int)$actor['id']);
+        } catch (InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        }
         writeAuditLog($this->db, $tournamentId, (int)$actor['id'], 'tournament_member_updated', 'user', (string)$userId, ['role' => $role]);
         echo json_encode(['success' => true]);
     }
@@ -79,6 +102,10 @@ class TournamentAccessController {
             writeAuditLog($this->db, $tournamentId, (int)$actor['id'], 'tournament_ownership_transferred', 'user', (string)$userId);
             $this->db->commit();
             echo json_encode(['success' => true]);
+        } catch (InvalidArgumentException $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
         } catch (Throwable $e) {
             $this->db->rollBack();
             throw $e;
