@@ -17,6 +17,9 @@ import { AuthService } from '../services/auth.service';
         @if (auth.isLoggedIn()) {
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Tournaments</a>
           <a routerLink="/admin" routerLinkActive="active">Admin</a>
+          @if (auth.isSuperAdmin()) {
+            <a routerLink="/admin/users" routerLinkActive="active">Users</a>
+          }
           <a routerLink="/admin/profile" routerLinkActive="active" class="nav-user">{{ auth.username() }}</a>
           <button class="btn btn-sm" (click)="auth.logout()">Sign out</button>
         } @else {

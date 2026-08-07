@@ -3,8 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
-import { Tournament, UserAccount } from '../shared/models/tournament.models';
-import { AuthService } from '../shared/services/auth.service';
+import { Tournament } from '../shared/models/tournament.models';
 import { confirmService } from '../shared/services/confirm.service';
 
 @Component({
@@ -16,33 +15,6 @@ import { confirmService } from '../shared/services/confirm.service';
       <div class="page-header">
         <h1>Admin</h1>
       </div>
-
-      @if (auth.isSuperAdmin()) {
-        <div class="card" style="margin-bottom:24px">
-          <div class="section-label">User Management</div>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <p style="margin: 0; color: var(--text-dim); font-size: 0.9rem;">Manage site users, roles, and account status</p>
-            <a class="btn btn-primary" routerLink="/admin/users">Manage Users</a>
-          </div>
-        </div>
-      }
-
-      @if (auth.isSuperAdmin()) {
-        <div class="card" style="margin-bottom:24px">
-          <div class="section-label">Create user</div>
-          <div class="row user-row">
-            <input class="input" [(ngModel)]="newUserUsername" placeholder="Username" />
-            <input class="input" type="email" [(ngModel)]="newUserEmail" placeholder="Email" />
-            <input class="input" type="password" [(ngModel)]="newUserPassword" placeholder="Password (12+ chars)" />
-            <select class="input" [(ngModel)]="newUserRole">
-              <option value="organizer">Organizer</option>
-              <option value="super_admin">Super admin</option>
-            </select>
-            <button class="btn btn-primary" [disabled]="creatingUser()" (click)="createUser()">Create user</button>
-          </div>
-          @if (userError()) { <div class="form-error">{{ userError() }}</div> }
-        </div>
-      }
 
       <!-- New tournament -->
       <div class="card" style="margin-bottom:24px">
@@ -100,8 +72,6 @@ import { confirmService } from '../shared/services/confirm.service';
       margin-bottom: 10px;
     }
     .row { display: flex; gap: 8px; }
-    .user-row { flex-wrap: wrap; }
-    .user-row .input { flex: 1 1 160px; min-width: 140px; }
     .form-error { font-size: 0.8rem; color: var(--danger); margin-top: 8px; }
     .list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .list-item {
@@ -137,14 +107,7 @@ export class AdminDashboardComponent implements OnInit {
   toast = signal('');
   newName = '';
 
-  newUserUsername = '';
-  newUserEmail = '';
-  newUserPassword = '';
-  newUserRole: 'organizer' | 'super_admin' = 'organizer';
-  creatingUser = signal(false);
-  userError = signal('');
-
-  constructor(private svc: TournamentService, public auth: AuthService) {}
+  constructor(private svc: TournamentService) {}
 
   ngOnInit() { this.load(); }
 
@@ -168,25 +131,6 @@ export class AdminDashboardComponent implements OnInit {
         this.showToast('Tournament created!');
       },
       error: () => { this.creating.set(false); this.createError.set('Failed to create tournament.'); },
-    });
-  }
-
-  createUser() {
-    if (!this.newUserUsername.trim() || !this.newUserEmail.trim() || this.newUserPassword.length < 12) {
-      this.userError.set('Enter a username, valid email, and password of at least 12 characters.');
-      return;
-    }
-    this.creatingUser.set(true);
-    this.userError.set('');
-    this.svc.createUser({
-      username: this.newUserUsername.trim(), email: this.newUserEmail.trim(),
-      password: this.newUserPassword, role: this.newUserRole,
-    }).subscribe({
-      next: () => {
-        this.newUserUsername = ''; this.newUserEmail = ''; this.newUserPassword = '';
-        this.creatingUser.set(false); this.showToast('User created.');
-      },
-      error: err => { this.creatingUser.set(false); this.userError.set(err?.error?.error ?? 'Failed to create user.'); },
     });
   }
 

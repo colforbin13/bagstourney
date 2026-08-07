@@ -217,5 +217,57 @@ describe('UserManagementComponent', () => {
     httpMock.expectNone(`${environment.apiUrl}/users/${user.id}/password-reset`);
     expect(component.updatingUserIds().length).toBe(0);
   });
+
+  describe('createUser', () => {
+    it('should display a validation error if fields are missing or invalid', () => {
+      component.newUserUsername = '';
+      component.newUserEmail = '';
+      component.newUserPassword = 'short';
+
+      component.createUser();
+
+      expect(component.createUserError()).toBe('Enter a username, valid email, and password of at least 12 characters.');
+    });
+
+    it('should create a user and prepend it to the list', () => {
+      component.users.set(mockUsers);
+      component.newUserUsername = 'newperson';
+      component.newUserEmail = 'newperson@example.com';
+      component.newUserPassword = 'newPassword1234';
+      component.newUserRole = 'organizer';
+
+      component.createUser();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/users`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        username: 'newperson', email: 'newperson@example.com',
+        password: 'newPassword1234', role: 'organizer',
+      });
+
+      const created: UserAccount = { id: 4, username: 'newperson', email: 'newperson@example.com', role: 'organizer', status: 'active', created_at: '2026-01-04' };
+      req.flush(created, { status: 201, statusText: 'Created' });
+
+      expect(component.users()[0]).toEqual(created);
+      expect(component.users().length).toBe(4);
+      expect(component.newUserUsername).toBe('');
+      expect(component.creatingUser()).toBe(false);
+    });
+
+    it('should surface a server error without clearing the form', () => {
+      component.newUserUsername = 'newperson';
+      component.newUserEmail = 'newperson@example.com';
+      component.newUserPassword = 'newPassword1234';
+
+      component.createUser();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/users`);
+      req.flush({ error: 'That username or email address is already registered' }, { status: 409, statusText: 'Conflict' });
+
+      expect(component.createUserError()).toBe('That username or email address is already registered');
+      expect(component.newUserUsername).toBe('newperson');
+      expect(component.creatingUser()).toBe(false);
+    });
+  });
 });
 

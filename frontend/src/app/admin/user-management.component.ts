@@ -16,6 +16,24 @@ import { UserAccount } from '../shared/models/tournament.models';
         <h1>User Management</h1>
       </div>
 
+      <div class="card" style="margin-bottom:24px">
+        <div class="section-label">Create User</div>
+        <div class="row create-user-row">
+          <input class="input" [(ngModel)]="newUserUsername" placeholder="Username" />
+          <input class="input" type="email" [(ngModel)]="newUserEmail" placeholder="Email" />
+          <input class="input" type="password" [(ngModel)]="newUserPassword" placeholder="Password (12+ chars)" />
+          <select class="input" [(ngModel)]="newUserRole">
+            <option value="organizer">Organizer</option>
+            <option value="super_admin">Super admin</option>
+          </select>
+          <button class="btn btn-primary" [disabled]="creatingUser()" (click)="createUser()">
+            @if (creatingUser()) { <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> }
+            Create user
+          </button>
+        </div>
+        @if (createUserError()) { <div class="form-error">{{ createUserError() }}</div> }
+      </div>
+
       @if (loading()) {
         <div class="empty"><span class="spinner"></span></div>
       } @else if (users().length === 0) {
@@ -99,7 +117,19 @@ import { UserAccount } from '../shared/models/tournament.models';
   styles: [`
     .page-header { margin-bottom: 24px; }
     .page-header h1 { margin: 0; font-size: 2rem; }
-    
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+    .row { display: flex; gap: 8px; }
+    .create-user-row { flex-wrap: wrap; }
+    .create-user-row .input { flex: 1 1 160px; min-width: 140px; }
+
     .table-container { overflow-x: auto; }
     .users-table {
       width: 100%;
@@ -208,9 +238,40 @@ export class UserManagementComponent implements OnInit {
   toastType = signal<'success' | 'error'>('success');
   updatingUserIds = signal<number[]>([]);
 
+  newUserUsername = '';
+  newUserEmail = '';
+  newUserPassword = '';
+  newUserRole: 'organizer' | 'super_admin' = 'organizer';
+  creatingUser = signal(false);
+  createUserError = signal('');
+
   constructor(private svc: TournamentService) {}
 
   ngOnInit() { this.load(); }
+
+  createUser() {
+    if (!this.newUserUsername.trim() || !this.newUserEmail.trim() || this.newUserPassword.length < 12) {
+      this.createUserError.set('Enter a username, valid email, and password of at least 12 characters.');
+      return;
+    }
+    this.creatingUser.set(true);
+    this.createUserError.set('');
+    this.svc.createUser({
+      username: this.newUserUsername.trim(), email: this.newUserEmail.trim(),
+      password: this.newUserPassword, role: this.newUserRole,
+    }).subscribe({
+      next: user => {
+        this.newUserUsername = ''; this.newUserEmail = ''; this.newUserPassword = ''; this.newUserRole = 'organizer';
+        this.creatingUser.set(false);
+        this.users.update(list => [user, ...list]);
+        this.showToast('User created.', 'success');
+      },
+      error: err => {
+        this.creatingUser.set(false);
+        this.createUserError.set(err?.error?.error ?? 'Failed to create user.');
+      },
+    });
+  }
 
   load() {
     this.loading.set(true);
