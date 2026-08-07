@@ -77,6 +77,10 @@ export interface Match {
   team1_name: string | null;
   team2_name: string | null;
   winner_name: string | null;
+  team1_participant1_name: string | null;
+  team1_participant2_name: string | null;
+  team2_participant1_name: string | null;
+  team2_participant2_name: string | null;
 }
 
 export interface BracketData {

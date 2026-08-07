@@ -134,6 +134,17 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Labels ─────────────────────────────────────────────────────────────────
 
+  // Participant names beneath a team name are only useful when the team name has been
+  // customized away from the auto-generated "P1 & P2" default — otherwise they'd just
+  // repeat what the team name already says. Same default-name comparison the backend
+  // uses in ParticipantController::update() to decide whether a team name is still
+  // auto-generated.
+  teamParticipants(teamName: string | null, p1: string | null, p2: string | null): string | null {
+    if (!teamName || !p1 || !p2) return null;
+    if (teamName === `${p1} & ${p2}`) return null;
+    return `${p1} · ${p2}`;
+  }
+
   roundLabel(num: number, total: number): string {
     const fromEnd = total - num;
     if (fromEnd === 0) return 'Final';

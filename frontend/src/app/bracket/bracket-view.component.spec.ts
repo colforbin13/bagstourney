@@ -82,4 +82,48 @@ describe('BracketViewComponent', () => {
 
     expect(component.error()).toBe('Tournament not found.');
   });
+
+  describe('teamParticipants', () => {
+    it('returns null when the team name is still the auto-generated default', () => {
+      bootstrap(tournamentWith());
+      expect(component.teamParticipants('Alice & Bob', 'Alice', 'Bob')).toBeNull();
+    });
+
+    it('returns the participant names when the team name has been customized', () => {
+      bootstrap(tournamentWith());
+      expect(component.teamParticipants('The Champions', 'Alice', 'Bob')).toBe('Alice · Bob');
+    });
+
+    it('returns null when the team or participant names are missing (TBD/bye slots)', () => {
+      bootstrap(tournamentWith());
+      expect(component.teamParticipants(null, null, null)).toBeNull();
+      expect(component.teamParticipants('Alice & Bob', null, null)).toBeNull();
+    });
+  });
+
+  it('renders a muted participant sub-label only for teams with a customized name', () => {
+    const bracket: BracketData = {
+      rounds: {
+        1: [
+          {
+            id: 1, tournament_id: tournamentId, round: 1, match_number: 1,
+            team1_id: 10, team2_id: 20, team1_score: null, team2_score: null,
+            winner_id: null, next_match_id: null, next_match_slot: null, status: 'ready',
+            team1_name: 'The Champions', team2_name: 'Carol & Dave', winner_name: null,
+            team1_participant1_name: 'Alice', team1_participant2_name: 'Bob',
+            team2_participant1_name: 'Carol', team2_participant2_name: 'Dave',
+          } as any,
+        ],
+      },
+    };
+
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
+    httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(bracket);
+    fixture.detectChanges();
+
+    const labels = Array.from(fixture.nativeElement.querySelectorAll('.team-participants'))
+      .map((el: any) => el.textContent.trim());
+    expect(labels).toEqual(['Alice · Bob']);
+  });
 });

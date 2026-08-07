@@ -44,12 +44,17 @@
                     <div class="match-team"
                         [class.winner]="match.winner_id === match.team1_id && match.status === 'complete'"
                         [class.loser]="match.winner_id === match.team2_id && match.status === 'complete'">
+                    <div class="team-name-wrap">
                     <span class="team-name">
                         {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
                         @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team1_id) {
                         <span class="champion-icon" aria-hidden="true">🏆</span>
                         }
                     </span>
+                    @if (teamParticipants(match.team1_name, match.team1_participant1_name, match.team1_participant2_name); as participants) {
+                        <span class="team-participants">{{ participants }}</span>
+                    }
+                    </div>
                     @if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <span class="team-score">{{ match.team1_score }}</span>
                     } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
@@ -65,12 +70,17 @@
                     <div class="match-team"
                         [class.winner]="match.winner_id === match.team2_id && match.status === 'complete'"
                         [class.loser]="match.winner_id === match.team1_id && match.status === 'complete'">
+                    <div class="team-name-wrap">
                     <span class="team-name">
                         {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
                         @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team2_id) {
                         <span class="champion-icon" aria-hidden="true">🏆</span>
                         }
                     </span>
+                    @if (teamParticipants(match.team2_name, match.team2_participant1_name, match.team2_participant2_name); as participants) {
+                        <span class="team-participants">{{ participants }}</span>
+                    }
+                    </div>
                     @if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <span class="team-score">{{ match.team2_score }}</span>
                     } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {

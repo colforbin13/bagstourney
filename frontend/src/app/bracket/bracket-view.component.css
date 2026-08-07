@@ -88,12 +88,26 @@ Bracket outer shell: one flex column per round
     }
 }
 
+.team-name-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
 .team-name {
     font-size: 0.95rem;
     overflow-wrap: anywhere;
     white-space: normal;
     min-width: 0;
-    flex: 1 1 auto;
+}
+
+.team-participants {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .team-score {
