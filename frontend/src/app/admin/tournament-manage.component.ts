@@ -1,5 +1,5 @@
 // src/app/admin/tournament-manage.component.ts
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,6 +12,12 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
   imports: [RouterLink, FormsModule],
   template: `
     <div class="page">
+    @if (loadError()) {
+      <div class="empty" style="padding:48px 24px">
+        {{ loadError() }}
+        <div style="margin-top:16px"><a routerLink="/admin" class="btn btn-sm">Back to Admin</a></div>
+      </div>
+    } @else {
       <!-- Header -->
       <div class="page-header">
         <div>
@@ -91,18 +97,20 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
         <!-- Add participant -->
-        <div class="card" style="margin-bottom:24px">
-          <div class="section-label">Add Participant</div>
-          <div class="row">
-            <input class="input" type="text" [(ngModel)]="newParticipant"
-              placeholder="Full name" (keyup.enter)="addParticipant()" />
-            <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
-              @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
-              Add
-            </button>
+        @if (canManageSetup()) {
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Add Participant</div>
+            <div class="row">
+              <input class="input" type="text" [(ngModel)]="newParticipant"
+                placeholder="Full name" (keyup.enter)="addParticipant()" />
+              <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
+                @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                Add
+              </button>
+            </div>
+            @if (addError()) { <div class="form-error">{{ addError() }}</div> }
           </div>
-          @if (addError()) { <div class="form-error">{{ addError() }}</div> }
-        </div>
+        }
 
         <!-- Participants list -->
         <div class="section-label">
@@ -125,12 +133,12 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
                   <button class="btn btn-sm" (click)="cancelEditParticipant()">Cancel</button>
                 } @else {
                   <span style="flex:1">{{ p.name }}</span>
-                  <div style="display:flex;gap:6px">
-                    <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
-                    @if (tournament()?.status === 'setup') {
+                  @if (canManageSetup()) {
+                    <div style="display:flex;gap:6px">
+                      <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
                       <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
-                    }
-                  </div>
+                    </div>
+                  }
                 }
               </div>
             }
@@ -138,7 +146,7 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
         }
 
         <!-- Draw button -->
-        @if (participants().length >= 4 && participants().length % 2 === 0) {
+        @if (canManageSetup() && participants().length >= 4 && participants().length % 2 === 0) {
           <hr class="divider" />
           <div class="draw-section">
             <div>
@@ -176,12 +184,11 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
                   <button class="btn btn-sm" (click)="cancelEditParticipant()">Cancel</button>
                 } @else {
                   <span style="flex:1">{{ p.name }}</span>
-                  <div style="display:flex;gap:6px">
-                    <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
-                    @if (tournament()?.status === 'setup') {
-                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
-                    }
-                  </div>
+                  @if (canManageSetup()) {
+                    <div style="display:flex;gap:6px">
+                      <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
+                    </div>
+                  }
                 }
               </div>
             }
@@ -205,14 +212,16 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
                   }
                   <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
                 </div>
-                <div style="display:flex;gap:8px">
-                  @if (editingTeamId === team.id) {
-                    <button class="btn btn-sm" (click)="saveTeam(team)">Save</button>
-                    <button class="btn btn-sm" (click)="cancelEditTeam()">Cancel</button>
-                  } @else {
-                    <button class="btn btn-sm" (click)="startEditTeam(team)">Edit</button>
-                  }
-                </div>
+                @if (canManageSetup()) {
+                  <div style="display:flex;gap:8px">
+                    @if (editingTeamId === team.id) {
+                      <button class="btn btn-sm" (click)="saveTeam(team)">Save</button>
+                      <button class="btn btn-sm" (click)="cancelEditTeam()">Cancel</button>
+                    } @else {
+                      <button class="btn btn-sm" (click)="startEditTeam(team)">Edit</button>
+                    }
+                  </div>
+                }
               </div>
             }
           </div>
@@ -231,6 +240,7 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
       @if (toast()) {
         <div class="toast toast-success">{{ toast() }}</div>
       }
+    }
     </div>
   `,
   styles: [`
@@ -351,8 +361,10 @@ export class TournamentManageComponent implements OnInit {
   participants = signal<Participant[]>([]);
   teams = signal<Team[]>([]);
   champion = signal<string | null>(null);
+  canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
 
   loading = signal(true);
+  loadError = signal('');
   adding = signal(false);
   drawing = signal(false);
   addError = signal('');
@@ -386,32 +398,42 @@ export class TournamentManageComponent implements OnInit {
   ngOnInit() {
     this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
     this.load();
-    this.loadMembers();
   }
 
   load() {
-    this.svc.getTournament(this.tournamentId).subscribe(t => {
-      this.tournament.set(t);
-      // Always load participants so names can be edited at any time
-      this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
+    this.svc.getTournament(this.tournamentId).subscribe({
+      next: t => {
+        this.tournament.set(t);
+        // Always load participants so names can be edited at any time
+        this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
 
-      if (t.status !== 'setup') {
-        this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
-        if (t.status === 'complete') {
-          this.svc.getBracket(this.tournamentId).subscribe(data => {
-            const rounds = Object.entries(data.rounds).map(([n, m]) => ({ n: +n, m })).sort((a, b) => b.n - a.n);
-            const final = rounds[0]?.m[0] as any;
-            this.champion.set(final?.winner_name ?? null);
-          });
+        if (t.status !== 'setup') {
+          this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
+          if (t.status === 'complete') {
+            this.svc.getBracket(this.tournamentId).subscribe(data => {
+              const rounds = Object.entries(data.rounds).map(([n, m]) => ({ n: +n, m })).sort((a, b) => b.n - a.n);
+              const final = rounds[0]?.m[0] as any;
+              this.champion.set(final?.winner_name ?? null);
+            });
+          }
         }
-      }
-      this.loading.set(false);
+
+        // Only ask for the member list when the tournament response says we're allowed
+        // to manage staff — avoids an always-attempted request that a manager or
+        // scorekeeper would just get a 403 back from.
+        if (t.capabilities?.can_manage_staff) {
+          this.loadMembers();
+        }
+
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.loadError.set('This tournament could not be found, or you do not have access to it.');
+      },
     });
   }
 
-  // GET /tournament-members/:id is itself restricted to the tournament owner and super
-  // admins, so whether this call succeeds is used directly to decide whether to show the
-  // staff panel at all, rather than duplicating that role check on the frontend.
   loadMembers() {
     this.svc.getTournamentMembers(this.tournamentId).subscribe({
       next: members => {

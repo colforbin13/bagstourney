@@ -11,11 +11,12 @@ class TournamentController {
         echo json_encode($stmt->fetchAll());
     }
 
-    public function get(int $id): void {
+    public function get(int $id, ?array $actor = null): void {
         $stmt = $this->db->prepare('SELECT * FROM tournaments WHERE id = ?');
         $stmt->execute([$id]);
         $t = $stmt->fetch();
         if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
+        $t['capabilities'] = tournamentCapabilities($this->db, $id, $actor);
         echo json_encode($t);
     }
 
@@ -31,7 +32,7 @@ class TournamentController {
                 ->execute([$id, $actor['id'], $actor['id']]);
             writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_created', 'tournament', (string)$id);
             $this->db->commit();
-            $this->get($id);
+            $this->get($id, $actor);
         } catch (Throwable $e) {
             $this->db->rollBack();
             throw $e;
@@ -58,7 +59,7 @@ class TournamentController {
         $params[] = $id;
         $this->db->prepare('UPDATE tournaments SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
         writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_updated', 'tournament', (string)$id, $body);
-        $this->get($id);
+        $this->get($id, $actor);
     }
 
     public function delete(int $id, array $actor): void {

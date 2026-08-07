@@ -6,12 +6,11 @@ import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament, UserAccount } from '../shared/models/tournament.models';
 import { AuthService } from '../shared/services/auth.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { ChangePasswordComponent } from './change-password.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [RouterLink, FormsModule, ChangePasswordComponent],
+  imports: [RouterLink, FormsModule],
   template: `
     <div class="page">
       <div class="page-header">
@@ -44,9 +43,6 @@ import { ChangePasswordComponent } from './change-password.component';
           @if (userError()) { <div class="form-error">{{ userError() }}</div> }
         </div>
       }
-
-      <!-- Change Password -->
-      <app-change-password></app-change-password>
 
       <!-- New tournament -->
       <div class="card" style="margin-bottom:24px">

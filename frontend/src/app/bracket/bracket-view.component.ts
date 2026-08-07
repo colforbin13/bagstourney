@@ -52,6 +52,11 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     return final?.winner_name ?? null;
   });
 
+  // Whether the current viewer can actually submit/edit scores for this tournament —
+  // distinct from auth.isLoggedIn(), which only says they're logged in as *someone*,
+  // not that they have a role on *this* tournament.
+  canScore = computed(() => this.tournament()?.capabilities?.can_score ?? false);
+
   // ── Grid helpers ───────────────────────────────────────────────────────────
 
   /**
@@ -109,7 +114,10 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   load() {
     this.loading.set(true);
-    this.svc.getTournament(this.tournamentId).subscribe(t => this.tournament.set(t));
+    this.svc.getTournament(this.tournamentId).subscribe({
+      next: t => this.tournament.set(t),
+      error: () => this.showError('Tournament not found.'),
+    });
     this.svc.getBracket(this.tournamentId).subscribe({
       next: data => {
         this.bracketData.set(data);

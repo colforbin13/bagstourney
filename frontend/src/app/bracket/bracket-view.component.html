@@ -52,7 +52,7 @@
                     </span>
                     @if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <span class="team-score">{{ match.team1_score }}</span>
-                    } @else if (auth.isLoggedIn() && (match.status === 'ready' || this.editingMatch === match.id)) {
+                    } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
                         <input class="input score-input" type="number" min="0"
                         [(ngModel)]="scores[match.id].team1"
                         [attr.aria-label]="'Score for ' + (match.team1_name ?? 'team 1')"
@@ -73,7 +73,7 @@
                     </span>
                     @if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <span class="team-score">{{ match.team2_score }}</span>
-                    } @else if (auth.isLoggedIn() && (match.status === 'ready' || this.editingMatch === match.id)) {
+                    } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
                         <input class="input score-input" type="number" min="0"
                         [(ngModel)]="scores[match.id].team2"
                         [attr.aria-label]="'Score for ' + (match.team2_name ?? 'team 2')"
@@ -81,8 +81,8 @@
                     }
                     </div>
 
-                    <!-- Score submit (admin only) -->
-                    @if (auth.isLoggedIn()) {
+                    <!-- Score submit: only for viewers who actually have a role on this tournament -->
+                    @if (canScore()) {
                     <div class="score-actions">
                         @if (match.status === 'ready' && this.editingMatch !== match.id) {
                         <button class="btn btn-primary btn-sm"

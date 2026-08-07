@@ -1,10 +1,22 @@
 // src/app/shared/models/tournament.models.ts
 
+export interface TournamentCapabilities {
+  role: 'owner' | 'manager' | 'scorekeeper' | null;
+  is_super_admin: boolean;
+  can_manage_setup: boolean;
+  can_manage_staff: boolean;
+  can_score: boolean;
+  can_delete: boolean;
+}
+
 export interface Tournament {
   id: number;
   name: string;
   status: 'setup' | 'active' | 'complete';
   created_at: string;
+  // Only present when GET /tournaments/:id is called with a valid session — omitted for
+  // anonymous public bracket views, and never persisted (always read fresh per request).
+  capabilities?: TournamentCapabilities;
 }
 
 export interface TournamentMember {

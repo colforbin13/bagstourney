@@ -17,7 +17,7 @@ import { AuthService } from '../services/auth.service';
         @if (auth.isLoggedIn()) {
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Tournaments</a>
           <a routerLink="/admin" routerLinkActive="active">Admin</a>
-          <span class="nav-user">{{ auth.username() }}</span>
+          <a routerLink="/admin/profile" routerLinkActive="active" class="nav-user">{{ auth.username() }}</a>
           <button class="btn btn-sm" (click)="auth.logout()">Sign out</button>
         } @else {
           <a routerLink="/admin/login" routerLinkActive="active">Sign in</a>
@@ -74,6 +74,7 @@ import { AuthService } from '../services/auth.service';
       padding: 0 8px;
       border-left: 1px solid var(--border);
       border-right: 1px solid var(--border);
+      text-decoration: none;
     }
   `]
 })

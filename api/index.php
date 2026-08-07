@@ -67,7 +67,7 @@ try {
             if ($method === 'GET' && !$id && !$idInvalid) {
                 $ctrl->list();
             } elseif ($method === 'GET' && $id) {
-                $ctrl->get($id);
+                $ctrl->get($id, currentUserOrNull($db));
             } elseif ($method === 'POST' && !$id) {
                 $ctrl->create($body, requireCurrentUser($db));
             } elseif ($method === 'PUT' && $id) {

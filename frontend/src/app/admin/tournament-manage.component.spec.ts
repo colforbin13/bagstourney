@@ -5,7 +5,7 @@ import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { TournamentManageComponent } from './tournament-manage.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
+import { TournamentMember, UserSearchResult, TournamentCapabilities } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 
 describe('TournamentManageComponent', () => {
@@ -22,6 +22,16 @@ describe('TournamentManageComponent', () => {
   const mockSearchResults: UserSearchResult[] = [
     { id: 3, username: 'newperson', email: 'newperson@example.com', role: 'organizer' },
   ];
+
+  const ownerCapabilities: TournamentCapabilities = {
+    role: 'owner', is_super_admin: false,
+    can_manage_setup: true, can_manage_staff: true, can_score: true, can_delete: true,
+  };
+
+  const managerCapabilities: TournamentCapabilities = {
+    role: 'manager', is_super_admin: false,
+    can_manage_setup: true, can_manage_staff: false, can_score: true, can_delete: false,
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -44,13 +54,14 @@ describe('TournamentManageComponent', () => {
     httpMock.verify();
   });
 
-  // Triggers ngOnInit (load() + loadMembers()) and flushes the tournament/participants
-  // requests with a minimal 'setup' tournament, leaving the tournament-members request
-  // for each test to flush individually (its outcome is what's under test).
-  function bootstrapCore() {
+  // Triggers ngOnInit (load()) and flushes the tournament/participants requests with a
+  // minimal 'setup' tournament. loadMembers() is only invoked by load() itself when the
+  // returned capabilities allow it (see tournament-manage.component.ts), so callers that
+  // expect it to fire must also flush the tournament-members request afterward.
+  function bootstrapCore(capabilities: TournamentCapabilities = ownerCapabilities) {
     fixture.detectChanges();
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
-      .flush({ id: tournamentId, name: 'Test Tournament', status: 'setup', created_at: '2026-01-01' });
+      .flush({ id: tournamentId, name: 'Test Tournament', status: 'setup', created_at: '2026-01-01', capabilities });
     httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
   }
 
@@ -68,13 +79,40 @@ describe('TournamentManageComponent', () => {
     expect(component.members()).toEqual(mockMembers);
   });
 
-  it('should hide the staff panel when the member list request fails (not owner/super admin)', () => {
-    bootstrapCore();
+  it('should not request or show the staff panel when capabilities say can_manage_staff is false', () => {
+    bootstrapCore(managerCapabilities);
+
+    httpMock.expectNone(`${environment.apiUrl}/tournament-members/${tournamentId}`);
+    expect(component.staffVisible()).toBe(false);
+    expect(component.members()).toEqual([]);
+  });
+
+  it('should hide the staff panel if the member list request unexpectedly fails despite capabilities allowing it', () => {
+    bootstrapCore(); // owner capabilities → load() still requests the member list
     httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`)
       .flush({ error: 'You do not have permission to manage this tournament' }, { status: 403, statusText: 'Forbidden' });
 
     expect(component.staffVisible()).toBe(false);
     expect(component.members()).toEqual([]);
+  });
+
+  it('should not show setup controls when capabilities say can_manage_setup is false', () => {
+    const scorekeeperCapabilities: TournamentCapabilities = {
+      role: 'scorekeeper', is_super_admin: false,
+      can_manage_setup: false, can_manage_staff: false, can_score: true, can_delete: false,
+    };
+    bootstrapCore(scorekeeperCapabilities);
+
+    expect(component.canManageSetup()).toBe(false);
+  });
+
+  it('should show a load error and not crash when the tournament request fails', () => {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+      .flush({ error: 'Not found' }, { status: 404, statusText: 'Not Found' });
+
+    expect(component.loadError()).toBe('This tournament could not be found, or you do not have access to it.');
+    expect(component.loading()).toBe(false);
   });
 
   it('should not search for queries under 2 characters', fakeAsync(() => {

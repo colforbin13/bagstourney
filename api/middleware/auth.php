@@ -67,6 +67,51 @@ function requireTournamentRole(PDO $db, int $tournamentId, array $allowedRoles):
     return $user;
 }
 
+// Like requireCurrentUser(), but returns null instead of exiting when there is no valid
+// session — for endpoints (like viewing a tournament) that work for anonymous callers but
+// should still report richer information when the caller is authenticated.
+function currentUserOrNull(PDO $db): ?array {
+    $headers = getallheaders();
+    $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    if (strpos($auth, 'Bearer ') !== 0) return null;
+    $claims = verifyJWT(substr($auth, 7));
+    if (!$claims) return null;
+    return currentUser($db, $claims);
+}
+
+// Derives what the given user (possibly anonymous) is allowed to do on a tournament, so
+// the frontend can hide controls it can't use instead of only discovering that from a
+// rejected request. Mirrors the role checks actually enforced by requireTournamentRole()
+// across TournamentController, TeamController, ParticipantController, MatchController, and
+// TournamentAccessController — keep this in sync if those requirements change.
+function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array {
+    $role = null;
+    $isSuperAdmin = false;
+
+    if ($user) {
+        if ($user['role'] === 'super_admin') {
+            $isSuperAdmin = true;
+        } else {
+            $stmt = $db->prepare('SELECT role FROM tournament_members WHERE tournament_id = ? AND user_id = ?');
+            $stmt->execute([$tournamentId, $user['id']]);
+            $role = $stmt->fetch()['role'] ?? null;
+        }
+    }
+
+    $isOwner = $isSuperAdmin || $role === 'owner';
+    $isManager = $isSuperAdmin || in_array($role, ['owner', 'manager'], true);
+    $canScore = $isSuperAdmin || in_array($role, ['owner', 'manager', 'scorekeeper'], true);
+
+    return [
+        'role' => $role,
+        'is_super_admin' => $isSuperAdmin,
+        'can_manage_setup' => $isManager,
+        'can_manage_staff' => $isOwner,
+        'can_score' => $canScore,
+        'can_delete' => $isOwner,
+    ];
+}
+
 function writeAuditLog(PDO $db, ?int $tournamentId, ?int $actorUserId, string $action, ?string $targetType = null, ?string $targetId = null, ?array $details = null): void {
     $stmt = $db->prepare('INSERT INTO audit_log (tournament_id, actor_user_id, action, target_type, target_id, details_json) VALUES (?, ?, ?, ?, ?, ?)');
     $stmt->execute([

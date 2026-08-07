@@ -30,6 +30,11 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),
   },
   {
+    path: 'admin/profile',
+    canActivate: [authGuard],
+    loadComponent: () => import('./admin/profile.component').then(m => m.ProfileComponent),
+  },
+  {
     path: 'admin/users',
     canActivate: [authGuard, superAdminGuard],
     loadComponent: () => import('./admin/user-management.component').then(m => m.UserManagementComponent),
