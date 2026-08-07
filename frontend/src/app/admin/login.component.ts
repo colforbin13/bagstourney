@@ -44,6 +44,7 @@ import { AuthService } from '../shared/services/auth.service';
           }
         </button>
         <a class="register-link" routerLink="/admin/register">Create an organizer account</a>
+        <a class="register-link" routerLink="/reset-password">Have a password reset token?</a>
       </div>
     </div>
   `,

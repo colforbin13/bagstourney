@@ -96,4 +96,36 @@ class UserController {
             exit;
         }
     }
+
+    public function resetPassword(int $id): void {
+        $actor = requireSuperAdmin($this->db);
+        $stmt = $this->db->prepare('SELECT id, email FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+        $user = $stmt->fetch();
+        if (!$user) {
+            http_response_code(404);
+            echo json_encode(['error' => 'User not found']);
+            return;
+        }
+
+        // Generate a secure random token (64 hex chars = 256 bits)
+        $token = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $token);
+        $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 hours
+
+        // Clear any existing tokens for this user
+        $this->db->prepare('DELETE FROM password_reset_tokens WHERE user_id = ?')->execute([$id]);
+
+        // Store only the token hash; the plaintext token is returned once and not persisted
+        try {
+            $stmt = $this->db->prepare('INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)');
+            $stmt->execute([$id, $tokenHash, $expiresAt]);
+            writeAuditLog($this->db, null, (int)$actor['id'], 'password_reset_initiated', 'user', (string)$id);
+            http_response_code(200);
+            echo json_encode(['token' => $token, 'expires_at' => $expiresAt]);
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to generate reset token']);
+        }
+    }
 }

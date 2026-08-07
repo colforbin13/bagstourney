@@ -21,6 +21,10 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/register.component').then(m => m.RegisterComponent),
   },
   {
+    path: 'reset-password',
+    loadComponent: () => import('./admin/reset-password.component').then(m => m.ResetPasswordComponent),
+  },
+  {
     path: 'admin',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),

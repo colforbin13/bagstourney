@@ -44,6 +44,11 @@ try {
                 $ctrl->login($body);
             } elseif ($action === 'register' && $method === 'POST') {
                 $ctrl->register($body);
+            } elseif ($action === 'change-password' && $method === 'POST') {
+                $actor = requireCurrentUser(getDB());
+                $ctrl->changePassword($body, $actor);
+            } elseif ($action === 'reset-password' && $method === 'POST') {
+                $ctrl->resetPassword($body);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
@@ -172,6 +177,8 @@ try {
                 $ctrl->create($body);
             } elseif ($method === 'PUT' && $id) {
                 $ctrl->update($id, $body);
+            } elseif ($method === 'POST' && $id && $action === 'password-reset') {
+                $ctrl->resetPassword($id);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);

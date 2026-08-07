@@ -63,6 +63,24 @@ export class TournamentService {
     return this.http.put<UserAccount>(`${this.api}/users/${id}`, data);
   }
 
+  changePassword(currentPassword: string, newPassword: string) {
+    return this.http.post(`${this.api}/auth/change-password`, { 
+      current_password: currentPassword, 
+      new_password: newPassword 
+    });
+  }
+
+  resetUserPassword(userId: number) {
+    return this.http.post<{ token: string; expires_at: string }>(`${this.api}/users/${userId}/password-reset`, {});
+  }
+
+  resetPasswordWithToken(token: string, newPassword: string) {
+    return this.http.post(`${this.api}/auth/reset-password`, {
+      token,
+      new_password: newPassword,
+    });
+  }
+
   // Participants
   getParticipants(tournamentId: number) {
     return this.http.get<Participant[]>(`${this.api}/participants/${tournamentId}`);

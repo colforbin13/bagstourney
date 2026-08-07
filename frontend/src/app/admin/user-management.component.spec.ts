@@ -154,6 +154,7 @@ describe('UserManagementComponent', () => {
     await component.changeRole(user, event);
     
     const req = httpMock.expectOne(`${environment.apiUrl}/users/${user.id}`);
+    expect(req.request.method).toBe('PUT');
     expect(req.request.body).toEqual({ role: 'organizer' });
     
     const updatedUser = { ...user, role: 'organizer' as const };
@@ -161,4 +162,60 @@ describe('UserManagementComponent', () => {
     
     expect(component.users().find(u => u.id === user.id)?.role).toBe('organizer');
   });
+
+  it('should generate password reset token', async () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[1];
+    
+    spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+    
+    // resetPassword awaits confirmService.confirm() before making the HTTP call,
+    // so the request isn't registered until that microtask resolves.
+    await component.resetPassword(user);
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/users/${user.id}/password-reset`);
+    expect(req.request.method).toBe('POST');
+
+    req.flush({ token: 'abc123def456', expires_at: '2026-08-06T15:00:00Z' });
+
+    // Wait for the clipboard operation to complete
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('abc123def456');
+    expect(component.toast()).toContain('Reset token copied');
+    expect(component.toastType()).toBe('success');
+  });
+
+  it('should handle error when generating reset token', async () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[1];
+    
+    spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+    
+    await component.resetPassword(user);
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/users/${user.id}/password-reset`);
+    req.error(new ErrorEvent('Server error'), { status: 500 });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    expect(component.toastType()).toBe('error');
+    expect(component.toast()).toContain('Failed to generate reset token');
+  });
+
+  it('should not generate reset token if user cancels confirmation', async () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[1];
+    
+    spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(false));
+    
+    const resetPromise = component.resetPassword(user);
+    await resetPromise;
+    
+    // Should not make any HTTP request if canceled
+    httpMock.expectNone(`${environment.apiUrl}/users/${user.id}/password-reset`);
+    expect(component.updatingUserIds().length).toBe(0);
+  });
 });
+

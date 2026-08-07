@@ -173,4 +173,81 @@ describe('TournamentService', () => {
       req.flush(mockTournament);
     });
   });
+
+  describe('changePassword', () => {
+    it('should call POST /auth/change-password with correct body', () => {
+      service.changePassword('oldPass123', 'newPass1234').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/change-password`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        current_password: 'oldPass123',
+        new_password: 'newPass1234'
+      });
+      req.flush({ message: 'Password changed successfully' });
+    });
+
+    it('should handle error response', () => {
+      let errorReceived = false;
+      service.changePassword('wrongPass', 'newPass1234').subscribe({
+        error: () => { errorReceived = true; }
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/change-password`);
+      req.error(new ErrorEvent('Unauthorized'), { status: 401 });
+
+      expect(errorReceived).toBe(true);
+    });
+  });
+
+  describe('resetUserPassword', () => {
+    it('should call POST /users/:id/password-reset', () => {
+      service.resetUserPassword(42).subscribe(result => {
+        expect(result.token).toBe('abc123');
+        expect(result.expires_at).toBe('2026-08-06T15:00:00Z');
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/users/42/password-reset`);
+      expect(req.request.method).toBe('POST');
+      req.flush({ token: 'abc123', expires_at: '2026-08-06T15:00:00Z' });
+    });
+
+    it('should handle error response on password reset', () => {
+      let errorReceived = false;
+      service.resetUserPassword(99).subscribe({
+        error: () => { errorReceived = true; }
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/users/99/password-reset`);
+      req.error(new ErrorEvent('Forbidden'), { status: 403 });
+
+      expect(errorReceived).toBe(true);
+    });
+  });
+
+  describe('resetPasswordWithToken', () => {
+    it('should call POST /auth/reset-password with correct body', () => {
+      service.resetPasswordWithToken('abc123', 'newPass1234').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/reset-password`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        token: 'abc123',
+        new_password: 'newPass1234'
+      });
+      req.flush({ message: 'Password reset successfully' });
+    });
+
+    it('should handle error response for an invalid or expired token', () => {
+      let errorReceived = false;
+      service.resetPasswordWithToken('bad-token', 'newPass1234').subscribe({
+        error: () => { errorReceived = true; }
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/auth/reset-password`);
+      req.error(new ErrorEvent('Bad Request'), { status: 400 });
+
+      expect(errorReceived).toBe(true);
+    });
+  });
 });

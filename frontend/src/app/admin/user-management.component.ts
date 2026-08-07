@@ -11,7 +11,7 @@ import { UserAccount } from '../shared/models/tournament.models';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="page">
+    <div class="page-wide">
       <div class="page-header">
         <h1>User Management</h1>
       </div>
@@ -57,6 +57,17 @@ import { UserAccount } from '../shared/models/tournament.models';
                   <td class="actions">
                     <button 
                       class="btn btn-sm" 
+                      title="Reset password"
+                      [disabled]="isUpdating(user.id)"
+                      (click)="resetPassword(user)">
+                      @if (isUpdating(user.id)) {
+                        <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
+                      } @else {
+                        Reset
+                      }
+                    </button>
+                    <button 
+                      class="btn btn-sm" 
                       [class.btn-danger]="user.status === 'active'"
                       [disabled]="isUpdating(user.id)"
                       (click)="toggleStatus(user)">
@@ -86,7 +97,6 @@ import { UserAccount } from '../shared/models/tournament.models';
     </div>
   `,
   styles: [`
-    .page { padding: 16px; }
     .page-header { margin-bottom: 24px; }
     .page-header h1 { margin: 0; font-size: 2rem; }
     
@@ -253,6 +263,31 @@ export class UserManagementComponent implements OnInit {
     }
 
     this.updateUser(user.id, { status: newStatus });
+  }
+
+  async resetPassword(user: UserAccount) {
+    const confirm = await confirmService.confirm(
+      `Generate a password reset token for ${user.username}? They will need this token to set a new password.`
+    );
+    if (!confirm) return;
+
+    this.updatingUserIds.update(ids => [...ids, user.id]);
+    this.svc.resetUserPassword(user.id).subscribe({
+      next: result => {
+        this.updatingUserIds.update(ids => ids.filter(id => id !== user.id));
+        // Copy token to clipboard for easy sharing
+        navigator.clipboard.writeText(result.token).then(() => {
+          this.showToast('Reset token copied to clipboard (expires in 24 hours).', 'success');
+        }).catch(() => {
+          this.showToast(`Reset token: ${result.token}`, 'success');
+        });
+      },
+      error: err => {
+        this.updatingUserIds.update(ids => ids.filter(id => id !== user.id));
+        const msg = err?.error?.error ?? 'Failed to generate reset token.';
+        this.showToast(msg, 'error');
+      },
+    });
   }
 
   private updateUser(userId: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled' }) {

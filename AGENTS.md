@@ -75,6 +75,59 @@ and RxJS 7.8.
 - Production is deployed below `/bags/`; keep `baseHref` and the production API URL as
   configured in `angular.json` and `environment.prod.ts`.
 
+## Unit testing requirements
+
+All new frontend components, services, and guards **must include unit tests**. Use Karma/Jasmine:
+
+- **Test file location:** Place `.spec.ts` files in the same directory as the component/service
+- **Test structure:** Use `describe()` blocks for the class, `it()` blocks for individual scenarios
+- **Mocking:** Use `HttpClientTestingModule` for services that call APIs; use `TestBed` for dependency injection
+- **Coverage expectations:** Aim for at least 60% statement coverage; 50% is the minimum acceptable
+
+### Writing tests
+
+Create test files following this pattern:
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { MyService } from './my.service';
+
+describe('MyService', () => {
+  let service: MyService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [MyService]
+    });
+    service = TestBed.inject(MyService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify(); // ensure no outstanding HTTP requests
+  });
+
+  it('should do something', () => {
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Running tests
+
+```powershell
+npm.cmd run test --prefix frontend           # Interactive mode (Chrome, auto-reload) - local development only
+npm.cmd run test:ci --prefix frontend        # CI mode (headless, code coverage) - use for automated checks and agents
+```
+
+**Important:** When running test verification from agents or automated tasks, always use `test:ci` to run headless. Do not use the interactive `test` command from agents as it will attempt to launch a browser.
+
+Code coverage reports are generated in `frontend/coverage/` (in `.gitignore`). Review the HTML report at
+`frontend/coverage/beanbag-bracket/index.html` to identify uncovered code paths.
+
 ## Verification
 
 Before handing off backend changes, run PHP syntax checks on changed files, for example:
@@ -84,18 +137,12 @@ php -l api\controllers\AuthController.php
 php -l api\index.php
 ```
 
-For frontend changes, run:
+For frontend changes, **always include unit tests for new code**. Then run:
 
 ```powershell
 npm.cmd ci --prefix frontend
-npm.cmd run test:ci --prefix frontend    # Run tests in CI mode (headless, code coverage)
-npm.cmd run build:prod --prefix frontend
-```
-
-Unit tests use Karma/Jasmine. To run tests interactively (with auto-reload):
-
-```powershell
-npm.cmd run test --prefix frontend    # Opens Chrome, watches for changes
+npm.cmd run test:ci --prefix frontend        # Verify tests pass and check coverage
+npm.cmd run build:prod --prefix frontend     # Verify production build succeeds
 ```
 
 Also run `git diff --check`. A local PHP CLI without `pdo_mysql` cannot exercise database
