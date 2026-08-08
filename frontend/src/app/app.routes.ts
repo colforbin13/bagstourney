@@ -25,6 +25,18 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/reset-password.component').then(m => m.ResetPasswordComponent),
   },
   {
+    path: 'notifications/confirm',
+    loadComponent: () => import('./notifications/confirm-subscription.component').then(m => m.ConfirmSubscriptionComponent),
+  },
+  {
+    path: 'notifications/unsubscribe',
+    loadComponent: () => import('./notifications/unsubscribe.component').then(m => m.UnsubscribeComponent),
+  },
+  {
+    path: 'notifications/preferences',
+    loadComponent: () => import('./notifications/preferences.component').then(m => m.PreferencesComponent),
+  },
+  {
     path: 'admin',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),

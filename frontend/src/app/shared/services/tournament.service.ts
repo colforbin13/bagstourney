@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult } from '../models/tournament.models';
+import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -106,6 +106,32 @@ export class TournamentService {
     return this.http.put<Participant>(`${this.api}/participants/${id}`, { name });
   }
 
+  setParticipantNotificationEmail(participantId: number, email: string) {
+    return this.http.put<Participant & { warning?: string }>(
+      `${this.api}/participants/${participantId}/notification-email`, { email });
+  }
+
+  // Notification opt-in/opt-out (public, token-based, no login)
+  confirmNotificationSubscription(participantId: number, token: string) {
+    return this.http.post<{ message: string; manage_preferences_url?: string }>(
+      `${this.api}/notifications/confirm`, { participant_id: participantId, token });
+  }
+
+  unsubscribeNotificationCategory(participantId: number, token: string, category: string) {
+    return this.http.post<{ message: string }>(`${this.api}/notifications/unsubscribe`,
+      { participant_id: participantId, token, category });
+  }
+
+  getNotificationPreferences(participantId: number, token: string) {
+    return this.http.get<NotificationPreferences>(`${this.api}/notifications/preferences`,
+      { params: { pid: participantId, token } });
+  }
+
+  updateNotificationPreferences(participantId: number, token: string, categories: Partial<NotificationPreferences['categories']>) {
+    return this.http.put<{ message: string }>(`${this.api}/notifications/preferences`,
+      { participant_id: participantId, token, ...categories });
+  }
+
   // Teams
   getTeams(tournamentId: number) {
     return this.http.get<Team[]>(`${this.api}/teams/${tournamentId}`);
@@ -122,6 +148,10 @@ export class TournamentService {
   // Bracket / Matches
   getBracket(tournamentId: number) {
     return this.http.get<BracketData>(`${this.api}/matches/${tournamentId}`);
+  }
+
+  getBracketByUuid(uuid: string) {
+    return this.http.get<BracketData>(`${this.api}/matches/by-uuid/${uuid}`);
   }
 
   updateScore(matchId: number, team1Score: number, team2Score: number) {

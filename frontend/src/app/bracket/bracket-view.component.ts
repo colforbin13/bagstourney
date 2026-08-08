@@ -88,6 +88,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   private tournamentId!: number;
+  private uuid: string | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -99,10 +100,10 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     const param = this.route.snapshot.paramMap.get('id')!;
     if (/^\d+$/.test(param)) {
       this.tournamentId = +param;
-      this.load();
     } else {
-      this.loadByUuid(param);
+      this.uuid = param;
     }
+    this.load();
   }
 
   ngAfterViewInit() {
@@ -117,47 +118,45 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Data loading ───────────────────────────────────────────────────────────
 
+  // Fires the tournament and bracket fetches in parallel, keyed consistently off however
+  // this page was reached: numeric id (authenticated admin routes) or uuid (the public,
+  // non-guessable bracket link — including for private tournaments, where knowing the
+  // uuid is itself the access grant; the numeric-id endpoints require a role and would
+  // 404 for an anonymous viewer even after the tournament itself resolved by uuid). This
+  // must stay uuid-based on every call, not just the first: auto-reload (startAutoReload())
+  // calls this same method on a timer, and previously fell back to the numeric-id path,
+  // silently breaking a private tournament's live bracket updates after the first load.
   load() {
     this.loading.set(true);
-    this.svc.getTournament(this.tournamentId).subscribe({
-      next: t => this.tournament.set(t),
-      error: () => this.showError('Tournament not found.'),
-    });
-    this.loadBracket();
+    if (this.uuid) {
+      this.svc.getTournamentByUuid(this.uuid).subscribe({
+        next: t => { this.tournament.set(t); this.tournamentId = t.id; },
+        error: () => this.showError('Tournament not found.'),
+      });
+      this.svc.getBracketByUuid(this.uuid).subscribe({
+        next: data => this.applyBracketData(data),
+        error: () => this.loading.set(false),
+      });
+    } else {
+      this.svc.getTournament(this.tournamentId).subscribe({
+        next: t => this.tournament.set(t),
+        error: () => this.showError('Tournament not found.'),
+      });
+      this.svc.getBracket(this.tournamentId).subscribe({
+        next: data => this.applyBracketData(data),
+        error: () => this.loading.set(false),
+      });
+    }
   }
 
-  // Resolves a UUID route param (the public, non-guessable bracket link) to its
-  // underlying tournament — which carries the numeric id — before the bracket itself
-  // can be fetched. Unlike load(), this can't fire both requests in parallel: the
-  // bracket fetch depends on the numeric id this call resolves.
-  private loadByUuid(uuid: string) {
-    this.loading.set(true);
-    this.svc.getTournamentByUuid(uuid).subscribe({
-      next: t => {
-        this.tournament.set(t);
-        this.tournamentId = t.id;
-        this.loadBracket();
-      },
-      error: () => {
-        this.showError('Tournament not found.');
-        this.loading.set(false);
-      },
+  private applyBracketData(data: BracketData) {
+    this.bracketData.set(data);
+    Object.values(data.rounds).flat().forEach((m: Match) => {
+      if (!this.scores[m.id]) {
+        this.scores[m.id] = { team1: '', team2: '' };
+      }
     });
-  }
-
-  private loadBracket() {
-    this.svc.getBracket(this.tournamentId).subscribe({
-      next: data => {
-        this.bracketData.set(data);
-        Object.values(data.rounds).flat().forEach((m: Match) => {
-          if (!this.scores[m.id]) {
-            this.scores[m.id] = { team1: '', team2: '' };
-          }
-        });
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+    this.loading.set(false);
   }
 
   // ── Labels ─────────────────────────────────────────────────────────────────

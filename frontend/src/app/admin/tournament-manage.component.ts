@@ -135,11 +135,19 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
             @for (p of participants(); track p.id) {
               <div class="participant-item">
                 @if (editingParticipantId === p.id) {
-                  <input class="input" type="text" [(ngModel)]="editingParticipantName" />
-                  <button class="btn btn-sm" (click)="saveParticipant(p)">Save</button>
-                  <button class="btn btn-sm" (click)="cancelEditParticipant()">Cancel</button>
+                  <input class="input" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
+                  <input class="input" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
+                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
+                    @if (savingParticipantId() === p.id) { Saving… } @else { Save }
+                  </button>
+                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
                 } @else {
-                  <span style="flex:1">{{ p.name }}</span>
+                  <span style="flex:1">
+                    {{ p.name }}
+                    @if (notificationStatusLabel(p); as label) {
+                      <span class="notify-status">— {{ label }}</span>
+                    }
+                  </span>
                   @if (canManageSetup()) {
                     <div style="display:flex;gap:6px">
                       <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
@@ -186,11 +194,19 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
             @for (p of participants(); track p.id) {
               <div class="participant-item">
                 @if (editingParticipantId === p.id) {
-                  <input class="input" type="text" [(ngModel)]="editingParticipantName" />
-                  <button class="btn btn-sm" (click)="saveParticipant(p)">Save</button>
-                  <button class="btn btn-sm" (click)="cancelEditParticipant()">Cancel</button>
+                  <input class="input" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
+                  <input class="input" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
+                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
+                    @if (savingParticipantId() === p.id) { Saving… } @else { Save }
+                  </button>
+                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
                 } @else {
-                  <span style="flex:1">{{ p.name }}</span>
+                  <span style="flex:1">
+                    {{ p.name }}
+                    @if (notificationStatusLabel(p); as label) {
+                      <span class="notify-status">— {{ label }}</span>
+                    }
+                  </span>
                   @if (canManageSetup()) {
                     <div style="display:flex;gap:6px">
                       <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
@@ -285,6 +301,7 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
       border-radius: var(--radius);
       font-size: .875rem;
     }
+    .notify-status { color: var(--text-dim); font-size: .75rem; }
 
     /* Draw section */
     .draw-section {
@@ -387,6 +404,8 @@ export class TournamentManageComponent implements OnInit {
   // Inline editing state
   editingParticipantId: number | null = null;
   editingParticipantName = '';
+  editingParticipantEmail = '';
+  savingParticipantId = signal<number | null>(null);
 
   editingTeamId: number | null = null;
   editingTeamName = '';
@@ -609,16 +628,33 @@ export class TournamentManageComponent implements OnInit {
   startEditParticipant(p: Participant) {
     this.editingParticipantId = p.id;
     this.editingParticipantName = p.name;
+    this.editingParticipantEmail = p.email ?? '';
   }
 
   cancelEditParticipant() {
     this.editingParticipantId = null;
     this.editingParticipantName = '';
+    this.editingParticipantEmail = '';
+  }
+
+  notificationStatusLabel(p: Participant): string | null {
+    switch (p.notification_lifecycle) {
+      case 'pending': return 'pending confirmation';
+      case 'confirmed': return 'subscribed';
+      case 'suppressed': return 'suppressed';
+      default: return null;
+    }
   }
 
   saveParticipant(p: Participant) {
+    // Guards against a double-click firing two overlapping saves — the second call would
+    // otherwise regenerate and silently invalidate the confirm token the first call just
+    // issued (each call to setParticipantNotificationEmail() starts a fresh opt-in flow).
+    if (this.savingParticipantId() === p.id) return;
     const name = this.editingParticipantName.trim();
+    const email = this.editingParticipantEmail.trim();
     if (!name) return;
+    this.savingParticipantId.set(p.id);
     this.svc.updateParticipant(p.id, name).subscribe({
       next: updated => {
         this.participants.update(list => list.map(item => item.id === p.id ? updated : item));
@@ -626,9 +662,27 @@ export class TournamentManageComponent implements OnInit {
         if (this.tournament()?.status !== 'setup') {
           this.svc.getTeams(this.tournamentId).subscribe(t => this.teams.set(t));
         }
+        if (email !== (p.email ?? '')) {
+          this.svc.setParticipantNotificationEmail(p.id, email).subscribe({
+            next: withEmail => {
+              this.participants.update(list => list.map(item => item.id === p.id ? { ...item, ...withEmail } : item));
+              if (withEmail.warning) this.showToast(withEmail.warning);
+              this.savingParticipantId.set(null);
+            },
+            error: () => {
+              this.showToast('Failed to update notification email.');
+              this.savingParticipantId.set(null);
+            },
+          });
+        } else {
+          this.savingParticipantId.set(null);
+        }
         this.cancelEditParticipant();
       },
-      error: () => this.showToast('Failed to update participant.'),
+      error: () => {
+        this.showToast('Failed to update participant.');
+        this.savingParticipantId.set(null);
+      },
     });
   }
 

@@ -196,6 +196,20 @@ describe('TournamentService', () => {
     });
   });
 
+  describe('getBracketByUuid', () => {
+    it('should fetch bracket data by tournament uuid', () => {
+      const mockBracket = { rounds: {} };
+
+      service.getBracketByUuid('test-uuid-1234').subscribe(bracket => {
+        expect(bracket).toEqual(mockBracket);
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/matches/by-uuid/test-uuid-1234`);
+      expect(req.request.method).toBe('GET');
+      req.flush(mockBracket);
+    });
+  });
+
   describe('changePassword', () => {
     it('should call POST /auth/change-password with correct body', () => {
       service.changePassword('oldPass123', 'newPass1234').subscribe();
@@ -270,6 +284,84 @@ describe('TournamentService', () => {
       req.error(new ErrorEvent('Bad Request'), { status: 400 });
 
       expect(errorReceived).toBe(true);
+    });
+  });
+
+  describe('setParticipantNotificationEmail', () => {
+    it('should call PUT /participants/:id/notification-email with the email', () => {
+      service.setParticipantNotificationEmail(7, 'player@example.com').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/7/notification-email`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ email: 'player@example.com' });
+      req.flush({ id: 7, tournament_id: 1, name: 'Alice', email: 'player@example.com' });
+    });
+  });
+
+  describe('confirmNotificationSubscription', () => {
+    it('should call POST /notifications/confirm with participant_id and token', () => {
+      service.confirmNotificationSubscription(7, 'tok123').subscribe(result => {
+        expect(result.message).toBe('Subscription confirmed.');
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/notifications/confirm`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ participant_id: 7, token: 'tok123' });
+      req.flush({ message: 'Subscription confirmed.' });
+    });
+
+    it('should handle an invalid or expired token', () => {
+      let errorReceived = false;
+      service.confirmNotificationSubscription(7, 'bad-token').subscribe({
+        error: () => { errorReceived = true; }
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/notifications/confirm`);
+      req.error(new ErrorEvent('Bad Request'), { status: 400 });
+
+      expect(errorReceived).toBe(true);
+    });
+  });
+
+  describe('unsubscribeNotificationCategory', () => {
+    it('should call POST /notifications/unsubscribe with the category', () => {
+      service.unsubscribeNotificationCategory(7, 'tok123', 'round_completed').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/notifications/unsubscribe`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ participant_id: 7, token: 'tok123', category: 'round_completed' });
+      req.flush({ message: 'You will no longer receive these emails.' });
+    });
+  });
+
+  describe('getNotificationPreferences', () => {
+    it('should call GET /notifications/preferences with pid and token params', () => {
+      service.getNotificationPreferences(7, 'tok123').subscribe(prefs => {
+        expect(prefs.email).toBe('player@example.com');
+        expect(prefs.categories.match_completed).toBe(true);
+      });
+
+      const req = httpMock.expectOne(
+        r => r.url === `${environment.apiUrl}/notifications/preferences`
+          && r.params.get('pid') === '7' && r.params.get('token') === 'tok123'
+      );
+      expect(req.request.method).toBe('GET');
+      req.flush({
+        email: 'player@example.com',
+        tournament_name: 'Summer Bags',
+        categories: { match_completed: true, round_completed: true, tournament_finalized: true },
+      });
+    });
+  });
+
+  describe('updateNotificationPreferences', () => {
+    it('should call PUT /notifications/preferences with the changed categories', () => {
+      service.updateNotificationPreferences(7, 'tok123', { round_completed: false }).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/notifications/preferences`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ participant_id: 7, token: 'tok123', round_completed: false });
+      req.flush({ message: 'Preferences updated.' });
     });
   });
 });

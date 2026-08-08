@@ -5,7 +5,7 @@ import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { TournamentManageComponent } from './tournament-manage.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { TournamentMember, UserSearchResult, TournamentCapabilities } from '../shared/models/tournament.models';
+import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 
 describe('TournamentManageComponent', () => {
@@ -271,5 +271,69 @@ describe('TournamentManageComponent', () => {
     await Promise.resolve();
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${location.origin}/bracket/test-uuid-1234`);
+  });
+
+  function bootstrapWithParticipant(participant: Participant) {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+      .flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+    httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([participant]);
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+  }
+
+  describe('saveParticipant', () => {
+    const participant: Participant = { id: 5, tournament_id: tournamentId, name: 'Alice', email: 'alice@example.com' };
+
+    it('should not call the notification-email endpoint when the email is unchanged', () => {
+      bootstrapWithParticipant(participant);
+
+      component.startEditParticipant(participant);
+      component.saveParticipant(participant);
+
+      const nameReq = httpMock.expectOne(`${environment.apiUrl}/participants/5`);
+      expect(nameReq.request.method).toBe('PUT');
+      nameReq.flush({ ...participant });
+
+      httpMock.expectNone(`${environment.apiUrl}/participants/5/notification-email`);
+    });
+
+    it('should call the notification-email endpoint when the email changes', () => {
+      bootstrapWithParticipant(participant);
+
+      component.startEditParticipant(participant);
+      component.editingParticipantEmail = 'newalice@example.com';
+      component.saveParticipant(participant);
+
+      const nameReq = httpMock.expectOne(`${environment.apiUrl}/participants/5`);
+      nameReq.flush({ ...participant });
+
+      const emailReq = httpMock.expectOne(`${environment.apiUrl}/participants/5/notification-email`);
+      expect(emailReq.request.method).toBe('PUT');
+      expect(emailReq.request.body).toEqual({ email: 'newalice@example.com' });
+      emailReq.flush({ ...participant, email: 'newalice@example.com', notification_lifecycle: 'pending' });
+
+      expect(component.participants()[0].notification_lifecycle).toBe('pending');
+    });
+
+    // Regression coverage: a double-click used to fire two overlapping
+    // setParticipantNotificationEmail() calls, each regenerating a confirm token and
+    // silently invalidating the one the other call just issued.
+    it('should ignore a second saveParticipant call for the same participant while the first is still in flight', () => {
+      bootstrapWithParticipant(participant);
+
+      component.startEditParticipant(participant);
+      component.saveParticipant(participant);
+      expect(component.savingParticipantId()).toBe(participant.id);
+
+      component.saveParticipant(participant); // should be a no-op
+
+      const nameReq = httpMock.expectOne(`${environment.apiUrl}/participants/5`);
+      nameReq.flush({ ...participant });
+
+      expect(component.savingParticipantId()).toBeNull();
+    });
   });
 });

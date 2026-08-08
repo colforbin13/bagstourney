@@ -1,5 +1,5 @@
 // src/app/shared/components/nav.component.ts
-import { Component, computed } from '@angular/core';
+import { Component, computed, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 
@@ -9,11 +9,16 @@ import { AuthService } from '../services/auth.service';
   imports: [RouterLink, RouterLinkActive],
   template: `
     <nav class="nav">
-      <a class="nav-brand" routerLink="/">
+      <a class="nav-brand" routerLink="/" (click)="closeMenu()">
         <span class="nav-icon">◈</span>
         <span class="nav-title">Apple Lane Bag Bracket</span>
       </a>
-      <div class="nav-links">
+      <button class="nav-toggle" type="button"
+        [attr.aria-expanded]="menuOpen()" aria-label="Toggle menu"
+        (click)="menuOpen.set(!menuOpen())">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" [class.open]="menuOpen()" (click)="closeMenu()">
         @if (auth.isLoggedIn()) {
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Tournaments</a>
           <a routerLink="/admin" routerLinkActive="active">Admin</a>
@@ -79,8 +84,58 @@ import { AuthService } from '../services/auth.service';
       border-right: 1px solid var(--border);
       text-decoration: none;
     }
+    .nav-toggle {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      gap: 5px;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+
+      span {
+        display: block;
+        width: 20px;
+        height: 2px;
+        background: var(--text);
+        border-radius: 1px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .nav-toggle { display: flex; }
+
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 52px;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 16px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+
+        &.open { display: flex; }
+      }
+      .nav-user {
+        border: none;
+        padding: 0;
+      }
+    }
   `]
 })
 export class NavComponent {
+  menuOpen = signal(false);
+
   constructor(public auth: AuthService) {}
+
+  closeMenu() {
+    this.menuOpen.set(false);
+  }
 }

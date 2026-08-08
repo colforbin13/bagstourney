@@ -149,27 +149,50 @@ describe('BracketViewComponent', () => {
       httpMock = TestBed.inject(HttpTestingController);
     });
 
-    it('resolves the tournament by uuid first, then fetches the bracket by the resolved numeric id', () => {
+    // Regression coverage for a real bug: the bracket must be fetched via the uuid-keyed
+    // endpoint, not the numeric-id one — the numeric-id matches endpoint requires a
+    // tournament role and 404s for an anonymous viewer, which broke a private
+    // tournament's own shareable /bracket/{uuid} link (it resolved the tournament fine,
+    // by design, but then never loaded the bracket).
+    it('fetches the tournament and bracket by uuid, not by the resolved numeric id', () => {
       fixture.detectChanges();
 
       const uuidReq = httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/${uuid}`);
       expect(uuidReq.request.method).toBe('GET');
       uuidReq.flush(tournamentWith());
 
-      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(emptyBracket);
+      const bracketReq = httpMock.expectOne(`${environment.apiUrl}/matches/by-uuid/${uuid}`);
+      expect(bracketReq.request.method).toBe('GET');
+      bracketReq.flush(emptyBracket);
 
       expect(component.tournament()?.id).toBe(tournamentId);
       expect(component.loading()).toBe(false);
+      httpMock.expectNone(`${environment.apiUrl}/matches/${tournamentId}`);
     });
 
-    it('shows an error and stops loading if the uuid does not resolve to a tournament', () => {
+    it('shows an error but still resolves the independent bracket fetch if the uuid does not resolve to a tournament', () => {
       fixture.detectChanges();
 
       httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/${uuid}`)
         .flush({ error: 'Not found' }, { status: 404, statusText: 'Not Found' });
+      httpMock.expectOne(`${environment.apiUrl}/matches/by-uuid/${uuid}`).flush(emptyBracket);
 
       expect(component.error()).toBe('Tournament not found.');
       expect(component.loading()).toBe(false);
+    });
+
+    // Regression coverage: auto-reload (shown only to anonymous viewers, per the
+    // template's `@if (!auth.isLoggedIn())` guard) calls the same load() on a timer —
+    // it must keep using the uuid-keyed endpoints on every refresh, not just the first.
+    it('keeps using the uuid-keyed endpoints when auto-reload re-triggers load()', () => {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/${uuid}`).flush(tournamentWith());
+      httpMock.expectOne(`${environment.apiUrl}/matches/by-uuid/${uuid}`).flush(emptyBracket);
+
+      component.onAutoReloadToggle(true);
+
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/${uuid}`).flush(tournamentWith());
+      httpMock.expectOne(`${environment.apiUrl}/matches/by-uuid/${uuid}`).flush(emptyBracket);
       httpMock.expectNone(`${environment.apiUrl}/matches/${tournamentId}`);
     });
   });

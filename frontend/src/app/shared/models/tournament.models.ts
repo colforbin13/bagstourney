@@ -50,6 +50,21 @@ export interface Participant {
   id: number;
   tournament_id: number;
   name: string;
+  email?: string | null;
+  notification_lifecycle?: 'none' | 'pending' | 'confirmed' | 'suppressed';
+  notify_match_completed?: boolean;
+  notify_round_completed?: boolean;
+  notify_tournament_finalized?: boolean;
+}
+
+export interface NotificationPreferences {
+  email: string;
+  tournament_name: string;
+  categories: {
+    match_completed: boolean;
+    round_completed: boolean;
+    tournament_finalized: boolean;
+  };
 }
 
 export interface Team {

@@ -181,3 +181,49 @@ a:hover { text-decoration: underline; }
   color: var(--text-dim);
   font-size: 0.875rem;
 }
+
+/* ── Notification pages (confirm/unsubscribe/preferences) ── */
+.notif-wrap {
+  min-height: calc(100dvh - 52px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.notif-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.notif-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  h1 { font-size: 1.1rem; font-weight: 600; }
+}
+.notif-icon { color: var(--accent); font-size: 1.2rem; }
+.notif-status { font-size: 0.85rem; color: var(--text-dim); }
+.notif-checkbox { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.notif-error {
+  font-size: 0.8rem;
+  color: var(--danger);
+  background: #1a0000;
+  border: 1px solid #330000;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+.notif-success {
+  font-size: 0.85rem;
+  color: var(--text);
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.notif-link { color: var(--accent); font-size: 0.8rem; text-align: center; }

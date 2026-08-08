@@ -6,6 +6,21 @@ class MatchController {
 		$this->db = $db;
 	}
 
+    // Resolves a uuid to its tournament before delegating to bracket() — no visibility
+    // check here, matching TournamentController::getByUuid(): knowing the uuid is itself
+    // the access grant for a private tournament.
+    public function bracketByUuid(string $uuid): void {
+        $stmt = $this->db->prepare('SELECT id FROM tournaments WHERE uuid = ?');
+        $stmt->execute([$uuid]);
+        $t = $stmt->fetch();
+        if (!$t) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Not found']);
+            return;
+        }
+        $this->bracket((int)$t['id']);
+    }
+
     public function bracket(int $tournamentId): void {
         $stmt = $this->db->prepare('
             SELECT
@@ -59,28 +74,35 @@ class MatchController {
             return;
         }
 
-        $stmt = $this->db->prepare('SELECT * FROM matches WHERE id = ?');
-        $stmt->execute([$matchId]);
-        $match = $stmt->fetch();
-
-        if (!$match) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Match not found']);
-            return;
-        }
-
-        // Allow updates for matches that are ready or already complete (editing past results)
-        if (!in_array($match['status'], ['ready', 'complete'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Match is not ready to play']);
-            return;
-        }
-
-        $winnerId = $team1Score > $team2Score ? $match['team1_id'] : $match['team2_id'];
-        $wasComplete = $match['status'] === 'complete';
-
         $this->db->beginTransaction();
         try {
+            // Lock the match row for the rest of this transaction so two concurrent
+            // submissions for the same match can't both read status='ready' here and both
+            // take the first-completion branch below (which would double-enqueue
+            // notification emails) — the second request blocks on this SELECT until the
+            // first commits, then sees the already-updated status.
+            $stmt = $this->db->prepare('SELECT * FROM matches WHERE id = ? FOR UPDATE');
+            $stmt->execute([$matchId]);
+            $match = $stmt->fetch();
+
+            if (!$match) {
+                $this->db->rollBack();
+                http_response_code(404);
+                echo json_encode(['error' => 'Match not found']);
+                return;
+            }
+
+            // Allow updates for matches that are ready or already complete (editing past results)
+            if (!in_array($match['status'], ['ready', 'complete'])) {
+                $this->db->rollBack();
+                http_response_code(400);
+                echo json_encode(['error' => 'Match is not ready to play']);
+                return;
+            }
+
+            $winnerId = $team1Score > $team2Score ? $match['team1_id'] : $match['team2_id'];
+            $wasComplete = $match['status'] === 'complete';
+
             // Update the match
             $this->db->prepare('
                 UPDATE matches
@@ -94,6 +116,11 @@ class MatchController {
                 // different) winner below, so the bracket doesn't show two teams as
                 // having won the same slot.
                 $this->cascadeClearDownstream($matchId);
+            } else {
+                // Only a first-time completion notifies participants — corrections stay
+                // silent so editing an old score doesn't re-blast an email that looks like
+                // a duplicate.
+                $this->enqueueMatchCompletedNotifications($match, $matchId);
             }
 
             // Advance winner to next match
@@ -113,6 +140,10 @@ class MatchController {
 
                 // Cascade-propagate winners through chained byes so a completed match advances properly.
                 $this->cascadePropagate($matchId);
+
+                if (!$wasComplete) {
+                    $this->enqueueRoundCompletedNotifications($match);
+                }
             } else {
                 // No next match → this was the final, mark tournament complete
                 $stmt = $this->db->prepare('SELECT tournament_id FROM matches WHERE id = ?');
@@ -121,6 +152,10 @@ class MatchController {
                 if ($m) {
                     $this->db->prepare('UPDATE tournaments SET status = "complete" WHERE id = ?')
                         ->execute([$m['tournament_id']]);
+                }
+
+                if (!$wasComplete) {
+                    $this->enqueueTournamentFinalizedNotifications($match, $matchId);
                 }
             }
 
@@ -223,6 +258,73 @@ class MatchController {
         $nm = $stmt2->fetch();
         if ($nm && $nm['team1_id'] && $nm['team2_id']) {
             $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
+        }
+    }
+
+    // Notifies the 4 participants (2 per team) of this specific match. $match is the
+    // pre-update row fetched at the top of updateScore(), so its tournament_id/round/
+    // team1_id/team2_id reflect this match regardless of what the score update changed.
+    private function enqueueMatchCompletedNotifications(array $match, int $matchId): void {
+        $stmt = $this->db->prepare('
+            SELECT DISTINCT p.id, p.email
+            FROM participants p
+            JOIN teams t ON p.id = t.participant1_id OR p.id = t.participant2_id
+            WHERE t.id IN (?, ?)
+              AND p.notification_lifecycle = "confirmed"
+              AND p.notify_match_completed = 1
+        ');
+        $stmt->execute([$match['team1_id'], $match['team2_id']]);
+        $insert = $this->db->prepare('
+            INSERT INTO notification_queue (tournament_id, match_id, round, participant_id, email, event_type)
+            VALUES (?, ?, ?, ?, ?, "match_completed")
+        ');
+        foreach ($stmt->fetchAll() as $recipient) {
+            $insert->execute([$match['tournament_id'], $matchId, (int)$match['round'], $recipient['id'], $recipient['email']]);
+        }
+    }
+
+    // Fires only when every match in this match's round is now complete or a bye — byes
+    // are resolved entirely at draw time (TeamController::generateBracket()) and never
+    // reach this method, so a round completed purely via byes will not notify (accepted
+    // limitation). Notifies every confirmed, opted-in participant in the whole tournament,
+    // not just this match's own participants or those advancing.
+    private function enqueueRoundCompletedNotifications(array $match): void {
+        $remaining = $this->db->prepare('
+            SELECT COUNT(*) FROM matches
+            WHERE tournament_id = ? AND round = ? AND status NOT IN ("complete", "bye")
+        ');
+        $remaining->execute([$match['tournament_id'], $match['round']]);
+        if ((int)$remaining->fetchColumn() !== 0) return;
+
+        $stmt = $this->db->prepare('
+            SELECT id, email FROM participants
+            WHERE tournament_id = ? AND notification_lifecycle = "confirmed" AND notify_round_completed = 1
+        ');
+        $stmt->execute([$match['tournament_id']]);
+        $insert = $this->db->prepare('
+            INSERT INTO notification_queue (tournament_id, round, participant_id, email, event_type)
+            VALUES (?, ?, ?, ?, "round_completed")
+        ');
+        foreach ($stmt->fetchAll() as $recipient) {
+            $insert->execute([$match['tournament_id'], (int)$match['round'], $recipient['id'], $recipient['email']]);
+        }
+    }
+
+    // Called only from the "no next_match_id" branch, which is structurally always the
+    // championship match — so this and enqueueRoundCompletedNotifications() never both
+    // fire for the same match. Notifies every confirmed, opted-in participant tournament-wide.
+    private function enqueueTournamentFinalizedNotifications(array $match, int $matchId): void {
+        $stmt = $this->db->prepare('
+            SELECT id, email FROM participants
+            WHERE tournament_id = ? AND notification_lifecycle = "confirmed" AND notify_tournament_finalized = 1
+        ');
+        $stmt->execute([$match['tournament_id']]);
+        $insert = $this->db->prepare('
+            INSERT INTO notification_queue (tournament_id, match_id, round, participant_id, email, event_type)
+            VALUES (?, ?, ?, ?, ?, "tournament_finalized")
+        ');
+        foreach ($stmt->fetchAll() as $recipient) {
+            $insert->execute([$match['tournament_id'], $matchId, (int)$match['round'], $recipient['id'], $recipient['email']]);
         }
     }
 }

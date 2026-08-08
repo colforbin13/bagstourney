@@ -131,6 +131,27 @@ function requireTournamentVisible(PDO $db, int $tournamentId, ?array $actor): ar
     return $t;
 }
 
+// Single source of truth for the notification category names and the participants
+// column each one toggles — shared by NotificationController.php (opt-out API) and
+// api/scripts/send_notifications.php (per-category send-time re-check) so the two can't
+// drift apart.
+const NOTIFICATION_CATEGORY_COLUMNS = [
+    'match_completed' => 'notify_match_completed',
+    'round_completed' => 'notify_round_completed',
+    'tournament_finalized' => 'notify_tournament_finalized',
+];
+
+// Deterministic capability token for a participant's "manage my notification
+// preferences" / one-click category-unsubscribe links. Unlike JWT_SECRET-signed session
+// tokens or the hashed, single-use password-reset/notification-confirm tokens, nothing is
+// stored: the worker and the public endpoints both recompute this on demand from the
+// participant id, their current token version, and this server secret. Bumping
+// participants.notification_manage_token_version invalidates every link issued before
+// the bump (used when a participant's email address changes).
+function notificationManageToken(int $participantId, int $version): string {
+    return hash_hmac('sha256', "participant:{$participantId}:v{$version}", NOTIFICATION_TOKEN_SECRET);
+}
+
 function writeAuditLog(PDO $db, ?int $tournamentId, ?int $actorUserId, string $action, ?string $targetType = null, ?string $targetId = null, ?array $details = null): void {
     $stmt = $db->prepare('INSERT INTO audit_log (tournament_id, actor_user_id, action, target_type, target_id, details_json) VALUES (?, ?, ?, ?, ?, ?)');
     $stmt->execute([

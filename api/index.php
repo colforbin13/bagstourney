@@ -20,6 +20,7 @@ require_once __DIR__ . '/controllers/TeamController.php';
 require_once __DIR__ . '/controllers/MatchController.php';
 require_once __DIR__ . '/controllers/TournamentAccessController.php';
 require_once __DIR__ . '/controllers/UserController.php';
+require_once __DIR__ . '/controllers/NotificationController.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -89,12 +90,20 @@ try {
             $db = getDB();
             $ctrl = new ParticipantController($db);
             if ($method === 'GET' && $id) {
-                // GET /participants/{tournamentId}
-                requireTournamentVisible($db, $id, currentUserOrNull($db));
+                // GET /participants/{tournamentId} — participant rows carry email
+                // addresses now, so this requires actual tournament staff access, not just
+                // visibility (a public tournament is visible to anonymous viewers, but its
+                // participants' emails are not).
+                requireTournamentRole($db, $id, ['owner', 'manager', 'scorekeeper']);
                 $ctrl->listByTournament($id);
             } elseif ($method === 'POST') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->create($body);
+            } elseif ($method === 'PUT' && $id && $action === 'notification-email') {
+                $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
+                $stmt->execute([$id]);
+                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->setNotificationEmail($id, $body, $actor);
             } elseif ($method === 'PUT' && $id) {
                 $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
                 $stmt->execute([$id]);
@@ -136,7 +145,14 @@ try {
         case 'matches':
             $db = getDB();
             $ctrl = new MatchController($db);
-            if ($method === 'GET' && $id) {
+            if ($method === 'GET' && !$id && $action === 'by-uuid' && isset($segments[2])) {
+                // GET /matches/by-uuid/{uuid} — no visibility check: same as
+                // TournamentController::getByUuid(), knowing the uuid is the access grant.
+                // This is what actually lets an anonymous viewer's /bracket/{uuid} link work
+                // for a private tournament; requireTournamentVisible() below only recognizes
+                // an explicit role, which an anonymous uuid-holder doesn't have.
+                $ctrl->bracketByUuid($segments[2]);
+            } elseif ($method === 'GET' && $id) {
                 requireTournamentVisible($db, $id, currentUserOrNull($db));
                 $ctrl->bracket($id); // GET /matches/{tournamentId}
             } elseif ($method === 'PUT' && $id) {
@@ -172,6 +188,29 @@ try {
         case 'tournament-ownership':
             if ($method === 'PUT' && $id) {
                 (new TournamentAccessController(getDB()))->transferOwnership($id, $body);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Notification opt-in/opt-out (participant-facing, token-gated, no login) ---
+        case 'notifications':
+            $ctrl = new NotificationController(getDB());
+            $notifAction = $segments[1] ?? null;
+            $notifSubAction = $segments[2] ?? null;
+            if ($method === 'POST' && $notifAction === 'confirm') {
+                $ctrl->confirm($body);
+            } elseif ($method === 'POST' && $notifAction === 'unsubscribe') {
+                $ctrl->unsubscribeCategory($body);
+            } elseif ($method === 'GET' && $notifAction === 'preferences') {
+                $ctrl->getPreferences($_GET);
+            } elseif ($method === 'PUT' && $notifAction === 'preferences') {
+                $ctrl->updatePreferences($body);
+            } elseif ($method === 'POST' && $notifAction === 'webhook' && $notifSubAction === 'bounce') {
+                $ctrl->webhookBounce($body);
+            } elseif ($method === 'POST' && $notifAction === 'webhook' && $notifSubAction === 'spam-complaint') {
+                $ctrl->webhookComplaint($body);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
