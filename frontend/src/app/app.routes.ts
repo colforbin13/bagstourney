@@ -37,6 +37,10 @@ export const routes: Routes = [
     loadComponent: () => import('./notifications/preferences.component').then(m => m.PreferencesComponent),
   },
   {
+    path: 'register/:uuid',
+    loadComponent: () => import('./register/self-register.component').then(m => m.SelfRegisterComponent),
+  },
+  {
     path: 'admin',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/admin-dashboard.component').then(m => m.AdminDashboardComponent),

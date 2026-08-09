@@ -50,6 +50,7 @@ export interface Participant {
   id: number;
   tournament_id: number;
   name: string;
+  registration_status?: 'approved' | 'pending';
   email?: string | null;
   notification_lifecycle?: 'none' | 'pending' | 'confirmed' | 'suppressed';
   notify_match_completed?: boolean;

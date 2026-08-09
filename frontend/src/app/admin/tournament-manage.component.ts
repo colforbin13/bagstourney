@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-tournament-manage',
@@ -33,6 +34,9 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
                 Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
               </button>
               <button class="btn btn-sm" (click)="copyPublicLink()">Copy link</button>
+              @if (tournament()!.status === 'setup') {
+                <button class="btn btn-sm" (click)="copyRegistrationLink()">Copy registration link</button>
+              }
             }
           }
           <a class="btn btn-sm" [routerLink]="['/bracket', tournamentId]">View bracket</a>
@@ -119,11 +123,18 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
           </div>
         }
 
+        @if (pendingParticipants().length > 0) {
+          <div class="card" style="margin-bottom:16px;border-color:var(--accent)">
+            {{ pendingParticipants().length }} self-registration{{ pendingParticipants().length === 1 ? '' : 's' }}
+            awaiting approval — approve or reject before drawing teams.
+          </div>
+        }
+
         <!-- Participants list -->
         <div class="section-label">
           Participants
-          <span class="count">{{ participants().length }}</span>
-          @if (participants().length % 2 !== 0 && participants().length > 0) {
+          <span class="count">{{ approvedParticipants().length }}</span>
+          @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
             <span class="warn">— Need an even number</span>
           }
         </div>
@@ -134,7 +145,15 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
           <div class="participant-list">
             @for (p of participants(); track p.id) {
               <div class="participant-item">
-                @if (editingParticipantId === p.id) {
+                @if (p.registration_status === 'pending') {
+                  <span style="flex:1">{{ p.name }} <span class="notify-status">— pending approval</span></span>
+                  @if (canManageSetup()) {
+                    <div style="display:flex;gap:6px">
+                      <button class="btn btn-sm btn-primary" [disabled]="approvingParticipantId() === p.id" (click)="approveParticipant(p)">Approve</button>
+                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">Reject</button>
+                    </div>
+                  }
+                } @else if (editingParticipantId === p.id) {
                   <input class="input" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
                   <input class="input" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
                   <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
@@ -161,13 +180,13 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
         }
 
         <!-- Draw button -->
-        @if (canManageSetup() && participants().length >= 4 && participants().length % 2 === 0) {
+        @if (canManageSetup() && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
           <hr class="divider" />
           <div class="draw-section">
             <div>
               <div style="font-weight:500;margin-bottom:4px;">Ready to draw teams?</div>
               <div style="font-size:.8rem;color:var(--text-dim);">
-                {{ participants().length }} participants → {{ participants().length / 2 }} teams.
+                {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
                 This will randomly pair players, seed teams, and generate the bracket.
               </div>
             </div>
@@ -388,6 +407,9 @@ export class TournamentManageComponent implements OnInit {
   teams = signal<Team[]>([]);
   champion = signal<string | null>(null);
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
+  approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
+  pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
+  approvingParticipantId = signal<number | null>(null);
   visibilityBusy = signal(false);
 
   loading = signal(true);
@@ -481,11 +503,23 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
+  // location.origin alone omits the deployment base path (environment.baseHref, "/bags/"
+  // in production — see main.ts, which sets the <base href> from it at runtime), so a
+  // plain `${location.origin}/bracket/...` string silently drops the "/bags" segment.
   copyPublicLink() {
     const uuid = this.tournament()?.uuid;
     if (!uuid) return;
-    navigator.clipboard.writeText(`${location.origin}/bracket/${uuid}`).then(
+    navigator.clipboard.writeText(`${location.origin}${environment.baseHref}bracket/${uuid}`).then(
       () => this.showToast('Link copied!'),
+      () => this.showToast('Could not copy link.'),
+    );
+  }
+
+  copyRegistrationLink() {
+    const uuid = this.tournament()?.uuid;
+    if (!uuid) return;
+    navigator.clipboard.writeText(`${location.origin}${environment.baseHref}register/${uuid}`).then(
+      () => this.showToast('Registration link copied!'),
       () => this.showToast('Could not copy link.'),
     );
   }
@@ -692,11 +726,30 @@ export class TournamentManageComponent implements OnInit {
       this.showToast('Cannot delete participants after teams have been drawn.');
       return;
     }
-    const ok = await confirmService.confirm(`Delete participant "${p.name}"? This cannot be undone.`);
+    // A pending self-registration is a real row — rejecting it is just deleting it —
+    // but the confirmation wording should match what the organizer actually asked for.
+    const prompt = p.registration_status === 'pending'
+      ? `Reject "${p.name}"'s registration? This cannot be undone.`
+      : `Delete participant "${p.name}"? This cannot be undone.`;
+    const ok = await confirmService.confirm(prompt);
     if (!ok) return;
     this.svc.deleteParticipant(p.id).subscribe({
       next: () => this.participants.update(list => list.filter(x => x.id !== p.id)),
       error: (err) => this.showToast(err?.error?.error ?? 'Failed to delete participant.'),
+    });
+  }
+
+  approveParticipant(p: Participant) {
+    this.approvingParticipantId.set(p.id);
+    this.svc.approveParticipant(p.id).subscribe({
+      next: updated => {
+        this.approvingParticipantId.set(null);
+        this.participants.update(list => list.map(item => item.id === p.id ? { ...item, ...updated } : item));
+      },
+      error: err => {
+        this.approvingParticipantId.set(null);
+        this.showToast(err?.error?.error ?? 'Failed to approve participant.');
+      },
     });
   }
 

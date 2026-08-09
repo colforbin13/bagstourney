@@ -96,6 +96,11 @@ try {
                 // participants' emails are not).
                 requireTournamentRole($db, $id, ['owner', 'manager', 'scorekeeper']);
                 $ctrl->listByTournament($id);
+            } elseif ($method === 'POST' && $action === 'self-register') {
+                // Public, unauthenticated — a coordinator's shared tournament link/QR.
+                // No requireTournamentRole() here by design: this is exactly the endpoint
+                // anonymous attendees are meant to hit.
+                $ctrl->selfRegister($body);
             } elseif ($method === 'POST') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->create($body);
@@ -104,6 +109,11 @@ try {
                 $stmt->execute([$id]);
                 $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->setNotificationEmail($id, $body, $actor);
+            } elseif ($method === 'PUT' && $id && $action === 'approve') {
+                $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
+                $stmt->execute([$id]);
+                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->approve($id, $actor);
             } elseif ($method === 'PUT' && $id) {
                 $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
                 $stmt->execute([$id]);

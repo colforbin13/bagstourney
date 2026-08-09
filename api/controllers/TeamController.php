@@ -43,10 +43,18 @@ class TeamController {
                 throw new Exception('Tournament is not in setup phase');
             }
 
-            // Get participants
-            $stmt = $this->db->prepare('SELECT * FROM participants WHERE tournament_id = ? ORDER BY RAND()');
+            // Get participants — only 'approved' rows (self-registered walk-ups start
+            // 'pending' and must never end up on a team without the organizer having
+            // reviewed them first).
+            $stmt = $this->db->prepare('SELECT * FROM participants WHERE tournament_id = ? AND registration_status = "approved" ORDER BY RAND()');
             $stmt->execute([$tournamentId]);
             $participants = $stmt->fetchAll();
+
+            $pendingCount = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ? AND registration_status = "pending"');
+            $pendingCount->execute([$tournamentId]);
+            if ((int)$pendingCount->fetchColumn() > 0) {
+                throw new Exception('Approve or reject all pending self-registrations before drawing teams');
+            }
 
             if (count($participants) < 2) {
                 throw new Exception('Need at least 2 participants');

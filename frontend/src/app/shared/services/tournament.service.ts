@@ -111,6 +111,18 @@ export class TournamentService {
       `${this.api}/participants/${participantId}/notification-email`, { email });
   }
 
+  approveParticipant(id: number) {
+    return this.http.put<Participant>(`${this.api}/participants/${id}/approve`, {});
+  }
+
+  // Public, unauthenticated — a coordinator's shared tournament link/QR. `website` is a
+  // honeypot field; leave it untouched, real users never see or fill it.
+  selfRegisterParticipant(tournamentUuid: string, name: string, email: string, website: string) {
+    return this.http.post<{ success: boolean; name: string }>(`${this.api}/participants/self-register`, {
+      tournament_uuid: tournamentUuid, name, email, website,
+    });
+  }
+
   // Notification opt-in/opt-out (public, token-based, no login)
   confirmNotificationSubscription(participantId: number, token: string) {
     return this.http.post<{ message: string; manage_preferences_url?: string }>(

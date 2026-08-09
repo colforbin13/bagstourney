@@ -273,16 +273,72 @@ describe('TournamentManageComponent', () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${location.origin}/bracket/test-uuid-1234`);
   });
 
+  it('should copy the registration link to the clipboard', async () => {
+    bootstrapCore();
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+
+    component.copyRegistrationLink();
+    await Promise.resolve();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${location.origin}/register/test-uuid-1234`);
+  });
+
   function bootstrapWithParticipant(participant: Participant) {
+    bootstrapWithParticipants([participant]);
+  }
+
+  function bootstrapWithParticipants(list: Participant[]) {
     fixture.detectChanges();
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
       .flush({
         id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
         visibility: 'public', created_at: '2026-01-01', capabilities: ownerCapabilities,
       });
-    httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([participant]);
+    httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush(list);
     httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
   }
+
+  describe('self-registration approval', () => {
+    it('should split participants into approved and pending', () => {
+      bootstrapWithParticipants([
+        { id: 1, tournament_id: tournamentId, name: 'Alice', registration_status: 'approved' },
+        { id: 2, tournament_id: tournamentId, name: 'Bob', registration_status: 'pending' },
+      ]);
+
+      expect(component.approvedParticipants().map(p => p.id)).toEqual([1]);
+      expect(component.pendingParticipants().map(p => p.id)).toEqual([2]);
+    });
+
+    it('should approve a pending participant', () => {
+      bootstrapWithParticipants([
+        { id: 2, tournament_id: tournamentId, name: 'Bob', registration_status: 'pending' },
+      ]);
+
+      component.approveParticipant(component.participants()[0]);
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/2/approve`);
+      expect(req.request.method).toBe('PUT');
+      req.flush({ id: 2, tournament_id: tournamentId, name: 'Bob', registration_status: 'approved' });
+
+      expect(component.pendingParticipants().length).toBe(0);
+      expect(component.approvedParticipants().length).toBe(1);
+    });
+
+    it('should hide the draw section while any registration is pending, even with enough approved participants', () => {
+      bootstrapWithParticipants([
+        { id: 1, tournament_id: tournamentId, name: 'A', registration_status: 'approved' },
+        { id: 2, tournament_id: tournamentId, name: 'B', registration_status: 'approved' },
+        { id: 3, tournament_id: tournamentId, name: 'C', registration_status: 'approved' },
+        { id: 4, tournament_id: tournamentId, name: 'D', registration_status: 'approved' },
+        { id: 5, tournament_id: tournamentId, name: 'E', registration_status: 'pending' },
+      ]);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).not.toContain('Draw Teams');
+      expect(fixture.nativeElement.textContent).toContain('awaiting approval');
+    });
+  });
 
   describe('saveParticipant', () => {
     const participant: Participant = { id: 5, tournament_id: tournamentId, name: 'Alice', email: 'alice@example.com' };

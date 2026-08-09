@@ -298,6 +298,32 @@ describe('TournamentService', () => {
     });
   });
 
+  describe('approveParticipant', () => {
+    it('should call PUT /participants/:id/approve', () => {
+      service.approveParticipant(7).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/7/approve`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({});
+      req.flush({ id: 7, tournament_id: 1, name: 'Alice', registration_status: 'approved' });
+    });
+  });
+
+  describe('selfRegisterParticipant', () => {
+    it('should call POST /participants/self-register with the tournament uuid, name, email, and honeypot field', () => {
+      service.selfRegisterParticipant('test-uuid-1234', 'Alice', 'alice@example.com', '').subscribe(result => {
+        expect(result.name).toBe('Alice');
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/self-register`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        tournament_uuid: 'test-uuid-1234', name: 'Alice', email: 'alice@example.com', website: '',
+      });
+      req.flush({ success: true, name: 'Alice' });
+    });
+  });
+
   describe('confirmNotificationSubscription', () => {
     it('should call POST /notifications/confirm with participant_id and token', () => {
       service.confirmNotificationSubscription(7, 'tok123').subscribe(result => {

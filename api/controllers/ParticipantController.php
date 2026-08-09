@@ -5,9 +5,14 @@ class ParticipantController {
     // Excludes notification_confirm_token_hash / notification_confirm_token_expires_at —
     // once those columns exist, a bare SELECT * here would leak the confirm token hash to
     // every participant list/edit response.
-    const SAFE_COLUMNS = 'id, tournament_id, name, email, notification_lifecycle,
+    const SAFE_COLUMNS = 'id, tournament_id, name, registration_status, email, notification_lifecycle,
         notify_match_completed, notify_round_completed, notify_tournament_finalized,
         notification_confirmed_at, notification_manage_token_version, created_at';
+
+    // Soft cap on self-registration so a scripted flood (or a bored attendee mashing the
+    // button) can't blow up a tournament's roster. Organizer-added participants are not
+    // capped — this only guards the public, unauthenticated self-register endpoint.
+    const MAX_PARTICIPANTS_PER_TOURNAMENT = 64;
 
     public function __construct(PDO $db) {
 		$this->db = $db;
@@ -47,7 +52,7 @@ class ParticipantController {
         $stmt->execute([$tournamentId, $name]);
         $id = (int)$this->db->lastInsertId();
 
-        echo json_encode(['id' => $id, 'tournament_id' => $tournamentId, 'name' => $name]);
+        echo json_encode(['id' => $id, 'tournament_id' => $tournamentId, 'name' => $name, 'registration_status' => 'approved']);
     }
 
     public function delete(int $id): void {
@@ -183,7 +188,107 @@ class ParticipantController {
         }
 
         $tournamentId = (int)$participant['tournament_id'];
+        $warning = $this->startEmailOptIn($id, $tournamentId, $email, (int)$actor['id']);
 
+        $result = $this->getSafeParticipant($id);
+        if ($warning) $result['warning'] = $warning;
+        echo json_encode($result);
+    }
+
+    // Public, unauthenticated: a coordinator shares a tournament's uuid link/QR at an
+    // event and attendees add themselves. Self-registered rows start 'pending' —
+    // TeamController::draw() excludes them, and the organizer approves/rejects (reject
+    // reuses delete()) before they count toward the roster.
+    public function selfRegister(array $body): void {
+        // Honeypot: a real registration form never fills this hidden field, so a
+        // non-empty value means a bot filled every field it could find. Report success
+        // without touching the database so the bot doesn't learn it was rejected.
+        if (trim($body['website'] ?? '') !== '') {
+            echo json_encode(['success' => true]);
+            return;
+        }
+
+        $uuid = trim($body['tournament_uuid'] ?? '');
+        $name = trim($body['name'] ?? '');
+        $email = strtolower(trim($body['email'] ?? ''));
+
+        if (!$uuid || !$name) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A tournament and name are required']);
+            return;
+        }
+
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'That does not look like a valid email address']);
+            return;
+        }
+
+        $stmt = $this->db->prepare('SELECT id, status FROM tournaments WHERE uuid = ?');
+        $stmt->execute([$uuid]);
+        $tournament = $stmt->fetch();
+        if (!$tournament) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Tournament not found']);
+            return;
+        }
+        if ($tournament['status'] !== 'setup') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Registration is closed for this tournament']);
+            return;
+        }
+
+        $tournamentId = (int)$tournament['id'];
+
+        $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+        $countStmt->execute([$tournamentId]);
+        if ((int)$countStmt->fetchColumn() >= self::MAX_PARTICIPANTS_PER_TOURNAMENT) {
+            http_response_code(400);
+            echo json_encode(['error' => 'This tournament has reached its participant limit. Contact the organizer.']);
+            return;
+        }
+
+        $this->db->prepare('INSERT INTO participants (tournament_id, name, registration_status) VALUES (?, ?, "pending")')
+            ->execute([$tournamentId, $name]);
+        $id = (int)$this->db->lastInsertId();
+
+        if ($email !== '') {
+            $this->startEmailOptIn($id, $tournamentId, $email, null);
+        }
+
+        writeAuditLog($this->db, $tournamentId, null, 'participant_self_registered', 'participant', (string)$id, ['name' => $name]);
+
+        echo json_encode(['success' => true, 'name' => $name]);
+    }
+
+    // Organizer-initiated: moves a pending self-registration onto the live roster.
+    // Rejecting one is just delete() — a pending row is a real row.
+    public function approve(int $id, array $actor): void {
+        $stmt = $this->db->prepare('SELECT tournament_id, registration_status FROM participants WHERE id = ?');
+        $stmt->execute([$id]);
+        $participant = $stmt->fetch();
+        if (!$participant) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Participant not found']);
+            return;
+        }
+
+        if ($participant['registration_status'] === 'approved') {
+            echo json_encode($this->getSafeParticipant($id));
+            return;
+        }
+
+        $this->db->prepare('UPDATE participants SET registration_status = "approved" WHERE id = ?')->execute([$id]);
+        writeAuditLog($this->db, (int)$participant['tournament_id'], (int)$actor['id'], 'participant_approved', 'participant', (string)$id);
+
+        echo json_encode($this->getSafeParticipant($id));
+    }
+
+    // Shared by setNotificationEmail() (organizer, has an actor) and selfRegister()
+    // (public, no actor — audit log records null). Returns a warning string if the
+    // address is suppressed (participant is marked suppressed instead of pending), or
+    // null on a normal confirmation-email-queued path.
+    private function startEmailOptIn(int $id, int $tournamentId, string $email, ?int $actorUserId): ?string {
         $suppressed = $this->db->prepare('SELECT 1 FROM notification_suppressions WHERE email = ?');
         $suppressed->execute([$email]);
         if ($suppressed->fetchColumn()) {
@@ -194,18 +299,13 @@ class ParticipantController {
                 WHERE id = ?
             ')->execute([$email, $id]);
 
-            writeAuditLog($this->db, $tournamentId, (int)$actor['id'], 'participant_notification_email_set', 'participant', (string)$id, ['email' => $email, 'suppressed' => true]);
-
-            $result = $this->getSafeParticipant($id);
-            $result['warning'] = 'This address has previously bounced or complained and will not receive email.';
-            echo json_encode($result);
-            return;
+            writeAuditLog($this->db, $tournamentId, $actorUserId, 'participant_notification_email_set', 'participant', (string)$id, ['email' => $email, 'suppressed' => true]);
+            return 'This address has previously bounced or complained and will not receive email.';
         }
 
         $rawToken = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $rawToken);
         $expiresAt = date('Y-m-d H:i:s', time() + 72 * 3600);
-        $emailChanged = $email !== $participant['email'];
 
         $this->db->beginTransaction();
         try {
@@ -213,9 +313,9 @@ class ParticipantController {
                 UPDATE participants
                 SET email = ?, notification_lifecycle = "pending",
                     notification_confirm_token_hash = ?, notification_confirm_token_expires_at = ?,
-                    notification_manage_token_version = notification_manage_token_version + ?
+                    notification_manage_token_version = notification_manage_token_version + 1
                 WHERE id = ?
-            ')->execute([$email, $tokenHash, $expiresAt, $emailChanged ? 1 : 0, $id]);
+            ')->execute([$email, $tokenHash, $expiresAt, $id]);
 
             $this->db->prepare('
                 INSERT INTO notification_queue (tournament_id, participant_id, email, event_type, token_plaintext)
@@ -228,9 +328,8 @@ class ParticipantController {
             throw $e;
         }
 
-        writeAuditLog($this->db, $tournamentId, (int)$actor['id'], 'participant_notification_email_set', 'participant', (string)$id, ['email' => $email]);
-
-        echo json_encode($this->getSafeParticipant($id));
+        writeAuditLog($this->db, $tournamentId, $actorUserId, 'participant_notification_email_set', 'participant', (string)$id, ['email' => $email]);
+        return null;
     }
 
     private function getSafeParticipant(int $id): array {
