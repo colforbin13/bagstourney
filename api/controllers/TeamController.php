@@ -90,16 +90,135 @@ class TeamController {
                 ];
             }
 
-            // Generate bracket
+            // Manual seeding stops here: teams are formed (seeded in draw order as a
+            // starting point) but the bracket isn't generated and the tournament stays in
+            // 'setup' until the organizer confirms a seed order via generateBracketAction().
+            // Automatic seeding (the default) generates the bracket immediately, unchanged.
+            if (($tournament['seeding_mode'] ?? 'automatic') === 'automatic') {
+                $this->generateBracket($tournamentId, $teams);
+                $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
+                    ->execute(['active', $tournamentId]);
+            }
+
+            $this->db->commit();
+
+            // Return teams
+            $stmt = $this->db->prepare('
+                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
+                FROM teams t
+                JOIN participants p1 ON t.participant1_id = p1.id
+                JOIN participants p2 ON t.participant2_id = p2.id
+                WHERE t.tournament_id = ?
+                ORDER BY t.seed
+            ');
+            $stmt->execute([$tournamentId]);
+            echo json_encode($stmt->fetchAll());
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * PUT /teams/reorder — persist a drag-and-drop seed reorder (manual seeding only).
+     * Takes the full ordered list of team ids top-to-bottom and assigns seed = position,
+     * rather than trusting client-supplied seed numbers directly.
+     */
+    public function reorder(array $body): void {
+        $tournamentId = (int)($body['tournament_id'] ?? 0);
+        $teamIds = $body['team_ids'] ?? null;
+        if (!$tournamentId || !is_array($teamIds) || !$teamIds) {
+            http_response_code(400);
+            echo json_encode(['error' => 'tournament_id and team_ids required']);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch();
+            if (!$tournament || $tournament['status'] !== 'setup') {
+                throw new Exception('Teams can only be reordered before the bracket is generated');
+            }
+
+            $stmt = $this->db->prepare('SELECT id FROM teams WHERE tournament_id = ?');
+            $stmt->execute([$tournamentId]);
+            $existingIds = array_map('intval', array_column($stmt->fetchAll(), 'id'));
+            $submittedIds = array_map('intval', $teamIds);
+
+            $sortedExisting = $existingIds;
+            sort($sortedExisting);
+            $sortedSubmitted = $submittedIds;
+            sort($sortedSubmitted);
+            if ($sortedExisting !== $sortedSubmitted) {
+                throw new Exception('team_ids must match exactly the tournament\'s current teams');
+            }
+
+            foreach ($submittedIds as $i => $teamId) {
+                $this->db->prepare('UPDATE teams SET seed = ? WHERE id = ? AND tournament_id = ?')
+                    ->execute([$i + 1, $teamId, $tournamentId]);
+            }
+
+            $this->db->commit();
+
+            $stmt = $this->db->prepare('
+                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
+                FROM teams t
+                JOIN participants p1 ON t.participant1_id = p1.id
+                JOIN participants p2 ON t.participant2_id = p2.id
+                WHERE t.tournament_id = ?
+                ORDER BY t.seed
+            ');
+            $stmt->execute([$tournamentId]);
+            echo json_encode($stmt->fetchAll());
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * POST /teams/generate-bracket — finalize manual seeding: build the bracket from
+     * teams' current seed order (set via reorder(), or left at the draw()-assigned
+     * default) and activate the tournament. Automatic-seeding tournaments never reach
+     * here — draw() already generated their bracket and activated them in one step.
+     */
+    public function generateBracketAction(array $body): void {
+        $tournamentId = (int)($body['tournament_id'] ?? 0);
+        if (!$tournamentId) {
+            http_response_code(400);
+            echo json_encode(['error' => 'tournament_id required']);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch();
+            if (!$tournament || $tournament['status'] !== 'setup') {
+                throw new Exception('Tournament is not awaiting bracket generation');
+            }
+
+            $stmt = $this->db->prepare('SELECT id, seed FROM teams WHERE tournament_id = ? ORDER BY seed');
+            $stmt->execute([$tournamentId]);
+            $teams = $stmt->fetchAll();
+            if (!$teams) {
+                throw new Exception('No teams have been drawn yet');
+            }
+
             $this->generateBracket($tournamentId, $teams);
 
-            // Advance tournament status
             $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                 ->execute(['active', $tournamentId]);
 
             $this->db->commit();
 
-            // Return teams
             $stmt = $this->db->prepare('
                 SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
                 FROM teams t

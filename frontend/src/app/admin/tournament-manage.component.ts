@@ -3,6 +3,7 @@ import { Component, OnInit, signal, computed } from '@angular/core';
 import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
@@ -10,7 +11,7 @@ import { environment } from '../../environments/environment';
 @Component({
   selector: 'app-tournament-manage',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, DragDropModule],
   template: `
     <div class="page">
     @if (loadError()) {
@@ -20,28 +21,43 @@ import { environment } from '../../environments/environment';
       </div>
     } @else {
       <!-- Header -->
-      <div class="page-header">
+      <div class="page-header" style="margin-bottom:14px;">
         <div>
           <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;">← Admin</a>
           <h1 style="margin-top:4px;">{{ tournament()?.name }}</h1>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          @if (tournament()) {
+      </div>
+
+      @if (tournament()) {
+        <div class="tm-toolbar-row">
+          <div class="tm-badges">
             <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
             <span class="badge badge-visibility-{{ tournament()!.visibility }}">{{ tournament()!.visibility }}</span>
-            @if (canManageSetup()) {
-              <button class="btn btn-sm" [disabled]="visibilityBusy()" (click)="toggleVisibility()">
-                Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
-              </button>
-              <button class="btn btn-sm" (click)="copyPublicLink()">Copy link</button>
-              @if (tournament()!.status === 'setup') {
-                <button class="btn btn-sm" (click)="copyRegistrationLink()">Copy registration link</button>
-              }
+            @if (tournament()!.seeding_mode === 'manual') {
+              <span class="badge badge-visibility-private">manual seeding</span>
             }
+          </div>
+
+          @if (canManageSetup()) {
+            <div class="toolbar">
+              <div class="toolbar-group">
+                <span class="toolbar-group-label">Share</span>
+                <button class="btn btn-sm" (click)="copyPublicLink()">Copy link</button>
+                @if (tournament()!.status === 'setup') {
+                  <button class="btn btn-sm" (click)="copyRegistrationLink()">Copy registration link</button>
+                }
+              </div>
+              <div class="toolbar-group">
+                <span class="toolbar-group-label">Visibility</span>
+                <button class="btn btn-sm" [disabled]="visibilityBusy()" (click)="toggleVisibility()">
+                  Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
+                </button>
+              </div>
+            </div>
           }
-          <a class="btn btn-sm" [routerLink]="['/bracket', tournamentId]">View bracket</a>
+          <a class="btn btn-sm btn-primary" [routerLink]="['/bracket', tournamentId]">View bracket</a>
         </div>
-      </div>
+      }
 
       <!-- ── STAFF & ACCESS ── -->
       @if (staffVisible()) {
@@ -107,8 +123,20 @@ import { environment } from '../../environments/environment';
 
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
+        <!-- Seeding mode: only choosable before teams exist -->
+        @if (canManageSetup() && teams().length === 0) {
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Seeding</div>
+            <select class="input" style="width:auto" [ngModel]="tournament()!.seeding_mode"
+              (ngModelChange)="updateSeedingMode($event)" [disabled]="seedingModeBusy()">
+              <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
+              <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
+            </select>
+          </div>
+        }
+
         <!-- Add participant -->
-        @if (canManageSetup()) {
+        @if (canManageSetup() && teams().length === 0) {
           <div class="card" style="margin-bottom:24px">
             <div class="section-label">Add Participant</div>
             <div class="row">
@@ -170,7 +198,9 @@ import { environment } from '../../environments/environment';
                   @if (canManageSetup()) {
                     <div style="display:flex;gap:6px">
                       <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
-                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
+                      @if (teams().length === 0) {
+                        <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
+                      }
                     </div>
                   }
                 }
@@ -179,15 +209,19 @@ import { environment } from '../../environments/environment';
           </div>
         }
 
-        <!-- Draw button -->
-        @if (canManageSetup() && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
+        <!-- Draw button (before teams exist) -->
+        @if (canManageSetup() && teams().length === 0 && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
           <hr class="divider" />
           <div class="draw-section">
             <div>
               <div style="font-weight:500;margin-bottom:4px;">Ready to draw teams?</div>
               <div style="font-size:.8rem;color:var(--text-dim);">
                 {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
-                This will randomly pair players, seed teams, and generate the bracket.
+                @if (isManualSeeding()) {
+                  This will randomly pair players into teams. You'll set the final seed order before generating the bracket.
+                } @else {
+                  This will randomly pair players, seed teams, and generate the bracket.
+                }
               </div>
             </div>
             <button class="btn btn-primary" [disabled]="drawing()" (click)="drawTeams()">
@@ -195,11 +229,55 @@ import { environment } from '../../environments/environment';
                 <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
                 Drawing…
               } @else {
-                Draw Teams & Start
+                {{ isManualSeeding() ? 'Draw Teams' : 'Draw Teams & Start' }}
               }
             </button>
           </div>
           @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
+        }
+
+        <!-- Set seeds (manual seeding: teams drawn, bracket not yet generated) -->
+        @if (canManageSetup() && teams().length > 0) {
+          <hr class="divider" />
+          <div class="section-label">
+            Set Seeds
+            <span class="count">{{ teams().length }}</span>
+          </div>
+          <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px">
+            Drag to reorder — seed 1 plays the bracket's lowest seed first.
+          </div>
+          <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
+            @for (team of teams(); track team.id) {
+              <div class="team-seed-item" cdkDrag>
+                <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
+                <span class="seed">#{{ team.seed }}</span>
+                <div class="team-info">
+                  <div class="team-name">{{ team.name }}</div>
+                  <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="draw-section" style="margin-top:16px">
+            <button class="btn btn-sm" [disabled]="drawing()" (click)="drawTeams()">
+              @if (drawing()) {
+                <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
+                Redrawing…
+              } @else {
+                Redraw Teams
+              }
+            </button>
+            <button class="btn btn-primary" [disabled]="generatingBracket()" (click)="confirmGenerateBracket()">
+              @if (generatingBracket()) {
+                <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                Generating…
+              } @else {
+                Generate Bracket
+              }
+            </button>
+          </div>
+          @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
+          @if (generateBracketError()) { <div class="form-error" style="margin-top:12px">{{ generateBracketError() }}</div> }
         }
       }
 
@@ -271,9 +349,9 @@ import { environment } from '../../environments/environment';
 
         @if (tournament()?.status === 'complete') {
           <hr class="divider" />
-          <div class="card" style="border-color:var(--accent);background:var(--surface);text-align:center;color:var(--accent)">
-            <div style="font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;color:var(--accent-dim);margin-bottom:6px">CHAMPION</div>
-            <div style="font-size:1.1rem;font-weight:600;color:var(--accent)">{{ champion() }}</div>
+          <div class="card" style="border-color:var(--marker);background:var(--surface);text-align:center;color:var(--marker)">
+            <div style="font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;color:var(--marker);margin-bottom:6px">CHAMPION</div>
+            <div style="font-size:1.1rem;font-weight:600;color:var(--marker)">{{ champion() }}</div>
           </div>
         }
       }
@@ -308,6 +386,16 @@ import { environment } from '../../environments/environment';
     .row { display: flex; gap: 8px; }
     .form-error { font-size: .8rem; color: var(--danger); margin-top: 8px; }
 
+    /* Toolbar row */
+    .tm-toolbar-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .tm-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+
     /* Participants */
     .participant-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
     .participant-item {
@@ -329,6 +417,26 @@ import { environment } from '../../environments/environment';
       justify-content: space-between;
       gap: 16px;
       flex-wrap: wrap;
+    }
+
+    /* Seed reorder (manual seeding) */
+    .team-seed-list { display: flex; flex-direction: column; gap: 8px; }
+    .team-seed-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .drag-handle {
+      cursor: grab;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1;
+      touch-action: none;
+      flex-shrink: 0;
     }
 
     /* Teams */
@@ -367,7 +475,7 @@ import { environment } from '../../environments/environment';
     .member-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .member-name { font-weight: 500; font-size: .875rem; }
     .member-meta { font-size: .75rem; color: var(--text-dim); }
-    .badge-owner { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+    .badge-owner { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
     .badge-visibility-public  { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
     .badge-visibility-private { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
     .user-search { position: relative; }
@@ -409,15 +517,19 @@ export class TournamentManageComponent implements OnInit {
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
+  isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
   approvingParticipantId = signal<number | null>(null);
   visibilityBusy = signal(false);
+  seedingModeBusy = signal(false);
 
   loading = signal(true);
   loadError = signal('');
   adding = signal(false);
   drawing = signal(false);
+  generatingBracket = signal(false);
   addError = signal('');
   drawError = signal('');
+  generateBracketError = signal('');
   toast = signal('');
 
   newParticipant = '';
@@ -458,15 +570,16 @@ export class TournamentManageComponent implements OnInit {
         // Always load participants so names can be edited at any time
         this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
 
-        if (t.status !== 'setup') {
-          this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
-          if (t.status === 'complete') {
-            this.svc.getBracket(this.tournamentId).subscribe(data => {
-              const rounds = Object.entries(data.rounds).map(([n, m]) => ({ n: +n, m })).sort((a, b) => b.n - a.n);
-              const final = rounds[0]?.m[0] as any;
-              this.champion.set(final?.winner_name ?? null);
-            });
-          }
+        // Always load teams too — manual seeding leaves a tournament in 'setup' with
+        // teams already formed while awaiting bracket generation, so this can no longer
+        // be gated on status !== 'setup'.
+        this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
+        if (t.status === 'complete') {
+          this.svc.getBracket(this.tournamentId).subscribe(data => {
+            const rounds = Object.entries(data.rounds).map(([n, m]) => ({ n: +n, m })).sort((a, b) => b.n - a.n);
+            const final = rounds[0]?.m[0] as any;
+            this.champion.set(final?.winner_name ?? null);
+          });
         }
 
         // Only ask for the member list when the tournament response says we're allowed
@@ -499,6 +612,21 @@ export class TournamentManageComponent implements OnInit {
       error: () => {
         this.visibilityBusy.set(false);
         this.showToast('Failed to update visibility.');
+      },
+    });
+  }
+
+  updateSeedingMode(mode: 'automatic' | 'manual') {
+    if (this.tournament()?.seeding_mode === mode) return;
+    this.seedingModeBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { seeding_mode: mode }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.seedingModeBusy.set(false);
+      },
+      error: () => {
+        this.seedingModeBusy.set(false);
+        this.showToast('Failed to update seeding mode.');
       },
     });
   }
@@ -693,7 +821,7 @@ export class TournamentManageComponent implements OnInit {
       next: updated => {
         this.participants.update(list => list.map(item => item.id === p.id ? updated : item));
         // Refresh teams display so team participant_name fields reflect the change
-        if (this.tournament()?.status !== 'setup') {
+        if (this.teams().length > 0) {
           this.svc.getTeams(this.tournamentId).subscribe(t => this.teams.set(t));
         }
         if (email !== (p.email ?? '')) {
@@ -721,8 +849,10 @@ export class TournamentManageComponent implements OnInit {
   }
 
   async deleteParticipant(p: Participant) {
-    // Prevent deletes client-side if tournament not in setup
-    if (this.tournament()?.status !== 'setup') {
+    // Prevent deletes client-side if tournament not in setup, or teams have already been
+    // drawn (manual seeding leaves a tournament in 'setup' with teams formed while
+    // awaiting bracket generation — the roster is locked for that window too).
+    if (this.tournament()?.status !== 'setup' || this.teams().length > 0) {
       this.showToast('Cannot delete participants after teams have been drawn.');
       return;
     }
@@ -754,19 +884,57 @@ export class TournamentManageComponent implements OnInit {
   }
 
   async drawTeams() {
-    const ok = await confirmService.confirm('Draw teams and start the tournament? This cannot be undone.');
+    const redrawing = this.teams().length > 0;
+    const prompt = redrawing
+      ? 'Redraw teams? This will re-shuffle pairings and reset any seed order you\'ve set.'
+      : this.isManualSeeding()
+        ? 'Draw teams? You\'ll be able to set the final seed order before generating the bracket.'
+        : 'Draw teams and start the tournament? This cannot be undone.';
+    const ok = await confirmService.confirm(prompt);
     if (!ok) return;
     this.drawing.set(true);
     this.drawError.set('');
     this.svc.drawTeams(this.tournamentId).subscribe({
       next: () => {
         this.drawing.set(false);
-        this.showToast('Teams drawn! Bracket generated.');
+        this.showToast(this.isManualSeeding() ? 'Teams drawn — set your seed order below.' : 'Teams drawn! Bracket generated.');
         this.load();
       },
       error: err => {
         this.drawing.set(false);
         this.drawError.set(err?.error?.error ?? 'Failed to draw teams.');
+      },
+    });
+  }
+
+  onSeedDrop(event: CdkDragDrop<Team[]>) {
+    const reordered = [...this.teams()];
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+    const renumbered = reordered.map((t, i) => ({ ...t, seed: i + 1 }));
+    const previous = this.teams();
+    this.teams.set(renumbered);
+    this.svc.reorderTeams(this.tournamentId, renumbered.map(t => t.id)).subscribe({
+      error: () => {
+        this.teams.set(previous);
+        this.showToast('Failed to save new seed order.');
+      },
+    });
+  }
+
+  async confirmGenerateBracket() {
+    const ok = await confirmService.confirm('Generate the bracket with the current seed order? This cannot be undone.');
+    if (!ok) return;
+    this.generatingBracket.set(true);
+    this.generateBracketError.set('');
+    this.svc.generateBracket(this.tournamentId).subscribe({
+      next: () => {
+        this.generatingBracket.set(false);
+        this.showToast('Bracket generated!');
+        this.load();
+      },
+      error: err => {
+        this.generatingBracket.set(false);
+        this.generateBracketError.set(err?.error?.error ?? 'Failed to generate bracket.');
       },
     });
   }

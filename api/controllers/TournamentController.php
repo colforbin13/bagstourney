@@ -47,10 +47,11 @@ class TournamentController {
         $name = trim($body['name'] ?? '');
         if (!$name) { http_response_code(400); echo json_encode(['error' => 'Name required']); return; }
         $visibility = in_array($body['visibility'] ?? null, ['public', 'private'], true) ? $body['visibility'] : 'public';
+        $seedingMode = in_array($body['seeding_mode'] ?? null, ['automatic', 'manual'], true) ? $body['seeding_mode'] : 'automatic';
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, created_by_user_id) VALUES (?, ?, ?, ?)');
-            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $actor['id']]);
+            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, seeding_mode, created_by_user_id) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $seedingMode, $actor['id']]);
             $id = (int)$this->db->lastInsertId();
             $this->db->prepare('INSERT INTO tournament_members (tournament_id, user_id, role, granted_by_user_id) VALUES (?, ?, "owner", ?)')
                 ->execute([$id, $actor['id'], $actor['id']]);
@@ -87,6 +88,33 @@ class TournamentController {
             }
             $fields[] = 'visibility = ?';
             $params[] = $body['visibility'];
+        }
+        if (isset($body['seeding_mode'])) {
+            if (!in_array($body['seeding_mode'], ['automatic', 'manual'], true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid seeding mode']);
+                return;
+            }
+            // Only changeable before teams exist — once teams are drawn, flipping modes
+            // would leave a half-formed manual seed order or silently skip the seeding
+            // step the organizer already committed to.
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$id]);
+            $t = $stmt->fetch();
+            if (!$t || $t['status'] !== 'setup') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Seeding mode can only be changed during setup']);
+                return;
+            }
+            $teamCount = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
+            $teamCount->execute([$id]);
+            if ((int)$teamCount->fetchColumn() > 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Cannot change seeding mode after teams have been drawn']);
+                return;
+            }
+            $fields[] = 'seeding_mode = ?';
+            $params[] = $body['seeding_mode'];
         }
         if (!$fields) { http_response_code(400); echo json_encode(['error' => 'Nothing to update']); return; }
         $params[] = $id;

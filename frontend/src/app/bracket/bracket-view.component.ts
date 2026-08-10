@@ -45,6 +45,12 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   totalRounds = computed(() => this.rounds().length);
 
+  // Must stay in sync with --row-unit, which this binds onto .bracket-matches — single
+  // source of truth for both the CSS grid track size and the connector-line pixel math
+  // below, which needs the same value to compute match centers.
+  readonly rowUnitPx = 150;
+  readonly gutterWidth = 32;
+
   champion = computed(() => {
     const rs = this.rounds();
     if (!rs.length) return null;
@@ -83,6 +89,51 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     const span  = Math.pow(2, roundPos - 1);
     const start = (matchNumber - 1) * span + 1;
     return `${start} / span ${span}`;
+  }
+
+  // ── Bracket connector lines ─────────────────────────────────────────────────
+  // Drawn in the gutter between two round columns, purely from match_number/round
+  // position math — no DOM measurement needed, since .bracket-matches is a fixed-size
+  // grid (rowUnitPx × totalGridRows) and every match's vertical center is therefore
+  // exactly derivable, the same way matchGridRow() derives its grid-row placement.
+
+  /** Vertical pixel center of a match's row-block, relative to its round's own top. */
+  private matchCenterPx(matchNumber: number, roundPos: number): number {
+    const span = Math.pow(2, roundPos - 1);
+    const rowStart = (matchNumber - 1) * span + 1;
+    return (rowStart - 1 + span / 2) * this.rowUnitPx;
+  }
+
+  /**
+   * One entry per match-pair in this round, describing where its connector into the
+   * next round should be drawn: y1/y2 are the two matches' own centers (where their
+   * horizontal stubs start), mid is the merge point — which, by the same span doubling
+   * matchGridRow() relies on, lands exactly on the next round's match center too.
+   * Empty for the final round, which has no next round to connect to.
+   */
+  roundConnectors(round: { matches: Match[]; pos: number }): { y1: number; y2: number; mid: number }[] {
+    if (round.pos >= this.totalRounds()) return [];
+    const byNumber = new Map(round.matches.map(m => [m.match_number, m]));
+    const pairs: { y1: number; y2: number; mid: number }[] = [];
+    for (let i = 1; i <= round.matches.length; i += 2) {
+      const a = byNumber.get(i);
+      if (!a) continue;
+      const b = byNumber.get(i + 1);
+      const y1 = this.matchCenterPx(a.match_number, round.pos);
+      const y2 = b ? this.matchCenterPx(b.match_number, round.pos) : y1;
+      pairs.push({ y1, y2, mid: (y1 + y2) / 2 });
+    }
+    return pairs;
+  }
+
+  /**
+   * SVG path for one pair's connector: each match's stub out to the gutter midpoint
+   * (drawn as two separate subpaths from either end, meeting at `mid` with no visible
+   * seam), then one stub continuing from the midpoint into the next round's match.
+   */
+  connectorPath(c: { y1: number; y2: number; mid: number }): string {
+    const half = this.gutterWidth / 2;
+    return `M 0 ${c.y1} H ${half} V ${c.mid} M 0 ${c.y2} H ${half} V ${c.mid} M ${half} ${c.mid} H ${this.gutterWidth}`;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────

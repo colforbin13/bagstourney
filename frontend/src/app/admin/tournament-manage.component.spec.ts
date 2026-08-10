@@ -5,7 +5,7 @@ import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { TournamentManageComponent } from './tournament-manage.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant } from '../shared/models/tournament.models';
+import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 
 describe('TournamentManageComponent', () => {
@@ -63,9 +63,10 @@ describe('TournamentManageComponent', () => {
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
       .flush({
         id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
-        visibility, created_at: '2026-01-01', capabilities,
+        visibility, seeding_mode: 'automatic', created_at: '2026-01-01', capabilities,
       });
     httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+    httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
   }
 
   it('should create', () => {
@@ -293,9 +294,10 @@ describe('TournamentManageComponent', () => {
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
       .flush({
         id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
-        visibility: 'public', created_at: '2026-01-01', capabilities: ownerCapabilities,
+        visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01', capabilities: ownerCapabilities,
       });
     httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush(list);
+    httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
     httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
   }
 
@@ -390,6 +392,122 @@ describe('TournamentManageComponent', () => {
       nameReq.flush({ ...participant });
 
       expect(component.savingParticipantId()).toBeNull();
+    });
+  });
+
+  describe('manual seeding', () => {
+    const mockTeams: Team[] = [
+      { id: 10, tournament_id: tournamentId, name: 'A & B', participant1_id: 1, participant2_id: 2, participant1_name: 'A', participant2_name: 'B', seed: 1 },
+      { id: 11, tournament_id: tournamentId, name: 'C & D', participant1_id: 3, participant2_id: 4, participant1_name: 'C', participant2_name: 'D', seed: 2 },
+    ];
+
+    function bootstrapAwaitingSeeds() {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({
+          id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+          visibility: 'public', seeding_mode: 'manual', created_at: '2026-01-01', capabilities: ownerCapabilities,
+        });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(mockTeams);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+    }
+
+    it('should PUT the chosen seeding mode', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      component.updateSeedingMode('manual');
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ seeding_mode: 'manual' });
+      req.flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', seeding_mode: 'manual', created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+
+      expect(component.isManualSeeding()).toBe(true);
+      expect(component.seedingModeBusy()).toBe(false);
+    });
+
+    it('should show the "Set Seeds" panel once teams exist while still in setup', () => {
+      bootstrapAwaitingSeeds();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Set Seeds');
+      expect(fixture.nativeElement.textContent).toContain('Generate Bracket');
+      expect(fixture.nativeElement.textContent).not.toContain('Add Participant');
+      expect(component.teams()).toEqual(mockTeams);
+    });
+
+    it('should persist a drag-and-drop reorder as the new seed order', () => {
+      bootstrapAwaitingSeeds();
+
+      component.onSeedDrop({ previousIndex: 0, currentIndex: 1 } as any);
+
+      expect(component.teams().map(t => t.id)).toEqual([11, 10]);
+      expect(component.teams().map(t => t.seed)).toEqual([1, 2]);
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/reorder`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ tournament_id: tournamentId, team_ids: [11, 10] });
+      req.flush([]);
+    });
+
+    it('should revert the local order if persisting the reorder fails', () => {
+      bootstrapAwaitingSeeds();
+      const original = component.teams();
+
+      component.onSeedDrop({ previousIndex: 0, currentIndex: 1 } as any);
+      httpMock.expectOne(`${environment.apiUrl}/teams/reorder`)
+        .flush({ error: 'boom' }, { status: 400, statusText: 'Bad Request' });
+
+      expect(component.teams()).toEqual(original);
+    });
+
+    it('should generate the bracket after confirmation', async () => {
+      bootstrapAwaitingSeeds();
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+
+      await component.confirmGenerateBracket();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/generate-bracket`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ tournament_id: tournamentId });
+      req.flush(mockTeams);
+
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({
+          id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'active',
+          visibility: 'public', seeding_mode: 'manual', created_at: '2026-01-01', capabilities: ownerCapabilities,
+        });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(mockTeams);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      expect(component.generatingBracket()).toBe(false);
+    });
+
+    it('should not generate the bracket if confirmation is declined', async () => {
+      bootstrapAwaitingSeeds();
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(false));
+
+      await component.confirmGenerateBracket();
+
+      httpMock.expectNone(`${environment.apiUrl}/teams/generate-bracket`);
+      expect(component.generatingBracket()).toBe(false);
+    });
+
+    it('should block deleting a participant once teams have been drawn, even while still in setup', async () => {
+      bootstrapAwaitingSeeds();
+      const participant: Participant = { id: 1, tournament_id: tournamentId, name: 'A', registration_status: 'approved' };
+      component.participants.set([participant]);
+
+      await component.deleteParticipant(participant);
+
+      httpMock.expectNone(`${environment.apiUrl}/participants/1`);
+      expect(component.participants()).toEqual([participant]);
     });
   });
 });

@@ -90,16 +90,16 @@ import { TournamentService } from '../shared/services/tournament.service';
     .login-error {
       font-size: 0.8rem;
       color: var(--danger);
-      background: #1a0000;
-      border: 1px solid #330000;
+      background: rgba(var(--danger-rgb), 0.1);
+      border: 1px solid rgba(var(--danger-rgb), 0.35);
       border-radius: var(--radius);
       padding: 8px 12px;
     }
     .login-success {
       font-size: 0.85rem;
       color: var(--text);
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.3);
+      background: rgba(var(--marker-rgb), 0.1);
+      border: 1px solid rgba(var(--marker-rgb), 0.35);
       border-radius: var(--radius);
       padding: 10px 12px;
     }

@@ -23,8 +23,11 @@ export class TournamentService {
     return this.http.get<Tournament>(`${this.api}/tournaments/by-uuid/${uuid}`);
   }
 
-  createTournament(name: string, visibility?: 'public' | 'private') {
-    return this.http.post<Tournament>(`${this.api}/tournaments`, visibility ? { name, visibility } : { name });
+  createTournament(name: string, visibility?: 'public' | 'private', seedingMode?: 'automatic' | 'manual') {
+    const body: Record<string, string> = { name };
+    if (visibility) body['visibility'] = visibility;
+    if (seedingMode) body['seeding_mode'] = seedingMode;
+    return this.http.post<Tournament>(`${this.api}/tournaments`, body);
   }
 
   updateTournament(id: number, data: Partial<Tournament>) {
@@ -155,6 +158,16 @@ export class TournamentService {
 
   updateTeam(id: number, data: Partial<Team>) {
     return this.http.put<Team>(`${this.api}/teams/${id}`, data);
+  }
+
+  // Manual seeding: persist a drag-and-drop reorder as the new seed order (top to bottom
+  // = seed 1..N), then separately confirm it to actually build the bracket.
+  reorderTeams(tournamentId: number, teamIdsInOrder: number[]) {
+    return this.http.put<Team[]>(`${this.api}/teams/reorder`, { tournament_id: tournamentId, team_ids: teamIdsInOrder });
+  }
+
+  generateBracket(tournamentId: number) {
+    return this.http.post<Team[]>(`${this.api}/teams/generate-bracket`, { tournament_id: tournamentId });
   }
 
   // Bracket / Matches

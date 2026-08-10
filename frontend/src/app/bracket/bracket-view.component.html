@@ -1,11 +1,11 @@
 <div class="page-wide">
-    <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div style="min-width:0;">
         <a routerLink="/" style="color:var(--text-dim);font-size:.8rem;">← All tournaments</a>
         <h1 style="margin-top:4px;">{{ tournament()?.name }}</h1>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         @if (tournament()) {
         <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
         }
@@ -25,14 +25,14 @@
     <div class="empty">Bracket not generated yet.</div>
     } @else {
     <div class="bracket">
-        @for (round of rounds(); track round.num) {
+        @for (round of rounds(); track round.num; let lastRound = $last) {
         <div class="bracket-round">
             <div class="round-label">
             {{ roundLabel(round.pos, totalRounds()) }}
             </div>
             <!-- Each round is an independent grid. Rows are uniform (--row-unit).
                 Match cards span 2^(pos-1) rows and are placed via gridRow. -->
-            <div class="bracket-matches" [style.--total-rows]="totalGridRows(round.pos)">
+            <div class="bracket-matches" [style.--total-rows]="totalGridRows(round.pos)" [style.--row-unit.px]="rowUnitPx">
             @for (match of round.matches; track match.id) {
                 <div class="match-wrapper"
                     [style.grid-row]="matchGridRow(match.match_number, round.pos)">
@@ -122,6 +122,22 @@
             }
             </div>
         </div>
+        @if (!lastRound) {
+        <div class="bracket-gutter" [style.width.px]="gutterWidth">
+            <div class="round-label" aria-hidden="true" style="visibility:hidden">&nbsp;</div>
+            <svg class="connector-svg"
+                [attr.width]="gutterWidth"
+                [attr.height]="totalGridRows(round.pos) * rowUnitPx"
+                [attr.viewBox]="'0 0 ' + gutterWidth + ' ' + (totalGridRows(round.pos) * rowUnitPx)">
+            @for (c of roundConnectors(round); track $index) {
+                <path [attr.d]="connectorPath(c)" class="connector-line" />
+                <circle [attr.cx]="0" [attr.cy]="c.y1" r="3" class="connector-dot" />
+                <circle [attr.cx]="0" [attr.cy]="c.y2" r="3" class="connector-dot" />
+                <circle [attr.cx]="gutterWidth / 2" [attr.cy]="c.mid" r="4" class="connector-node" />
+            }
+            </svg>
+        </div>
+        }
         }
 
         @if (tournament()?.status === 'complete') {

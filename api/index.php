@@ -137,9 +137,15 @@ try {
             if ($method === 'GET' && $id) {
                 requireTournamentVisible($db, $id, currentUserOrNull($db));
                 $ctrl->listByTournament($id);
-            } elseif ($method === 'POST' && !$id) {
+            } elseif ($method === 'POST' && !$id && !$action) {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->draw($body); // draw teams from participants
+            } elseif ($method === 'POST' && !$id && $action === 'generate-bracket') {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->generateBracketAction($body); // manual seeding: finalize bracket from current seed order
+            } elseif ($method === 'PUT' && !$id && $action === 'reorder') {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->reorder($body); // manual seeding: persist drag-and-drop seed order
             } elseif ($method === 'PUT' && $id) {
                 $stmt = $db->prepare('SELECT tournament_id FROM teams WHERE id = ?');
                 $stmt->execute([$id]);

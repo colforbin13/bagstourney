@@ -158,7 +158,7 @@ import { UserAccount } from '../shared/models/tournament.models';
     
     .users-table tbody tr {
       transition: background-color 0.2s;
-      &:hover { background-color: rgba(255, 255, 255, 0.02); }
+      &:hover { background-color: var(--surface-2); }
       &.disabled { opacity: 0.6; }
     }
     
@@ -169,7 +169,7 @@ import { UserAccount } from '../shared/models/tournament.models';
       padding: 6px 8px;
       border: 1px solid var(--border);
       border-radius: 4px;
-      background: var(--bg);
+      background: var(--surface-2);
       color: var(--text);
       font-size: 0.9rem;
       cursor: pointer;
@@ -186,22 +186,22 @@ import { UserAccount } from '../shared/models/tournament.models';
       font-weight: 500;
       text-transform: uppercase;
       
-      &.badge-active { background: rgba(34, 197, 94, 0.15); color: rgb(34, 197, 94); }
-      &.badge-disabled { background: rgba(239, 68, 68, 0.15); color: rgb(239, 68, 68); }
+      &.badge-active { background: rgba(var(--marker-rgb), 0.15); color: var(--marker); }
+      &.badge-disabled { background: rgba(var(--danger-rgb), 0.15); color: var(--danger); }
     }
-    
+
     .created { font-size: 0.9rem; color: var(--text-dim); }
-    
+
     .actions { text-align: right; }
     .btn { padding: 6px 12px; font-size: 0.85rem; }
-    .btn-danger { color: rgb(239, 68, 68); border-color: rgb(239, 68, 68); }
-    
-    .form-error { 
-      color: var(--danger); 
-      font-size: 0.85rem; 
+    .btn-danger { color: var(--danger); border-color: var(--danger); }
+
+    .form-error {
+      color: var(--danger);
+      font-size: 0.85rem;
       margin-top: 16px;
       padding: 12px;
-      background: rgba(239, 68, 68, 0.1);
+      background: rgba(var(--danger-rgb), 0.1);
       border-radius: var(--radius);
     }
     
@@ -220,8 +220,8 @@ import { UserAccount } from '../shared/models/tournament.models';
       font-size: 0.9rem;
       animation: slideIn 0.3s ease-out;
       
-      &.toast-success { background: rgba(34, 197, 94, 0.9); color: white; }
-      &.toast-error { background: rgba(239, 68, 68, 0.9); color: white; }
+      &.toast-success { background: var(--marker); color: var(--marker-ink); }
+      &.toast-error { background: var(--danger); color: var(--danger-ink); }
     }
     
     @keyframes slideIn {

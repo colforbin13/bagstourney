@@ -24,6 +24,7 @@ describe('TournamentService', () => {
     name: 'Test Tournament',
     status: 'setup',
     visibility: 'public',
+    seeding_mode: 'automatic',
     created_at: '2026-01-01'
   };
 
@@ -169,6 +170,42 @@ describe('TournamentService', () => {
       const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
       expect(req.request.body).toEqual({ name: 'New Tournament', visibility: 'private' });
       req.flush(mockTournament);
+    });
+
+    it('should include seeding_mode in the request body when given', () => {
+      service.createTournament('New Tournament', 'public', 'manual').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+      expect(req.request.body).toEqual({ name: 'New Tournament', visibility: 'public', seeding_mode: 'manual' });
+      req.flush(mockTournament);
+    });
+  });
+
+  describe('reorderTeams', () => {
+    it('should PUT the ordered team ids to /teams/reorder', () => {
+      const mockTeams: any[] = [];
+      service.reorderTeams(1, [3, 1, 2]).subscribe(teams => {
+        expect(teams).toEqual(mockTeams);
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/reorder`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ tournament_id: 1, team_ids: [3, 1, 2] });
+      req.flush(mockTeams);
+    });
+  });
+
+  describe('generateBracket', () => {
+    it('should POST tournament_id to /teams/generate-bracket', () => {
+      const mockTeams: any[] = [];
+      service.generateBracket(1).subscribe(teams => {
+        expect(teams).toEqual(mockTeams);
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/generate-bracket`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ tournament_id: 1 });
+      req.flush(mockTeams);
     });
   });
 

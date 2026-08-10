@@ -19,7 +19,7 @@ describe('BracketViewComponent', () => {
   function tournamentWith(capabilities?: TournamentCapabilities): Tournament {
     return {
       id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'active',
-      visibility: 'public', created_at: '2026-01-01', capabilities,
+      visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01', capabilities,
     };
   }
 
@@ -101,6 +101,72 @@ describe('BracketViewComponent', () => {
       bootstrap(tournamentWith());
       expect(component.teamParticipants(null, null, null)).toBeNull();
       expect(component.teamParticipants('Alice & Bob', null, null)).toBeNull();
+    });
+  });
+
+  describe('bracket connector geometry', () => {
+    function loadTwoRoundBracket() {
+      const bracket: BracketData = {
+        rounds: {
+          1: [
+            {
+              id: 1, tournament_id: tournamentId, round: 1, match_number: 1,
+              team1_id: 10, team2_id: 20, team1_score: null, team2_score: null,
+              winner_id: null, next_match_id: 3, next_match_slot: 1, status: 'ready',
+              team1_name: 'A', team2_name: 'B', winner_name: null,
+              team1_participant1_name: null, team1_participant2_name: null,
+              team2_participant1_name: null, team2_participant2_name: null,
+            } as any,
+            {
+              id: 2, tournament_id: tournamentId, round: 1, match_number: 2,
+              team1_id: 30, team2_id: 40, team1_score: null, team2_score: null,
+              winner_id: null, next_match_id: 3, next_match_slot: 2, status: 'ready',
+              team1_name: 'C', team2_name: 'D', winner_name: null,
+              team1_participant1_name: null, team1_participant2_name: null,
+              team2_participant1_name: null, team2_participant2_name: null,
+            } as any,
+          ],
+          2: [
+            {
+              id: 3, tournament_id: tournamentId, round: 2, match_number: 1,
+              team1_id: null, team2_id: null, team1_score: null, team2_score: null,
+              winner_id: null, next_match_id: null, next_match_slot: null, status: 'pending',
+              team1_name: null, team2_name: null, winner_name: null,
+              team1_participant1_name: null, team1_participant2_name: null,
+              team2_participant1_name: null, team2_participant2_name: null,
+            } as any,
+          ],
+        },
+      };
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(bracket);
+      fixture.detectChanges();
+    }
+
+    it('computes pair midpoints using the same span math matchGridRow uses, so lines land on match centers', () => {
+      loadTwoRoundBracket();
+      const round1 = component.rounds()[0];
+
+      const pairs = component.roundConnectors(round1);
+
+      expect(pairs.length).toBe(1);
+      expect(pairs[0].y1).toBe(75);    // match 1's center: rowUnitPx * 0.5
+      expect(pairs[0].y2).toBe(225);   // match 2's center: rowUnitPx * 1.5
+      expect(pairs[0].mid).toBe(150);  // lands exactly on round 2's own single-match center
+    });
+
+    it('returns no connectors for the final round', () => {
+      loadTwoRoundBracket();
+      const finalRound = component.rounds()[1];
+
+      expect(component.roundConnectors(finalRound)).toEqual([]);
+    });
+
+    it('builds an SVG path as two stubs meeting at the midpoint, then one stub continuing into the next round', () => {
+      const path = component.connectorPath({ y1: 75, y2: 225, mid: 150 });
+
+      expect(path).toBe('M 0 75 H 16 V 150 M 0 225 H 16 V 150 M 16 150 H 32');
     });
   });
 

@@ -1,22 +1,36 @@
 /* src/assets/styles/global.scss */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Work+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg:        #f5f6f8;   /* off-white / light grey */
-  --surface:   #ffffff;   /* card background */
-  --border:    #e6e9ee;   /* subtle border */
-  --muted:     #6b7280;   /* muted text */
-  --text:      #0f1724;   /* near-black */
-  --text-dim:  #475569;   /* dim text */
-  --accent:    #2563eb;   /* calm blue */
-  --accent-dim:#1e40af;   /* darker blue */
-  --danger:    #e11d48;   /* subtle red */
-  --win:       #2563eb;   /* blue for win */
-  --lose:      #94a3b8;   /* grey for lose */
-  --radius:    6px;
-  --mono:      'DM Mono', monospace;
-  --sans:      'DM Sans', sans-serif;
+  --bg:         #EAE3D3;   /* field — page background */
+  --surface:    #FAF7F0;   /* paper — card background */
+  --surface-2:  #F1ECDF;   /* recessed paper — inputs, toolbar groups */
+  --border:     #D9D0BC;   /* line */
+  --muted:      #8A8371;   /* quiet icons, arrows, placeholders */
+  --text:       #22261F;   /* ink */
+  --text-dim:   #5B5A4E;   /* ink, dimmed */
+
+  --accent:     #BC3A1C;   /* flag — primary actions, live emphasis */
+  --accent-dim: #9A2F16;   /* flag, pressed/hover */
+  --accent-ink: #FFF8EF;   /* text on a flag-filled surface */
+  --accent-rgb: 188, 58, 28;
+
+  --marker:     #3F7A52;   /* won / active / confirmed */
+  --marker-ink: #F5FBF6;   /* text on a marker-filled surface */
+  --marker-rgb: 63, 122, 82;
+
+  --danger:     #93342A;   /* destructive actions */
+  --danger-ink: #FDF4F1;
+  --danger-rgb: 147, 52, 42;
+
+  --win:  var(--marker);
+  --lose: var(--muted);
+
+  --radius: 4px;
+  --mono:    'DM Mono', monospace;
+  --sans:    'Work Sans', sans-serif;
+  --display: 'Bebas Neue', sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,6 +48,13 @@ body {
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+h1, h2, h3 {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+
 /* ── Buttons ── */
 .btn {
   display: inline-flex;
@@ -46,7 +67,7 @@ a:hover { text-decoration: underline; }
   color: var(--text);
   font-family: var(--sans);
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: border-color .15s, background .15s, color .15s;
   white-space: nowrap;
@@ -56,14 +77,14 @@ a:hover { text-decoration: underline; }
 
   &.btn-primary {
     background: var(--accent);
-    color: #000;
+    color: var(--accent-ink);
     border-color: var(--accent);
     &:hover:not(:disabled) { background: var(--accent-dim); border-color: var(--accent-dim); }
   }
   &.btn-danger {
     border-color: var(--danger);
     color: var(--danger);
-    &:hover:not(:disabled) { background: var(--danger); color: #fff; }
+    &:hover:not(:disabled) { background: var(--danger); color: var(--danger-ink); }
   }
   &.btn-sm { padding: 6px 12px; font-size: 0.75rem; }
 }
@@ -72,7 +93,7 @@ a:hover { text-decoration: underline; }
 .input {
   width: 100%;
   padding: 10px 12px;
-  background: var(--surface);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
@@ -104,7 +125,7 @@ a:hover { text-decoration: underline; }
   text-transform: uppercase;
 
   &.badge-setup    { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
-  &.badge-active   { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+  &.badge-active   { background: var(--marker); color: var(--marker-ink); border: 1px solid var(--marker); }
   &.badge-complete { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 }
 
@@ -125,12 +146,11 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 28px;
   h1 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    letter-spacing: -.01em;
+    font-size: 1.9rem;
   }
 }
 
@@ -138,6 +158,60 @@ a:hover { text-decoration: underline; }
   border: none;
   border-top: 1px solid var(--border);
   margin: 24px 0;
+}
+
+/* Section labels carry the bracket-node mark as a matter of course, rather
+   than each template having to remember to add one. */
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+}
+
+/* ── Toolbar (grouped actions — see tournament-manage) ── */
+.toolbar {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-right: 1px solid var(--border);
+  flex-wrap: wrap;
+
+  &:last-of-type { border-right: none; }
+
+  .btn {
+    background: transparent;
+    border: none;
+    padding: 6px 8px;
+    &:hover { border-color: transparent; text-decoration: underline; }
+  }
+}
+.toolbar-group-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+  white-space: nowrap;
 }
 
 /* ── Toast ── */
@@ -155,7 +229,7 @@ a:hover { text-decoration: underline; }
   animation: fadeUp .2s ease;
 
   &.toast-error { border-color: var(--danger); color: var(--danger); }
-  &.toast-success { border-color: var(--accent); color: var(--accent); }
+  &.toast-success { border-color: var(--marker); color: var(--marker); }
 }
 
 @keyframes fadeUp {
@@ -182,6 +256,18 @@ a:hover { text-decoration: underline; }
   font-size: 0.875rem;
 }
 
+/* ── Drag & drop (CDK, e.g. manual-seed reordering) ── */
+.cdk-drag-preview {
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+.cdk-drag-placeholder { opacity: 0; }
+.cdk-drag-animating { transition: transform 200ms cubic-bezier(0, 0, 0.2, 1); }
+.cdk-drop-list-dragging .cdk-drag:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
 /* ── Notification pages (confirm/unsubscribe/preferences) ── */
 .notif-wrap {
   min-height: calc(100dvh - 52px);
@@ -205,7 +291,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   gap: 10px;
-  h1 { font-size: 1.1rem; font-weight: 600; }
+  h1 { font-size: 1.5rem; }
 }
 .notif-icon { color: var(--accent); font-size: 1.2rem; }
 .notif-status { font-size: 0.85rem; color: var(--text-dim); }
@@ -213,16 +299,16 @@ a:hover { text-decoration: underline; }
 .notif-error {
   font-size: 0.8rem;
   color: var(--danger);
-  background: #1a0000;
-  border: 1px solid #330000;
+  background: rgba(var(--danger-rgb), 0.1);
+  border: 1px solid rgba(var(--danger-rgb), 0.35);
   border-radius: var(--radius);
   padding: 8px 12px;
 }
 .notif-success {
   font-size: 0.85rem;
   color: var(--text);
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(var(--marker-rgb), 0.1);
+  border: 1px solid rgba(var(--marker-rgb), 0.35);
   border-radius: var(--radius);
   padding: 10px 12px;
 }

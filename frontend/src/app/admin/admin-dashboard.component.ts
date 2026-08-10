@@ -27,6 +27,10 @@ import { confirmService } from '../shared/services/confirm.service';
             <option value="public">Public</option>
             <option value="private">Private</option>
           </select>
+          <select class="input" style="width:auto" [(ngModel)]="newSeedingMode" title="How teams are seeded before the bracket is generated">
+            <option value="automatic">Automatic seeding</option>
+            <option value="manual">Manual seeding</option>
+          </select>
           <button class="btn btn-primary" [disabled]="creating()" (click)="create()">
             @if (creating()) { <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> }
             Create
@@ -111,6 +115,7 @@ export class AdminDashboardComponent implements OnInit {
   toast = signal('');
   newName = '';
   newVisibility: 'public' | 'private' = 'public';
+  newSeedingMode: 'automatic' | 'manual' = 'automatic';
 
   constructor(private svc: TournamentService) {}
 
@@ -128,10 +133,11 @@ export class AdminDashboardComponent implements OnInit {
     if (!name) { this.createError.set('Enter a tournament name.'); return; }
     this.creating.set(true);
     this.createError.set('');
-    this.svc.createTournament(name, this.newVisibility).subscribe({
+    this.svc.createTournament(name, this.newVisibility, this.newSeedingMode).subscribe({
       next: t => {
         this.newName = '';
         this.newVisibility = 'public';
+        this.newSeedingMode = 'automatic';
         this.creating.set(false);
         this.tournaments.update(list => [t, ...list]);
         this.showToast('Tournament created!');

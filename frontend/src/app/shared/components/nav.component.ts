@@ -10,7 +10,13 @@ import { AuthService } from '../services/auth.service';
   template: `
     <nav class="nav">
       <a class="nav-brand" routerLink="/" (click)="closeMenu()">
-        <span class="nav-icon">◈</span>
+        <svg class="nav-mark" width="20" height="18" viewBox="0 0 30 26" fill="none" aria-hidden="true">
+          <circle cx="4" cy="4" r="3.2" fill="var(--accent)"/>
+          <circle cx="4" cy="22" r="3.2" fill="var(--accent)"/>
+          <circle cx="26" cy="13" r="3.6" fill="var(--text)"/>
+          <path d="M7 4H14C16 4 16 13 18 13" stroke="var(--accent)" stroke-width="1.6" fill="none"/>
+          <path d="M7 22H14C16 22 16 13 18 13" stroke="var(--accent)" stroke-width="1.6" fill="none"/>
+        </svg>
         <span class="nav-title">Apple Lane Bag Bracket</span>
       </a>
       <button class="nav-toggle" type="button"
@@ -53,16 +59,16 @@ import { AuthService } from '../services/auth.service';
       gap: 8px;
       text-decoration: none;
     }
-    .nav-icon {
-      color: var(--accent);
-      font-size: 1.1rem;
+    .nav-mark {
+      display: block;
+      flex-shrink: 0;
     }
     .nav-title {
-      font-family: var(--mono);
-      font-size: 0.85rem;
-      font-weight: 500;
-      color: var(--text);
+      font-family: var(--display);
+      font-size: 1.15rem;
       letter-spacing: .02em;
+      color: var(--text);
+      line-height: 1;
     }
     .nav-links {
       display: flex;

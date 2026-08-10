@@ -15,6 +15,7 @@ export interface Tournament {
   name: string;
   status: 'setup' | 'active' | 'complete';
   visibility: 'public' | 'private';
+  seeding_mode: 'automatic' | 'manual';
   created_at: string;
   // Only present when GET /tournaments/:id is called with a valid session — omitted for
   // anonymous public bracket views, and never persisted (always read fresh per request).

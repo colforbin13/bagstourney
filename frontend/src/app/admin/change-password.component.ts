@@ -101,12 +101,12 @@ import { TournamentService } from '../shared/services/tournament.service';
       padding: 8px 16px;
       font-size: 0.85rem;
     }
-    .form-error { 
-      font-size: 0.8rem; 
-      color: var(--danger); 
+    .form-error {
+      font-size: 0.8rem;
+      color: var(--danger);
       margin-top: 8px;
       padding: 8px;
-      background: rgba(239, 68, 68, 0.1);
+      background: rgba(var(--danger-rgb), 0.1);
       border-radius: 4px;
     }
     .toast {
@@ -116,8 +116,8 @@ import { TournamentService } from '../shared/services/tournament.service';
       padding: 12px 16px;
       border-radius: var(--radius);
       font-size: 0.9rem;
-      background: rgba(34, 197, 94, 0.9);
-      color: white;
+      background: var(--marker);
+      color: var(--marker-ink);
       animation: slideIn 0.3s ease-out;
     }
     @keyframes slideIn {

@@ -36,11 +36,14 @@ class ParticipantController {
             return;
         }
 
-        // Ensure tournament is still in setup phase
+        // Ensure tournament is still in setup phase and teams haven't been drawn yet —
+        // manual seeding leaves a tournament in 'setup' with teams already formed while
+        // awaiting bracket generation, and the roster must be locked for that window too,
+        // not just once the tournament goes 'active'.
         $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
         $stmt->execute([$tournamentId]);
         $t = $stmt->fetch();
-        if (!$t || $t['status'] !== 'setup') {
+        if (!$t || $t['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
             http_response_code(400);
             echo json_encode(['error' => 'Tournament is not in setup phase']);
             return;
@@ -76,7 +79,7 @@ class ParticipantController {
             echo json_encode(['error' => 'Tournament not found']);
             return;
         }
-        if ($t['status'] !== 'setup') {
+        if ($t['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
             http_response_code(400);
             echo json_encode(['error' => 'Cannot delete participant after teams have been drawn']);
             return;
@@ -232,13 +235,12 @@ class ParticipantController {
             echo json_encode(['error' => 'Tournament not found']);
             return;
         }
-        if ($tournament['status'] !== 'setup') {
+        $tournamentId = (int)$tournament['id'];
+        if ($tournament['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
             http_response_code(400);
             echo json_encode(['error' => 'Registration is closed for this tournament']);
             return;
         }
-
-        $tournamentId = (int)$tournament['id'];
 
         $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
         $countStmt->execute([$tournamentId]);
@@ -330,6 +332,15 @@ class ParticipantController {
 
         writeAuditLog($this->db, $tournamentId, $actorUserId, 'participant_notification_email_set', 'participant', (string)$id, ['email' => $email]);
         return null;
+    }
+
+    // 'setup' status alone no longer means "roster is still editable": manual seeding
+    // (TeamController::draw()) leaves a tournament in 'setup' with teams already formed
+    // while it awaits bracket generation via generateBracketAction().
+    private function teamsExist(int $tournamentId): bool {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
+        $stmt->execute([$tournamentId]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     private function getSafeParticipant(int $id): array {
