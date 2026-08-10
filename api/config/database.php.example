@@ -18,6 +18,9 @@ export BB_APP_PUBLIC_URL="https://yourdomain.example/bags"
 export BB_NOTIFICATION_TOKEN_SECRET="a_long_random_string_here"
 export BB_POSTMARK_WEBHOOK_USER="postmark"
 export BB_POSTMARK_WEBHOOK_PASS="a_long_random_string_here"
+export BB_NOTIFY_MATCH_COMPLETED_ENABLED="true"
+export BB_NOTIFY_ROUND_COMPLETED_ENABLED="true"
+export BB_NOTIFY_TOURNAMENT_FINALIZED_ENABLED="true"
 
 Option B (development): copy this file and set values directly (not recommended for production).
 */
@@ -44,6 +47,11 @@ $NOTIFICATION_TOKEN_SECRET = 'replace_with_a_secure_random_value';
 // set these same values in Postmark's webhook URL configuration (https://user:pass@host/...).
 $POSTMARK_WEBHOOK_USER = 'postmark';
 $POSTMARK_WEBHOOK_PASS = 'replace_with_a_secure_random_value';
+// Per-category kill switches — e.g. to stay under a Postmark plan's monthly send limit.
+// Checked at both enqueue time (MatchController) and send time (send_notifications.php).
+$NOTIFY_MATCH_COMPLETED_ENABLED = true;
+$NOTIFY_ROUND_COMPLETED_ENABLED = true;
+$NOTIFY_TOURNAMENT_FINALIZED_ENABLED = true;
 
 // TTL for JWT in seconds (default 8 hours)
 define('JWT_EXPIRY', 3600 * 8);
@@ -61,6 +69,9 @@ define('APP_PUBLIC_URL', $APP_PUBLIC_URL);
 define('NOTIFICATION_TOKEN_SECRET', $NOTIFICATION_TOKEN_SECRET);
 define('POSTMARK_WEBHOOK_USER', $POSTMARK_WEBHOOK_USER);
 define('POSTMARK_WEBHOOK_PASS', $POSTMARK_WEBHOOK_PASS);
+define('NOTIFY_MATCH_COMPLETED_ENABLED', $NOTIFY_MATCH_COMPLETED_ENABLED);
+define('NOTIFY_ROUND_COMPLETED_ENABLED', $NOTIFY_ROUND_COMPLETED_ENABLED);
+define('NOTIFY_TOURNAMENT_FINALIZED_ENABLED', $NOTIFY_TOURNAMENT_FINALIZED_ENABLED);
 
 function getDB(): PDO {
     static $pdo = null;

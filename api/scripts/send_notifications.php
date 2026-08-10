@@ -87,6 +87,18 @@ function processRow(PDO $db, PostmarkClient $postmark, array $row): string {
             return 'skipped';
         }
     } else {
+        // Re-checked here too (not just at enqueue time in MatchController) in case a
+        // category was disabled after this row was already queued.
+        $categoryEnabled = [
+            'match_completed' => NOTIFY_MATCH_COMPLETED_ENABLED,
+            'round_completed' => NOTIFY_ROUND_COMPLETED_ENABLED,
+            'tournament_finalized' => NOTIFY_TOURNAMENT_FINALIZED_ENABLED,
+        ];
+        if (empty($categoryEnabled[$row['event_type']])) {
+            markTerminal($db, $row, 'skipped', 'This notification category is currently disabled');
+            return 'skipped';
+        }
+
         $categoryColumn = NOTIFICATION_CATEGORY_COLUMNS[$row['event_type']] ?? null;
         if ($participant['notification_lifecycle'] !== 'confirmed') {
             markTerminal($db, $row, 'skipped', 'Participant is not a confirmed subscriber');

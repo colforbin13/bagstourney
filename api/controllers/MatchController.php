@@ -265,6 +265,7 @@ class MatchController {
     // pre-update row fetched at the top of updateScore(), so its tournament_id/round/
     // team1_id/team2_id reflect this match regardless of what the score update changed.
     private function enqueueMatchCompletedNotifications(array $match, int $matchId): void {
+        if (!NOTIFY_MATCH_COMPLETED_ENABLED) return;
         $stmt = $this->db->prepare('
             SELECT DISTINCT p.id, p.email
             FROM participants p
@@ -289,6 +290,7 @@ class MatchController {
     // limitation). Notifies every confirmed, opted-in participant in the whole tournament,
     // not just this match's own participants or those advancing.
     private function enqueueRoundCompletedNotifications(array $match): void {
+        if (!NOTIFY_ROUND_COMPLETED_ENABLED) return;
         $remaining = $this->db->prepare('
             SELECT COUNT(*) FROM matches
             WHERE tournament_id = ? AND round = ? AND status NOT IN ("complete", "bye")
@@ -314,6 +316,7 @@ class MatchController {
     // championship match — so this and enqueueRoundCompletedNotifications() never both
     // fire for the same match. Notifies every confirmed, opted-in participant tournament-wide.
     private function enqueueTournamentFinalizedNotifications(array $match, int $matchId): void {
+        if (!NOTIFY_TOURNAMENT_FINALIZED_ENABLED) return;
         $stmt = $this->db->prepare('
             SELECT id, email FROM participants
             WHERE tournament_id = ? AND notification_lifecycle = "confirmed" AND notify_tournament_finalized = 1
