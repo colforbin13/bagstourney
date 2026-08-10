@@ -10,7 +10,8 @@ class TournamentController {
         if ($actor) {
             $stmt = $this->db->query('SELECT * FROM tournaments ORDER BY created_at DESC');
         } else {
-            $stmt = $this->db->query("SELECT * FROM tournaments WHERE visibility = 'public' ORDER BY created_at DESC");
+            // Public listing: hide tournaments still in setup (no bracket generated yet).
+            $stmt = $this->db->query("SELECT * FROM tournaments WHERE visibility = 'public' AND status != 'setup' ORDER BY created_at DESC");
         }
         echo json_encode($stmt->fetchAll());
     }
