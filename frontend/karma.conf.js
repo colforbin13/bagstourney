@@ -22,7 +22,7 @@ module.exports = function (config) {
       suppressAll: true // removes the duplicated traces
     },
     coverageReporter: {
-      dir: require('path').join(__dirname, './coverage/beanbag-bracket'),
+      dir: require('path').join(__dirname, './coverage/bracketway'),
       subdir: '.',
       reporters: [
         { type: 'html' },

@@ -101,6 +101,56 @@ import { UserAccount } from '../shared/models/tournament.models';
             </tbody>
           </table>
         </div>
+
+        <div class="user-cards">
+          @for (user of users(); track user.id) {
+            <div class="user-card" [class.disabled]="user.status === 'disabled'">
+              <div class="user-card-top">
+                <span class="username">{{ user.username }}</span>
+                <span class="badge" [class.badge-active]="user.status === 'active'" [class.badge-disabled]="user.status === 'disabled'">
+                  {{ user.status }}
+                </span>
+              </div>
+              <div class="email">{{ user.email }}</div>
+              <div class="user-card-row">
+                <span class="field-label">Role</span>
+                <select
+                  [value]="user.role"
+                  (change)="changeRole(user, $event)"
+                  [disabled]="isUpdating(user.id)"
+                  class="role-select">
+                  <option value="organizer">Organizer</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+              <div class="created">Joined {{ formatDate(user.created_at) }}</div>
+              <div class="user-card-actions">
+                <button
+                  class="btn btn-sm"
+                  title="Reset password"
+                  [disabled]="isUpdating(user.id)"
+                  (click)="resetPassword(user)">
+                  @if (isUpdating(user.id)) {
+                    <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
+                  } @else {
+                    Reset
+                  }
+                </button>
+                <button
+                  class="btn btn-sm"
+                  [class.btn-danger]="user.status === 'active'"
+                  [disabled]="isUpdating(user.id)"
+                  (click)="toggleStatus(user)">
+                  @if (isUpdating(user.id)) {
+                    <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
+                  } @else {
+                    {{ user.status === 'active' ? 'Disable' : 'Enable' }}
+                  }
+                </button>
+              </div>
+            </div>
+          }
+        </div>
       }
 
       @if (toast()) {
@@ -195,6 +245,34 @@ import { UserAccount } from '../shared/models/tournament.models';
     .actions { text-align: right; }
     .btn { padding: 6px 12px; font-size: 0.85rem; }
     .btn-danger { color: var(--danger); border-color: var(--danger); }
+
+    /* Mobile card list (replaces the table below the breakpoint) */
+    .user-cards { display: none; flex-direction: column; gap: 10px; }
+    .user-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      &.disabled { opacity: 0.6; }
+    }
+    .user-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .user-card-row { display: flex; align-items: center; gap: 8px; }
+    .field-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text-dim);
+    }
+    .user-card-actions { display: flex; gap: 8px; margin-top: 2px; }
+
+    @media (max-width: 640px) {
+      .table-container { display: none; }
+      .user-cards { display: flex; }
+    }
 
     .form-error {
       color: var(--danger);

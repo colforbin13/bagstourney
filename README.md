@@ -1,4 +1,4 @@
-# Bag Bracket
+# Bracketway
 
 A mobile-first, single-elimination tournament bracket manager.
 

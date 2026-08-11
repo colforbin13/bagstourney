@@ -431,11 +431,11 @@ describe('TournamentManageComponent', () => {
       expect(component.seedingModeBusy()).toBe(false);
     });
 
-    it('should show the "Set Seeds" panel once teams exist while still in setup', () => {
+    it('should show the shared Teams panel (drag-to-reorder) once teams exist while still in setup', () => {
       bootstrapAwaitingSeeds();
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.textContent).toContain('Set Seeds');
+      expect(fixture.nativeElement.textContent).toContain('Drag to reorder');
       expect(fixture.nativeElement.textContent).toContain('Generate Bracket');
       expect(fixture.nativeElement.textContent).not.toContain('Add Participant');
       expect(component.teams()).toEqual(mockTeams);
@@ -508,6 +508,170 @@ describe('TournamentManageComponent', () => {
 
       httpMock.expectNone(`${environment.apiUrl}/participants/1`);
       expect(component.participants()).toEqual([participant]);
+    });
+  });
+
+  describe('direct team entry', () => {
+    function bootstrapDirect(teams: Team[] = [], seedingMode: 'automatic' | 'manual' = 'automatic') {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({
+          id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+          visibility: 'public', seeding_mode: seedingMode, team_entry_mode: 'direct',
+          created_at: '2026-01-01', capabilities: ownerCapabilities,
+        });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(teams);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+    }
+
+    it('should PUT the chosen team entry mode', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      component.updateTeamEntryMode('direct');
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ team_entry_mode: 'direct' });
+      req.flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'direct',
+        created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+
+      expect(component.isDirectEntry()).toBe(true);
+      expect(component.teamEntryModeBusy()).toBe(false);
+    });
+
+    it('should show the Add Team form instead of Add Participant', () => {
+      bootstrapDirect();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Add Team');
+      expect(fixture.nativeElement.textContent).not.toContain('Add Participant');
+    });
+
+    it('should require a team name and both member names before adding a team', () => {
+      bootstrapDirect();
+      component.newTeamName = '  ';
+      component.newTeamP1Name = 'Alice';
+      component.newTeamP2Name = 'Bob';
+
+      component.addTeam();
+
+      expect(component.addTeamError()).toBe('Enter a team name and both member names.');
+      httpMock.expectNone(`${environment.apiUrl}/teams/direct`);
+    });
+
+    it('should POST the team and both member names, then append the created team', () => {
+      bootstrapDirect();
+      component.newTeamName = 'The Ringers';
+      component.newTeamP1Name = 'Alice';
+      component.newTeamP2Name = 'Bob';
+
+      component.addTeam();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/direct`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        tournament_id: tournamentId, team_name: 'The Ringers', participant1_name: 'Alice', participant2_name: 'Bob',
+      });
+      const created: Team = {
+        id: 20, tournament_id: tournamentId, name: 'The Ringers',
+        participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
+      };
+      req.flush(created);
+
+      expect(component.teams()).toEqual([created]);
+      expect(component.newTeamName).toBe('');
+      expect(component.newTeamP1Name).toBe('');
+      expect(component.newTeamP2Name).toBe('');
+      expect(component.addingTeam()).toBe(false);
+    });
+
+    it('should surface a server error without clearing the form', () => {
+      bootstrapDirect();
+      component.newTeamName = 'The Ringers';
+      component.newTeamP1Name = 'Alice';
+      component.newTeamP2Name = 'Bob';
+
+      component.addTeam();
+
+      httpMock.expectOne(`${environment.apiUrl}/teams/direct`)
+        .flush({ error: 'This tournament uses auto-draft team entry — add participants and draw teams instead' },
+          { status: 400, statusText: 'Bad Request' });
+
+      expect(component.addTeamError()).toBe('This tournament uses auto-draft team entry — add participants and draw teams instead');
+      expect(component.newTeamName).toBe('The Ringers');
+    });
+
+    it('should show a delete button per team, not the auto-draft Redraw Teams button', () => {
+      const team: Team = {
+        id: 20, tournament_id: tournamentId, name: 'The Ringers',
+        participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
+      };
+      bootstrapDirect([team]);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).not.toContain('Redraw Teams');
+      expect(fixture.nativeElement.textContent).toContain('Add at least 2 teams');
+    });
+
+    it('should delete a team after confirmation and reload', async () => {
+      const team: Team = {
+        id: 20, tournament_id: tournamentId, name: 'The Ringers',
+        participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
+      };
+      bootstrapDirect([team]);
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+
+      await component.deleteTeam(team);
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/20`);
+      expect(req.request.method).toBe('DELETE');
+      req.flush({ success: true });
+
+      // deleteTeam() reloads rather than filtering client-side (seeds get re-numbered
+      // server-side), so the full load() sequence fires again.
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({
+          id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+          visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'direct',
+          created_at: '2026-01-01', capabilities: ownerCapabilities,
+        });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      expect(component.deletingTeamId()).toBeNull();
+    });
+
+    it('should not delete a team if confirmation is declined', async () => {
+      const team: Team = {
+        id: 20, tournament_id: tournamentId, name: 'The Ringers',
+        participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
+      };
+      bootstrapDirect([team]);
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(false));
+
+      await component.deleteTeam(team);
+
+      httpMock.expectNone(`${environment.apiUrl}/teams/20`);
+      expect(component.teams()).toEqual([team]);
+    });
+
+    it('should disable Generate Bracket with fewer than 2 teams', () => {
+      const team: Team = {
+        id: 20, tournament_id: tournamentId, name: 'The Ringers',
+        participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
+      };
+      bootstrapDirect([team]);
+      fixture.detectChanges();
+
+      const generateBtn: HTMLButtonElement = Array.from(fixture.nativeElement.querySelectorAll('button'))
+        .find((b: any) => b.textContent.trim() === 'Generate Bracket') as HTMLButtonElement;
+      expect(generateBtn.disabled).toBe(true);
     });
   });
 });

@@ -40,12 +40,20 @@ class ParticipantController {
         // manual seeding leaves a tournament in 'setup' with teams already formed while
         // awaiting bracket generation, and the roster must be locked for that window too,
         // not just once the tournament goes 'active'.
-        $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT status, team_entry_mode FROM tournaments WHERE id = ?');
         $stmt->execute([$tournamentId]);
         $t = $stmt->fetch();
         if (!$t || $t['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
             http_response_code(400);
             echo json_encode(['error' => 'Tournament is not in setup phase']);
+            return;
+        }
+        if (($t['team_entry_mode'] ?? 'auto_draft') !== 'auto_draft') {
+            // Direct-entry tournaments create both members of a team together via
+            // TeamController::createDirect() — there's no unpaired-participant pool here
+            // for a lone participant to join.
+            http_response_code(400);
+            echo json_encode(['error' => 'This tournament uses direct team entry — add teams directly instead']);
             return;
         }
 
@@ -227,7 +235,7 @@ class ParticipantController {
             return;
         }
 
-        $stmt = $this->db->prepare('SELECT id, status FROM tournaments WHERE uuid = ?');
+        $stmt = $this->db->prepare('SELECT id, status, team_entry_mode FROM tournaments WHERE uuid = ?');
         $stmt->execute([$uuid]);
         $tournament = $stmt->fetch();
         if (!$tournament) {
@@ -236,7 +244,11 @@ class ParticipantController {
             return;
         }
         $tournamentId = (int)$tournament['id'];
-        if ($tournament['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
+        if ($tournament['status'] !== 'setup' || $this->teamsExist($tournamentId)
+            || ($tournament['team_entry_mode'] ?? 'auto_draft') !== 'auto_draft') {
+            // Direct-entry tournaments have no unpaired-participant pool for a
+            // self-registered walk-up to later join — nothing for the organizer to do
+            // with a pending row here.
             http_response_code(400);
             echo json_encode(['error' => 'Registration is closed for this tournament']);
             return;

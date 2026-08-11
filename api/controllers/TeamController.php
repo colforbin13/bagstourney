@@ -42,6 +42,9 @@ class TeamController {
             if (!$tournament || $tournament['status'] !== 'setup') {
                 throw new Exception('Tournament is not in setup phase');
             }
+            if (($tournament['team_entry_mode'] ?? 'auto_draft') !== 'auto_draft') {
+                throw new Exception('This tournament uses direct team entry — teams are created individually, not drawn');
+            }
 
             // Get participants — only 'approved' rows (self-registered walk-ups start
             // 'pending' and must never end up on a team without the organizer having
@@ -113,6 +116,72 @@ class TeamController {
             ');
             $stmt->execute([$tournamentId]);
             echo json_encode($stmt->fetchAll());
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * POST /teams/direct — create one team at a time by typing both member names
+     * directly (direct team-entry mode). Creates two new participant rows (immediately
+     * approved — there's no separate roster-building step to review against here, unlike
+     * auto-draft's pending self-registrations) plus the team row, appended at the next
+     * seed position so teams keep arriving in entry order until reordered or generated.
+     */
+    public function createDirect(array $body): void {
+        $tournamentId = (int)($body['tournament_id'] ?? 0);
+        $teamName = trim($body['team_name'] ?? '');
+        $p1Name = trim($body['participant1_name'] ?? '');
+        $p2Name = trim($body['participant2_name'] ?? '');
+
+        if (!$tournamentId || !$teamName || !$p1Name || !$p2Name) {
+            http_response_code(400);
+            echo json_encode(['error' => 'tournament_id, team_name, participant1_name, and participant2_name are required']);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare('SELECT * FROM tournaments WHERE id = ?');
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch();
+            if (!$tournament || $tournament['status'] !== 'setup') {
+                throw new Exception('Tournament is not in setup phase');
+            }
+            if (($tournament['team_entry_mode'] ?? 'auto_draft') !== 'direct') {
+                throw new Exception('This tournament uses auto-draft team entry — add participants and draw teams instead');
+            }
+
+            $insertParticipant = $this->db->prepare('INSERT INTO participants (tournament_id, name) VALUES (?, ?)');
+            $insertParticipant->execute([$tournamentId, $p1Name]);
+            $p1Id = (int)$this->db->lastInsertId();
+            $insertParticipant->execute([$tournamentId, $p2Name]);
+            $p2Id = (int)$this->db->lastInsertId();
+
+            $seedCount = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
+            $seedCount->execute([$tournamentId]);
+            $seed = (int)$seedCount->fetchColumn() + 1;
+
+            $stmt = $this->db->prepare(
+                'INSERT INTO teams (tournament_id, name, participant1_id, participant2_id, seed) VALUES (?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([$tournamentId, $teamName, $p1Id, $p2Id, $seed]);
+            $teamId = (int)$this->db->lastInsertId();
+
+            $this->db->commit();
+
+            $stmt = $this->db->prepare('
+                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
+                FROM teams t
+                JOIN participants p1 ON t.participant1_id = p1.id
+                JOIN participants p2 ON t.participant2_id = p2.id
+                WHERE t.id = ?
+            ');
+            $stmt->execute([$teamId]);
+            echo json_encode($stmt->fetch());
 
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -208,8 +277,13 @@ class TeamController {
             $stmt = $this->db->prepare('SELECT id, seed FROM teams WHERE tournament_id = ? ORDER BY seed');
             $stmt->execute([$tournamentId]);
             $teams = $stmt->fetchAll();
-            if (!$teams) {
-                throw new Exception('No teams have been drawn yet');
+            if (count($teams) < 2) {
+                // draw() already enforces this for auto-draft (>= 4 participants -> >= 2
+                // teams) before it ever reaches this action, but direct entry has no such
+                // upfront check — an organizer could try to generate with a single team and
+                // no opponent, which is exactly the "tournament active with zero matches"
+                // bug a prior review found and fixed for the auto-draft path.
+                throw new Exception('Need at least 2 teams to generate a bracket');
             }
 
             $this->generateBracket($tournamentId, $teams);
@@ -248,6 +322,57 @@ class TeamController {
         $stmt = $this->db->prepare('SELECT t.*, p1.name as participant1_name, p2.name as participant2_name FROM teams t JOIN participants p1 ON t.participant1_id = p1.id JOIN participants p2 ON t.participant2_id = p2.id WHERE t.id = ?');
         $stmt->execute([$id]);
         echo json_encode($stmt->fetch());
+    }
+
+    /**
+     * DELETE /teams/{id} — undo a direct-entry team: removes the team and the two
+     * participant rows created solely for it (direct entry has no standalone "unpaired
+     * participant" concept, unlike auto-draft), then re-numbers the remaining teams'
+     * seeds so they stay contiguous.
+     */
+    public function delete(int $id): void {
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare('SELECT * FROM teams WHERE id = ?');
+            $stmt->execute([$id]);
+            $team = $stmt->fetch();
+            if (!$team) {
+                throw new Exception('Team not found');
+            }
+            $tournamentId = (int)$team['tournament_id'];
+
+            $stmt = $this->db->prepare('SELECT status, team_entry_mode FROM tournaments WHERE id = ?');
+            $stmt->execute([$tournamentId]);
+            $tournament = $stmt->fetch();
+            if (!$tournament || $tournament['status'] !== 'setup') {
+                throw new Exception('Cannot delete a team after the bracket has been generated');
+            }
+            if (($tournament['team_entry_mode'] ?? 'auto_draft') !== 'direct') {
+                throw new Exception('Teams can only be deleted individually in direct-entry tournaments');
+            }
+
+            $this->db->prepare('DELETE FROM teams WHERE id = ?')->execute([$id]);
+            $this->db->prepare('DELETE FROM participants WHERE id IN (?, ?)')
+                ->execute([$team['participant1_id'], $team['participant2_id']]);
+
+            // Re-number remaining teams' seeds so they stay contiguous (1..N in their
+            // existing seed order). generateBracket() treats a gap in seed numbers as an
+            // implicit bye at that specific bracket position, which would silently
+            // reshuffle who plays whom rather than just shrinking the field by one team.
+            $remaining = $this->db->prepare('SELECT id FROM teams WHERE tournament_id = ? ORDER BY seed');
+            $remaining->execute([$tournamentId]);
+            foreach ($remaining->fetchAll() as $i => $row) {
+                $this->db->prepare('UPDATE teams SET seed = ? WHERE id = ?')->execute([$i + 1, $row['id']]);
+            }
+
+            $this->db->commit();
+            echo json_encode(['success' => true]);
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
     }
 
     /**

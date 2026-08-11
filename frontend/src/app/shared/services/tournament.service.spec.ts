@@ -25,6 +25,7 @@ describe('TournamentService', () => {
     status: 'setup',
     visibility: 'public',
     seeding_mode: 'automatic',
+    team_entry_mode: 'auto_draft',
     created_at: '2026-01-01'
   };
 
@@ -178,6 +179,42 @@ describe('TournamentService', () => {
       const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
       expect(req.request.body).toEqual({ name: 'New Tournament', visibility: 'public', seeding_mode: 'manual' });
       req.flush(mockTournament);
+    });
+
+    it('should include team_entry_mode in the request body when given', () => {
+      service.createTournament('New Tournament', 'public', 'automatic', 'direct').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+      expect(req.request.body).toEqual({
+        name: 'New Tournament', visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'direct',
+      });
+      req.flush(mockTournament);
+    });
+  });
+
+  describe('createTeamDirect', () => {
+    it('should POST the team name and both participant names to /teams/direct', () => {
+      const mockTeam: any = {};
+      service.createTeamDirect(1, 'The Ringers', 'Alice', 'Bob').subscribe(team => {
+        expect(team).toEqual(mockTeam);
+      });
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/direct`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({
+        tournament_id: 1, team_name: 'The Ringers', participant1_name: 'Alice', participant2_name: 'Bob',
+      });
+      req.flush(mockTeam);
+    });
+  });
+
+  describe('deleteTeam', () => {
+    it('should DELETE /teams/{id}', () => {
+      service.deleteTeam(5).subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams/5`);
+      expect(req.request.method).toBe('DELETE');
+      req.flush({ success: true });
     });
   });
 

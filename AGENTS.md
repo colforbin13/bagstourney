@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Bag Bracket is a mobile-first single-elimination tournament manager.
+Bracketway is a mobile-first single-elimination tournament manager.
 
 - `api/` contains the PHP JSON API and front controller.
 - `frontend/` contains the Angular application.
@@ -126,7 +126,7 @@ npm.cmd run test:ci --prefix frontend        # CI mode (headless, code coverage)
 **Important:** When running test verification from agents or automated tasks, always use `test:ci` to run headless. Do not use the interactive `test` command from agents as it will attempt to launch a browser.
 
 Code coverage reports are generated in `frontend/coverage/` (in `.gitignore`). Review the HTML report at
-`frontend/coverage/beanbag-bracket/index.html` to identify uncovered code paths.
+`frontend/coverage/bracketway/index.html` to identify uncovered code paths.
 
 ## Verification
 

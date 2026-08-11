@@ -1,4 +1,4 @@
-# beanbag-bracket.conf
+# bracketway.conf
 #
 # Copy this file OUTSIDE your web root and source it, or copy the values
 # directly into api/config/database.php.

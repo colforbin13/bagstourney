@@ -107,10 +107,10 @@
                         } @else if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <button class="btn btn-sm" (click)="startEdit(match)">Edit</button>
                         } @else if (this.editingMatch === match.id) {
+                        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
                         <button class="btn btn-primary btn-sm" (click)="submitScore(match)" [disabled]="submitting() === match.id">
                             Save
                         </button>
-                        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
                         }
                     </div>
                     }

@@ -1,12 +1,13 @@
 // src/app/admin/tournament-manage.component.ts
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
 import { confirmService } from '../shared/services/confirm.service';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
+import * as QRCode from 'qrcode';
 
 @Component({
   selector: 'app-tournament-manage',
@@ -38,24 +39,36 @@ import { environment } from '../../environments/environment';
             }
           </div>
 
-          @if (canManageSetup()) {
-            <div class="toolbar">
-              <div class="toolbar-group">
-                <span class="toolbar-group-label">Share</span>
-                <button class="btn btn-sm" (click)="copyPublicLink()">Copy link</button>
-                @if (tournament()!.status === 'setup') {
-                  <button class="btn btn-sm" (click)="copyRegistrationLink()">Copy registration link</button>
+          <div class="tm-actions-row">
+            <a class="btn btn-sm btn-primary" [routerLink]="['/bracket', tournamentId]">View bracket</a>
+
+            @if (canManageSetup() || canDelete()) {
+              <div class="dropdown">
+                <button class="btn btn-sm" (click)="toggleActionsMenu()">Actions ▾</button>
+                @if (actionsMenuOpen()) {
+                  <div class="dropdown-backdrop" (click)="closeActionsMenu()"></div>
+                  <div class="dropdown-menu">
+                    @if (canManageSetup()) {
+                      <button class="dropdown-item" (click)="copyPublicLink(); closeActionsMenu()">Copy link</button>
+                      @if (tournament()!.status === 'setup' && !isDirectEntry() && teams().length === 0) {
+                        <button class="dropdown-item" (click)="copyRegistrationLink(); closeActionsMenu()">Copy registration link</button>
+                        <button class="dropdown-item" (click)="openQrModal(); closeActionsMenu()">Show registration QR code</button>
+                      }
+                      <button class="dropdown-item" [disabled]="visibilityBusy()" (click)="toggleVisibility(); closeActionsMenu()">
+                        Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
+                      </button>
+                    }
+                    @if (canDelete()) {
+                      @if (canManageSetup()) { <div class="dropdown-divider"></div> }
+                      <button class="dropdown-item dropdown-item-danger" [disabled]="deletingTournament()" (click)="deleteTournamentAction()">
+                        @if (deletingTournament()) { Deleting… } @else { Delete Tournament }
+                      </button>
+                    }
+                  </div>
                 }
               </div>
-              <div class="toolbar-group">
-                <span class="toolbar-group-label">Visibility</span>
-                <button class="btn btn-sm" [disabled]="visibilityBusy()" (click)="toggleVisibility()">
-                  Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
-                </button>
-              </div>
-            </div>
-          }
-          <a class="btn btn-sm btn-primary" [routerLink]="['/bracket', tournamentId]">View bracket</a>
+            }
+          </div>
         </div>
       }
 
@@ -74,7 +87,7 @@ import { environment } from '../../environments/environment';
                 @if (m.role === 'owner') {
                   <span class="badge badge-owner">Owner</span>
                 } @else {
-                  <select class="input" style="width:auto"
+                  <select class="input" style="width:140px;flex:none"
                     [ngModel]="m.role"
                     (ngModelChange)="changeMemberRole(m, $event)"
                     [disabled]="memberBusyUserId() === m.user_id">
@@ -123,11 +136,19 @@ import { environment } from '../../environments/environment';
 
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
-        <!-- Seeding mode: only choosable before teams exist -->
+        <!-- Mode selectors: only choosable before teams exist -->
         @if (canManageSetup() && teams().length === 0) {
           <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Team Entry</div>
+            <select class="input" [ngModel]="tournament()!.team_entry_mode"
+              (ngModelChange)="updateTeamEntryMode($event)" [disabled]="teamEntryModeBusy()">
+              <option value="auto_draft">Auto-draft — add participants, randomly pair them into teams</option>
+              <option value="direct">Direct entry — create each team by typing both member names</option>
+            </select>
+          </div>
+          <div class="card" style="margin-bottom:24px">
             <div class="section-label">Seeding</div>
-            <select class="input" style="width:auto" [ngModel]="tournament()!.seeding_mode"
+            <select class="input" [ngModel]="tournament()!.seeding_mode"
               (ngModelChange)="updateSeedingMode($event)" [disabled]="seedingModeBusy()">
               <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
               <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
@@ -135,139 +156,180 @@ import { environment } from '../../environments/environment';
           </div>
         }
 
-        <!-- Add participant -->
-        @if (canManageSetup() && teams().length === 0) {
-          <div class="card" style="margin-bottom:24px">
-            <div class="section-label">Add Participant</div>
-            <div class="row">
-              <input class="input" type="text" [(ngModel)]="newParticipant"
-                placeholder="Full name" (keyup.enter)="addParticipant()" />
-              <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
-                @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
-                Add
-              </button>
-            </div>
-            @if (addError()) { <div class="form-error">{{ addError() }}</div> }
-          </div>
-        }
-
-        @if (pendingParticipants().length > 0) {
-          <div class="card" style="margin-bottom:16px;border-color:var(--accent)">
-            {{ pendingParticipants().length }} self-registration{{ pendingParticipants().length === 1 ? '' : 's' }}
-            awaiting approval — approve or reject before drawing teams.
-          </div>
-        }
-
-        <!-- Participants list -->
-        <div class="section-label">
-          Participants
-          <span class="count">{{ approvedParticipants().length }}</span>
-          @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
-            <span class="warn">— Need an even number</span>
-          }
-        </div>
-
-        @if (participants().length === 0) {
-          <div class="empty" style="padding:24px 0">No participants yet.</div>
-        } @else {
-          <div class="participant-list">
-            @for (p of participants(); track p.id) {
-              <div class="participant-item">
-                @if (p.registration_status === 'pending') {
-                  <span style="flex:1">{{ p.name }} <span class="notify-status">— pending approval</span></span>
-                  @if (canManageSetup()) {
-                    <div style="display:flex;gap:6px">
-                      <button class="btn btn-sm btn-primary" [disabled]="approvingParticipantId() === p.id" (click)="approveParticipant(p)">Approve</button>
-                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">Reject</button>
-                    </div>
-                  }
-                } @else if (editingParticipantId === p.id) {
-                  <input class="input" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
-                  <input class="input" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
-                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
-                    @if (savingParticipantId() === p.id) { Saving… } @else { Save }
-                  </button>
-                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
-                } @else {
-                  <span style="flex:1">
-                    {{ p.name }}
-                    @if (notificationStatusLabel(p); as label) {
-                      <span class="notify-status">— {{ label }}</span>
-                    }
-                  </span>
-                  @if (canManageSetup()) {
-                    <div style="display:flex;gap:6px">
-                      <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
-                      @if (teams().length === 0) {
-                        <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
-                      }
-                    </div>
-                  }
-                }
+        @if (isDirectEntry()) {
+          <!-- Add team (direct entry) -->
+          @if (canManageSetup()) {
+            <div class="card" style="margin-bottom:24px">
+              <div class="section-label">Add Team</div>
+              <div class="row" style="flex-wrap:wrap">
+                <input class="input" type="text" [(ngModel)]="newTeamName"
+                  placeholder="Team name" style="flex:1;min-width:140px" />
+                <input class="input" type="text" [(ngModel)]="newTeamP1Name"
+                  placeholder="Member 1 name" style="flex:1;min-width:140px" />
+                <input class="input" type="text" [(ngModel)]="newTeamP2Name"
+                  placeholder="Member 2 name" style="flex:1;min-width:140px" />
+                <button class="btn btn-primary" [disabled]="addingTeam()" (click)="addTeam()">
+                  @if (addingTeam()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                  Add Team
+                </button>
               </div>
+              @if (addTeamError()) { <div class="form-error">{{ addTeamError() }}</div> }
+            </div>
+          }
+        } @else {
+          <!-- Add participant (auto-draft) -->
+          @if (canManageSetup() && teams().length === 0) {
+            <div class="card" style="margin-bottom:24px">
+              <div class="section-label">Add Participant</div>
+              <div class="row">
+                <input class="input" type="text" [(ngModel)]="newParticipant"
+                  placeholder="Full name" (keyup.enter)="addParticipant()" />
+                <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
+                  @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                  Add
+                </button>
+              </div>
+              @if (addError()) { <div class="form-error">{{ addError() }}</div> }
+            </div>
+          }
+
+          @if (pendingParticipants().length > 0) {
+            <div class="card" style="margin-bottom:16px;border-color:var(--accent)">
+              {{ pendingParticipants().length }} self-registration{{ pendingParticipants().length === 1 ? '' : 's' }}
+              awaiting approval — approve or reject before drawing teams.
+            </div>
+          }
+
+          <!-- Participants list -->
+          <div class="section-label">
+            Participants
+            <span class="count">{{ approvedParticipants().length }}</span>
+            @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
+              <span class="warn">— Need an even number</span>
             }
           </div>
-        }
 
-        <!-- Draw button (before teams exist) -->
-        @if (canManageSetup() && teams().length === 0 && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
-          <hr class="divider" />
-          <div class="draw-section">
-            <div>
-              <div style="font-weight:500;margin-bottom:4px;">Ready to draw teams?</div>
-              <div style="font-size:.8rem;color:var(--text-dim);">
-                {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
-                @if (isManualSeeding()) {
-                  This will randomly pair players into teams. You'll set the final seed order before generating the bracket.
-                } @else {
-                  This will randomly pair players, seed teams, and generate the bracket.
-                }
-              </div>
-            </div>
-            <button class="btn btn-primary" [disabled]="drawing()" (click)="drawTeams()">
-              @if (drawing()) {
-                <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
-                Drawing…
-              } @else {
-                {{ isManualSeeding() ? 'Draw Teams' : 'Draw Teams & Start' }}
+          @if (participants().length === 0) {
+            <div class="empty" style="padding:24px 0">No participants yet.</div>
+          } @else {
+            <div class="participant-list">
+              @for (p of participants(); track p.id) {
+                <div class="participant-item">
+                  @if (p.registration_status === 'pending') {
+                    <span style="flex:1">{{ p.name }} <span class="notify-status">— pending approval</span></span>
+                    @if (canManageSetup()) {
+                      <div style="display:flex;gap:6px">
+                        <button class="btn btn-sm btn-primary" [disabled]="approvingParticipantId() === p.id" (click)="approveParticipant(p)">Approve</button>
+                        <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">Reject</button>
+                      </div>
+                    }
+                  } @else if (editingParticipantId === p.id) {
+                    <div class="edit-form">
+                      <div class="edit-form-fields">
+                        <input class="input" style="flex:1;min-width:140px" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
+                        <input class="input" style="flex:1;min-width:140px" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
+                      </div>
+                      <div class="edit-form-actions">
+                        <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
+                        <button class="btn btn-sm btn-primary" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
+                          @if (savingParticipantId() === p.id) { Saving… } @else { Save }
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <span style="flex:1">
+                      {{ p.name }}
+                      @if (notificationStatusLabel(p); as label) {
+                        <span class="notify-status">— {{ label }}</span>
+                      }
+                    </span>
+                    @if (canManageSetup()) {
+                      <div style="display:flex;gap:6px">
+                        <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
+                        @if (teams().length === 0) {
+                          <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
               }
-            </button>
-          </div>
-          @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
+            </div>
+          }
+
+          <!-- Draw button (before teams exist) -->
+          @if (canManageSetup() && teams().length === 0 && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
+            <hr class="divider" />
+            <div class="draw-section">
+              <div>
+                <div style="font-weight:500;margin-bottom:4px;">Ready to draw teams?</div>
+                <div style="font-size:.8rem;color:var(--text-dim);">
+                  {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
+                  @if (isManualSeeding()) {
+                    This will randomly pair players into teams. You'll set the final seed order before generating the bracket.
+                  } @else {
+                    This will randomly pair players, seed teams, and generate the bracket.
+                  }
+                </div>
+              </div>
+              <button class="btn btn-primary" [disabled]="drawing()" (click)="drawTeams()">
+                @if (drawing()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Drawing…
+                } @else {
+                  {{ isManualSeeding() ? 'Draw Teams' : 'Draw Teams & Start' }}
+                }
+              </button>
+            </div>
+            @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
+          }
         }
 
-        <!-- Set seeds (manual seeding: teams drawn, bracket not yet generated) -->
+        <!-- Teams: seed order + bracket generation, shared by both entry modes -->
         @if (canManageSetup() && teams().length > 0) {
           <hr class="divider" />
           <div class="section-label">
-            Set Seeds
+            Teams
             <span class="count">{{ teams().length }}</span>
           </div>
-          <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px">
-            Drag to reorder — seed 1 plays the bracket's lowest seed first.
-          </div>
+          @if (isManualSeeding()) {
+            <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px">
+              Drag to reorder — seed 1 plays the bracket's lowest seed first.
+            </div>
+          }
           <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
             @for (team of teams(); track team.id) {
-              <div class="team-seed-item" cdkDrag>
-                <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
+              <div class="team-seed-item" cdkDrag [cdkDragDisabled]="!isManualSeeding()">
+                @if (isManualSeeding()) {
+                  <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
+                }
                 <span class="seed">#{{ team.seed }}</span>
                 <div class="team-info">
                   <div class="team-name">{{ team.name }}</div>
                   <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
                 </div>
+                @if (isDirectEntry()) {
+                  <button class="btn btn-sm btn-danger" [disabled]="deletingTeamId() === team.id" (click)="deleteTeam(team)">✕</button>
+                }
               </div>
             }
           </div>
           <div class="draw-section" style="margin-top:16px">
-            <button class="btn btn-sm" [disabled]="drawing()" (click)="drawTeams()">
-              @if (drawing()) {
-                <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
-                Redrawing…
-              } @else {
-                Redraw Teams
+            @if (isDirectEntry()) {
+              @if (teams().length < 2) {
+                <div style="font-size:.8rem;color:var(--text-dim)">Add at least 2 teams to generate the bracket.</div>
               }
-            </button>
-            <button class="btn btn-primary" [disabled]="generatingBracket()" (click)="confirmGenerateBracket()">
+            } @else {
+              <button class="btn btn-sm" [disabled]="drawing()" (click)="drawTeams()">
+                @if (drawing()) {
+                  <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
+                  Redrawing…
+                } @else {
+                  Redraw Teams
+                }
+              </button>
+            }
+            <button class="btn btn-primary" [disabled]="generatingBracket() || teams().length < 2" (click)="confirmGenerateBracket()">
               @if (generatingBracket()) {
                 <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
                 Generating…
@@ -291,12 +353,18 @@ import { environment } from '../../environments/environment';
             @for (p of participants(); track p.id) {
               <div class="participant-item">
                 @if (editingParticipantId === p.id) {
-                  <input class="input" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
-                  <input class="input" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
-                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
-                    @if (savingParticipantId() === p.id) { Saving… } @else { Save }
-                  </button>
-                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
+                  <div class="edit-form">
+                    <div class="edit-form-fields">
+                      <input class="input" style="flex:1;min-width:140px" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
+                      <input class="input" style="flex:1;min-width:140px" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
+                    </div>
+                    <div class="edit-form-actions">
+                      <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
+                      <button class="btn btn-sm btn-primary" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
+                        @if (savingParticipantId() === p.id) { Saving… } @else { Save }
+                      </button>
+                    </div>
+                  </div>
                 } @else {
                   <span style="flex:1">
                     {{ p.name }}
@@ -326,20 +394,21 @@ import { environment } from '../../environments/environment';
                 <span class="seed">#{{ team.seed }}</span>
                 <div class="team-info" style="flex:1">
                   @if (editingTeamId === team.id) {
-                    <input class="input" type="text" [(ngModel)]="editingTeamName" />
+                    <div class="edit-form">
+                      <input class="input" type="text" [(ngModel)]="editingTeamName" />
+                      <div class="edit-form-actions">
+                        <button class="btn btn-sm" (click)="cancelEditTeam()">Cancel</button>
+                        <button class="btn btn-sm btn-primary" (click)="saveTeam(team)">Save</button>
+                      </div>
+                    </div>
                   } @else {
                     <div class="team-name">{{ team.name }}</div>
                   }
                   <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
                 </div>
-                @if (canManageSetup()) {
+                @if (canManageSetup() && editingTeamId !== team.id) {
                   <div style="display:flex;gap:8px">
-                    @if (editingTeamId === team.id) {
-                      <button class="btn btn-sm" (click)="saveTeam(team)">Save</button>
-                      <button class="btn btn-sm" (click)="cancelEditTeam()">Cancel</button>
-                    } @else {
-                      <button class="btn btn-sm" (click)="startEditTeam(team)">Edit</button>
-                    }
+                    <button class="btn btn-sm" (click)="startEditTeam(team)">Edit</button>
                   </div>
                 }
               </div>
@@ -359,6 +428,21 @@ import { environment } from '../../environments/environment';
       <!-- Toast -->
       @if (toast()) {
         <div class="toast toast-success">{{ toast() }}</div>
+      }
+
+      <!-- Registration QR code -->
+      @if (qrModalOpen()) {
+        <div class="qr-modal-backdrop" (click)="closeQrModal()">
+          <div class="qr-modal" (click)="$event.stopPropagation()">
+            <div class="qr-modal-title">Registration QR Code</div>
+            <div class="qr-modal-sub">{{ tournament()?.name }}</div>
+            <canvas #qrCanvas class="qr-canvas"></canvas>
+            <div class="qr-modal-actions">
+              <button class="btn btn-sm" (click)="downloadQrCode()">Download PNG</button>
+              <button class="btn btn-sm btn-primary" (click)="closeQrModal()">Close</button>
+            </div>
+          </div>
+        </div>
       }
     }
     </div>
@@ -390,11 +474,80 @@ import { environment } from '../../environments/environment';
     .tm-toolbar-row {
       display: flex;
       align-items: center;
+      justify-content: space-between;
       flex-wrap: wrap;
       gap: 10px;
       margin-bottom: 24px;
     }
     .tm-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tm-actions-row { display: flex; align-items: center; gap: 8px; }
+
+    /* Actions dropdown */
+    .dropdown { position: relative; }
+    .dropdown-backdrop { position: fixed; inset: 0; z-index: 40; }
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      z-index: 50;
+      min-width: 210px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+    }
+    .dropdown-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      padding: 8px 10px;
+      border-radius: calc(var(--radius) - 1px);
+      font-family: var(--sans);
+      font-size: .8rem;
+      color: var(--text);
+      cursor: pointer;
+      &:hover:not(:disabled) { background: var(--surface-2); }
+      &:disabled { opacity: .5; cursor: not-allowed; }
+    }
+    .dropdown-item-danger {
+      color: var(--danger);
+      &:hover:not(:disabled) { background: rgba(var(--danger-rgb), 0.1); }
+    }
+    .dropdown-divider { height: 1px; background: var(--border); margin: 4px 2px; }
+
+    /* Registration QR code modal */
+    .qr-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .45);
+      padding: 24px;
+    }
+    .qr-modal {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, .3);
+      max-width: 90vw;
+    }
+    .qr-modal-title { font-weight: 600; font-size: 1rem; }
+    .qr-modal-sub { font-size: .8rem; color: var(--text-dim); margin-bottom: 12px; }
+    .qr-canvas { max-width: 100%; height: auto; border-radius: calc(var(--radius) - 1px); }
+    .qr-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 
     /* Participants */
     .participant-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
@@ -409,6 +562,11 @@ import { environment } from '../../environments/environment';
       font-size: .875rem;
     }
     .notify-status { color: var(--text-dim); font-size: .75rem; }
+
+    /* Inline edit forms (participant / team) */
+    .edit-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+    .edit-form-fields { display: flex; gap: 8px; flex-wrap: wrap; }
+    .edit-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
     /* Draw section */
     .draw-section {
@@ -515,12 +673,17 @@ export class TournamentManageComponent implements OnInit {
   teams = signal<Team[]>([]);
   champion = signal<string | null>(null);
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
+  canDelete = computed(() => this.tournament()?.capabilities?.can_delete ?? false);
+  deletingTournament = signal(false);
+  actionsMenuOpen = signal(false);
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
   isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
+  isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
   approvingParticipantId = signal<number | null>(null);
   visibilityBusy = signal(false);
   seedingModeBusy = signal(false);
+  teamEntryModeBusy = signal(false);
 
   loading = signal(true);
   loadError = signal('');
@@ -534,6 +697,14 @@ export class TournamentManageComponent implements OnInit {
 
   newParticipant = '';
   tournamentId!: number;
+
+  // Direct team entry
+  newTeamName = '';
+  newTeamP1Name = '';
+  newTeamP2Name = '';
+  addingTeam = signal(false);
+  addTeamError = signal('');
+  deletingTeamId = signal<number | null>(null);
 
   // Inline editing state
   editingParticipantId: number | null = null;
@@ -556,7 +727,11 @@ export class TournamentManageComponent implements OnInit {
   staffActionBusy = signal(false);
   private staffSearchDebounce?: ReturnType<typeof setTimeout>;
 
-  constructor(private route: ActivatedRoute, private svc: TournamentService) {}
+  // Registration QR code
+  qrModalOpen = signal(false);
+  @ViewChild('qrCanvas') qrCanvasRef?: ElementRef<HTMLCanvasElement>;
+
+  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router) {}
 
   ngOnInit() {
     this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
@@ -616,6 +791,29 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
+  toggleActionsMenu() {
+    this.actionsMenuOpen.update(open => !open);
+  }
+
+  closeActionsMenu() {
+    this.actionsMenuOpen.set(false);
+  }
+
+  async deleteTournamentAction() {
+    const t = this.tournament();
+    if (!t) return;
+    const ok = await confirmService.confirm(`Delete "${t.name}"? This cannot be undone.`);
+    if (!ok) return;
+    this.deletingTournament.set(true);
+    this.svc.deleteTournament(this.tournamentId).subscribe({
+      next: () => this.router.navigate(['/admin']),
+      error: (err) => {
+        this.deletingTournament.set(false);
+        this.showToast(err?.error?.error ?? 'Failed to delete tournament.');
+      },
+    });
+  }
+
   updateSeedingMode(mode: 'automatic' | 'manual') {
     if (this.tournament()?.seeding_mode === mode) return;
     this.seedingModeBusy.set(true);
@@ -631,9 +829,25 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  // location.origin alone omits the deployment base path (environment.baseHref, "/bags/"
-  // in production — see main.ts, which sets the <base href> from it at runtime), so a
-  // plain `${location.origin}/bracket/...` string silently drops the "/bags" segment.
+  updateTeamEntryMode(mode: 'auto_draft' | 'direct') {
+    if (this.tournament()?.team_entry_mode === mode) return;
+    this.teamEntryModeBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { team_entry_mode: mode }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.teamEntryModeBusy.set(false);
+      },
+      error: () => {
+        this.teamEntryModeBusy.set(false);
+        this.showToast('Failed to update team entry mode.');
+      },
+    });
+  }
+
+  // location.origin alone omits the deployment base path (environment.baseHref — see
+  // main.ts, which sets the <base href> from it at runtime), so a plain
+  // `${location.origin}/bracket/...` string would silently drop it if it's ever
+  // non-root again (it's "/" today).
   copyPublicLink() {
     const uuid = this.tournament()?.uuid;
     if (!uuid) return;
@@ -643,13 +857,47 @@ export class TournamentManageComponent implements OnInit {
     );
   }
 
-  copyRegistrationLink() {
+  private registrationUrl(): string | null {
     const uuid = this.tournament()?.uuid;
-    if (!uuid) return;
-    navigator.clipboard.writeText(`${location.origin}${environment.baseHref}register/${uuid}`).then(
+    if (!uuid) return null;
+    return `${location.origin}${environment.baseHref}register/${uuid}`;
+  }
+
+  copyRegistrationLink() {
+    const url = this.registrationUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(
       () => this.showToast('Registration link copied!'),
       () => this.showToast('Could not copy link.'),
     );
+  }
+
+  openQrModal() {
+    const url = this.registrationUrl();
+    if (!url) return;
+    this.qrModalOpen.set(true);
+    // Wait a tick for the @if-gated <canvas> to actually exist in the DOM.
+    setTimeout(() => {
+      const canvas = this.qrCanvasRef?.nativeElement;
+      if (!canvas) return;
+      QRCode.toCanvas(canvas, url, { width: 240, margin: 2 }, err => {
+        if (err) this.showToast('Could not generate QR code.');
+      });
+    });
+  }
+
+  closeQrModal() {
+    this.qrModalOpen.set(false);
+  }
+
+  downloadQrCode() {
+    const canvas = this.qrCanvasRef?.nativeElement;
+    if (!canvas) return;
+    const link = document.createElement('a');
+    const name = (this.tournament()?.name ?? 'tournament').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    link.download = `${name}-registration-qr.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   }
 
   loadMembers() {
@@ -782,6 +1030,52 @@ export class TournamentManageComponent implements OnInit {
       error: err => {
         this.adding.set(false);
         this.addError.set(err?.error?.error ?? 'Failed to add participant.');
+      },
+    });
+  }
+
+  // Direct team entry
+  addTeam() {
+    const teamName = this.newTeamName.trim();
+    const p1 = this.newTeamP1Name.trim();
+    const p2 = this.newTeamP2Name.trim();
+    if (!teamName || !p1 || !p2) {
+      this.addTeamError.set('Enter a team name and both member names.');
+      return;
+    }
+    this.addingTeam.set(true);
+    this.addTeamError.set('');
+    this.svc.createTeamDirect(this.tournamentId, teamName, p1, p2).subscribe({
+      next: team => {
+        this.newTeamName = '';
+        this.newTeamP1Name = '';
+        this.newTeamP2Name = '';
+        this.addingTeam.set(false);
+        this.teams.update(list => [...list, team]);
+      },
+      error: err => {
+        this.addingTeam.set(false);
+        this.addTeamError.set(err?.error?.error ?? 'Failed to add team.');
+      },
+    });
+  }
+
+  async deleteTeam(t: Team) {
+    const ok = await confirmService.confirm(
+      `Delete team "${t.name}"? This also removes ${t.participant1_name} and ${t.participant2_name}. This cannot be undone.`
+    );
+    if (!ok) return;
+    this.deletingTeamId.set(t.id);
+    this.svc.deleteTeam(t.id).subscribe({
+      next: () => {
+        this.deletingTeamId.set(null);
+        // Reload rather than filtering client-side — the backend re-numbers the
+        // remaining teams' seeds to stay contiguous, and this picks that up.
+        this.load();
+      },
+      error: err => {
+        this.deletingTeamId.set(null);
+        this.showToast(err?.error?.error ?? 'Failed to delete team.');
       },
     });
   }

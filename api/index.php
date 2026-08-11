@@ -140,6 +140,9 @@ try {
             } elseif ($method === 'POST' && !$id && !$action) {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->draw($body); // draw teams from participants
+            } elseif ($method === 'POST' && !$id && $action === 'direct') {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->createDirect($body); // direct team entry: create one team from typed-in member names
             } elseif ($method === 'POST' && !$id && $action === 'generate-bracket') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->generateBracketAction($body); // manual seeding: finalize bracket from current seed order
@@ -151,6 +154,11 @@ try {
                 $stmt->execute([$id]);
                 requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->update($id, $body);
+            } elseif ($method === 'DELETE' && $id) {
+                $stmt = $db->prepare('SELECT tournament_id FROM teams WHERE id = ?');
+                $stmt->execute([$id]);
+                requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->delete($id); // direct team entry: undo a mistakenly-entered team
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);

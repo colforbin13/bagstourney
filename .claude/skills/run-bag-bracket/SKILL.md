@@ -1,9 +1,9 @@
 ---
 name: run-bag-bracket
-description: Launch a local Bag Bracket dev stack (Angular frontend + PHP API) against the production database on the local network, for browser-based verification of UI/API changes before deploying.
+description: Launch a local Bracketway dev stack (Angular frontend + PHP API) against the production database on the local network, for browser-based verification of UI/API changes before deploying.
 ---
 
-# Running Bag Bracket locally
+# Running Bracketway locally
 
 This repo's API talks to a MySQL database that normally only production
 touches, reachable over the local network at `192.168.1.18:3306`. This

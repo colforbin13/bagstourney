@@ -14,7 +14,8 @@ describe('AdminDashboardComponent', () => {
 
   const mockTournament: Tournament = {
     id: 1, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
-    visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01',
+    visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'auto_draft',
+    created_at: '2026-01-01',
   };
 
   beforeEach(async () => {
@@ -51,22 +52,26 @@ describe('AdminDashboardComponent', () => {
     httpMock.expectNone(`${environment.apiUrl}/tournaments`);
   });
 
-  it('should create a tournament with the chosen visibility and seeding mode', () => {
+  it('should create a tournament with the chosen visibility, seeding mode, and team entry mode', () => {
     bootstrap();
     component.newName = 'New Tournament';
     component.newVisibility = 'private';
     component.newSeedingMode = 'manual';
+    component.newTeamEntryMode = 'direct';
     component.create();
 
     const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'New Tournament', visibility: 'private', seeding_mode: 'manual' });
-    req.flush({ ...mockTournament, name: 'New Tournament', visibility: 'private', seeding_mode: 'manual' });
+    expect(req.request.body).toEqual({
+      name: 'New Tournament', visibility: 'private', seeding_mode: 'manual', team_entry_mode: 'direct',
+    });
+    req.flush({ ...mockTournament, name: 'New Tournament', visibility: 'private', seeding_mode: 'manual', team_entry_mode: 'direct' });
 
     expect(component.tournaments()[0].name).toBe('New Tournament');
     expect(component.newName).toBe('');
     expect(component.newVisibility).toBe('public');
     expect(component.newSeedingMode).toBe('automatic');
+    expect(component.newTeamEntryMode).toBe('auto_draft');
     expect(component.creating()).toBe(false);
   });
 

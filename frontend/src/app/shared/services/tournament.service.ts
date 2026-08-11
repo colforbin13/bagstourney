@@ -23,10 +23,16 @@ export class TournamentService {
     return this.http.get<Tournament>(`${this.api}/tournaments/by-uuid/${uuid}`);
   }
 
-  createTournament(name: string, visibility?: 'public' | 'private', seedingMode?: 'automatic' | 'manual') {
+  createTournament(
+    name: string,
+    visibility?: 'public' | 'private',
+    seedingMode?: 'automatic' | 'manual',
+    teamEntryMode?: 'auto_draft' | 'direct',
+  ) {
     const body: Record<string, string> = { name };
     if (visibility) body['visibility'] = visibility;
     if (seedingMode) body['seeding_mode'] = seedingMode;
+    if (teamEntryMode) body['team_entry_mode'] = teamEntryMode;
     return this.http.post<Tournament>(`${this.api}/tournaments`, body);
   }
 
@@ -158,6 +164,21 @@ export class TournamentService {
 
   updateTeam(id: number, data: Partial<Team>) {
     return this.http.put<Team>(`${this.api}/teams/${id}`, data);
+  }
+
+  // Direct team entry: create one team at a time from typed-in member names, rather
+  // than adding participants individually and letting the app randomize pairing.
+  createTeamDirect(tournamentId: number, teamName: string, participant1Name: string, participant2Name: string) {
+    return this.http.post<Team>(`${this.api}/teams/direct`, {
+      tournament_id: tournamentId,
+      team_name: teamName,
+      participant1_name: participant1Name,
+      participant2_name: participant2Name,
+    });
+  }
+
+  deleteTeam(id: number) {
+    return this.http.delete(`${this.api}/teams/${id}`);
   }
 
   // Manual seeding: persist a drag-and-drop reorder as the new seed order (top to bottom

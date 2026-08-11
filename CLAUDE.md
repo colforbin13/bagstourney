@@ -15,7 +15,7 @@ Repo-wide conventions — PHP 7 compatibility, backend/frontend patterns, migrat
 - All tests, headless with coverage (use this for CI/agent verification): `npm run test:ci`
 - All tests, interactive (local only — opens a real Chrome window): `npm run test`
 - Single test file: `npm run test -- --include='**/user-management.component.spec.ts' --watch=false --browsers=ChromeHeadless`
-- Coverage report after `test:ci`: `frontend/coverage/beanbag-bracket/index.html`
+- Coverage report after `test:ci`: `frontend/coverage/bracketway/index.html`
 
 ### Backend (PHP)
 
@@ -62,4 +62,10 @@ Core tournament tables (`db/schema.sql`): `tournaments` → `participants` → `
 
 ### Roadmap docs
 
-`FEATURE_TRACKER.md` and `USER_MANAGEMENT_PLAN.md` track in-progress and planned work — currently centered on role-based access and user management (phases: user management UI, password management, tournament staff-management UI, capability-aware frontend). Check these before starting new work in that area to avoid duplicating or conflicting with the plan.
+`FEATURE_TRACKER.md` lists planned work in priority order, with shipped work summarized
+in one line each. `FEATURE_ARCHIVE.md` holds the full implementation notes, design
+decisions, and verification history for every shipped item — check it for prior art
+before touching an area again. `USER_MANAGEMENT_PLAN.md` is the detailed design doc for
+the (now-complete) role-based access and user-management work, kept as historical
+reference. Check `FEATURE_TRACKER.md` before starting new work to avoid duplicating or
+conflicting with what's planned.

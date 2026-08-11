@@ -19,7 +19,8 @@ describe('BracketViewComponent', () => {
   function tournamentWith(capabilities?: TournamentCapabilities): Tournament {
     return {
       id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'active',
-      visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01', capabilities,
+      visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'auto_draft',
+      created_at: '2026-01-01', capabilities,
     };
   }
 

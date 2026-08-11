@@ -48,10 +48,11 @@ class TournamentController {
         if (!$name) { http_response_code(400); echo json_encode(['error' => 'Name required']); return; }
         $visibility = in_array($body['visibility'] ?? null, ['public', 'private'], true) ? $body['visibility'] : 'public';
         $seedingMode = in_array($body['seeding_mode'] ?? null, ['automatic', 'manual'], true) ? $body['seeding_mode'] : 'automatic';
+        $teamEntryMode = in_array($body['team_entry_mode'] ?? null, ['auto_draft', 'direct'], true) ? $body['team_entry_mode'] : 'auto_draft';
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, seeding_mode, created_by_user_id) VALUES (?, ?, ?, ?, ?)');
-            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $seedingMode, $actor['id']]);
+            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, seeding_mode, team_entry_mode, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $seedingMode, $teamEntryMode, $actor['id']]);
             $id = (int)$this->db->lastInsertId();
             $this->db->prepare('INSERT INTO tournament_members (tournament_id, user_id, role, granted_by_user_id) VALUES (?, ?, "owner", ?)')
                 ->execute([$id, $actor['id'], $actor['id']]);
@@ -115,6 +116,31 @@ class TournamentController {
             }
             $fields[] = 'seeding_mode = ?';
             $params[] = $body['seeding_mode'];
+        }
+        if (isset($body['team_entry_mode'])) {
+            if (!in_array($body['team_entry_mode'], ['auto_draft', 'direct'], true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid team entry mode']);
+                return;
+            }
+            // Same reasoning as seeding_mode above: only changeable before teams exist.
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$id]);
+            $t = $stmt->fetch();
+            if (!$t || $t['status'] !== 'setup') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Team entry mode can only be changed during setup']);
+                return;
+            }
+            $teamCount = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
+            $teamCount->execute([$id]);
+            if ((int)$teamCount->fetchColumn() > 0) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Cannot change team entry mode after teams have been created']);
+                return;
+            }
+            $fields[] = 'team_entry_mode = ?';
+            $params[] = $body['team_entry_mode'];
         }
         if (!$fields) { http_response_code(400); echo json_encode(['error' => 'Nothing to update']); return; }
         $params[] = $id;
