@@ -1,25 +1,25 @@
 // src/app/admin/login.component.ts
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../shared/services/auth.service';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="login-wrap">
       <div class="login-card">
         <div class="login-header">
           <span class="login-icon">◈</span>
-          <h1>Admin Sign In</h1>
+          <h1>Organizer Sign In</h1>
         </div>
 
         <div class="form-group">
-          <label class="label">Username</label>
+          <label class="label">Email or username</label>
           <input class="input" type="text" [(ngModel)]="username"
-            placeholder="admin" autocomplete="username"
+            placeholder="you@example.com" autocomplete="username"
             (keyup.enter)="login()" />
         </div>
 
@@ -43,6 +43,8 @@ import { AuthService } from '../shared/services/auth.service';
             Sign in
           }
         </button>
+        <a class="register-link" routerLink="/admin/register">Create an organizer account</a>
+        <a class="register-link" routerLink="/reset-password">Have a password reset token?</a>
       </div>
     </div>
   `,
@@ -78,11 +80,12 @@ import { AuthService } from '../shared/services/auth.service';
     .login-error {
       font-size: 0.8rem;
       color: var(--danger);
-      background: #1a0000;
-      border: 1px solid #330000;
+      background: rgba(var(--danger-rgb), 0.1);
+      border: 1px solid rgba(var(--danger-rgb), 0.35);
       border-radius: var(--radius);
       padding: 8px 12px;
     }
+    .register-link { color: var(--accent); font-size: .8rem; text-align: center; }
   `]
 })
 export class LoginComponent {
@@ -103,7 +106,7 @@ export class LoginComponent {
     } catch (e) {}
   }
   login() {
-    if (!this.username || !this.password) { this.error.set('Enter username and password.'); return; }
+    if (!this.username || !this.password) { this.error.set('Enter your email or username and password.'); return; }
     this.loading.set(true);
     this.error.set('');
     this.auth.login(this.username, this.password).subscribe({

@@ -6,13 +6,13 @@
 #   ./deploy.sh
 #
 # Or deploy to a remote server:
-#   DEPLOY_HOST=user@yourserver.com DEPLOY_PATH=/var/www/html/beanbag DEPLOY_API_PATH=/var/www/beanbag-api ./deploy.sh
+#   DEPLOY_HOST=user@yourserver.com DEPLOY_PATH=/var/www/html/bracketway DEPLOY_API_PATH=/var/www/bracketway-api ./deploy.sh
 
 set -e
 
 DEPLOY_HOST="${DEPLOY_HOST:-}"
-DEPLOY_PATH="${DEPLOY_PATH:-/var/www/html/beanbag-bracket}"
-DEPLOY_API_PATH="${DEPLOY_API_PATH:-/var/www/html/beanbag-bracket-api}"
+DEPLOY_PATH="${DEPLOY_PATH:-/var/www/html/bracketway}"
+DEPLOY_API_PATH="${DEPLOY_API_PATH:-/var/www/html/bracketway-api}"
 
 echo "==> Building Angular (production)..."
 cd frontend

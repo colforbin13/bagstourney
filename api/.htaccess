@@ -1,4 +1,4 @@
-# beanbag-bracket/api/.htaccess
+# bags/api/.htaccess
 # Route all API requests through index.php
 
 Options -Indexes

@@ -1,11 +1,11 @@
 <div class="page-wide">
-    <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div style="min-width:0;">
         <a routerLink="/" style="color:var(--text-dim);font-size:.8rem;">← All tournaments</a>
         <h1 style="margin-top:4px;">{{ tournament()?.name }}</h1>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         @if (tournament()) {
         <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
         }
@@ -25,14 +25,14 @@
     <div class="empty">Bracket not generated yet.</div>
     } @else {
     <div class="bracket">
-        @for (round of rounds(); track round.num) {
+        @for (round of rounds(); track round.num; let lastRound = $last) {
         <div class="bracket-round">
             <div class="round-label">
             {{ roundLabel(round.pos, totalRounds()) }}
             </div>
             <!-- Each round is an independent grid. Rows are uniform (--row-unit).
                 Match cards span 2^(pos-1) rows and are placed via gridRow. -->
-            <div class="bracket-matches" [style.--total-rows]="totalGridRows(round.pos)">
+            <div class="bracket-matches" [style.--total-rows]="totalGridRows(round.pos)" [style.--row-unit.px]="rowUnitPx">
             @for (match of round.matches; track match.id) {
                 <div class="match-wrapper"
                     [style.grid-row]="matchGridRow(match.match_number, round.pos)">
@@ -44,15 +44,20 @@
                     <div class="match-team"
                         [class.winner]="match.winner_id === match.team1_id && match.status === 'complete'"
                         [class.loser]="match.winner_id === match.team2_id && match.status === 'complete'">
+                    <div class="team-name-wrap">
                     <span class="team-name">
                         {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
                         @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team1_id) {
                         <span class="champion-icon" aria-hidden="true">🏆</span>
                         }
                     </span>
+                    @if (teamParticipants(match.team1_name, match.team1_participant1_name, match.team1_participant2_name); as participants) {
+                        <span class="team-participants">{{ participants }}</span>
+                    }
+                    </div>
                     @if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <span class="team-score">{{ match.team1_score }}</span>
-                    } @else if (auth.isLoggedIn() && (match.status === 'ready' || this.editingMatch === match.id)) {
+                    } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
                         <input class="input score-input" type="number" min="0"
                         [(ngModel)]="scores[match.id].team1"
                         [attr.aria-label]="'Score for ' + (match.team1_name ?? 'team 1')"
@@ -65,15 +70,20 @@
                     <div class="match-team"
                         [class.winner]="match.winner_id === match.team2_id && match.status === 'complete'"
                         [class.loser]="match.winner_id === match.team1_id && match.status === 'complete'">
+                    <div class="team-name-wrap">
                     <span class="team-name">
                         {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
                         @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team2_id) {
                         <span class="champion-icon" aria-hidden="true">🏆</span>
                         }
                     </span>
+                    @if (teamParticipants(match.team2_name, match.team2_participant1_name, match.team2_participant2_name); as participants) {
+                        <span class="team-participants">{{ participants }}</span>
+                    }
+                    </div>
                     @if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <span class="team-score">{{ match.team2_score }}</span>
-                    } @else if (auth.isLoggedIn() && (match.status === 'ready' || this.editingMatch === match.id)) {
+                    } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
                         <input class="input score-input" type="number" min="0"
                         [(ngModel)]="scores[match.id].team2"
                         [attr.aria-label]="'Score for ' + (match.team2_name ?? 'team 2')"
@@ -81,8 +91,8 @@
                     }
                     </div>
 
-                    <!-- Score submit (admin only) -->
-                    @if (auth.isLoggedIn()) {
+                    <!-- Score submit: only for viewers who actually have a role on this tournament -->
+                    @if (canScore()) {
                     <div class="score-actions">
                         @if (match.status === 'ready' && this.editingMatch !== match.id) {
                         <button class="btn btn-primary btn-sm"
@@ -97,10 +107,10 @@
                         } @else if (match.status === 'complete' && this.editingMatch !== match.id) {
                         <button class="btn btn-sm" (click)="startEdit(match)">Edit</button>
                         } @else if (this.editingMatch === match.id) {
+                        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
                         <button class="btn btn-primary btn-sm" (click)="submitScore(match)" [disabled]="submitting() === match.id">
                             Save
                         </button>
-                        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
                         }
                     </div>
                     }
@@ -112,6 +122,22 @@
             }
             </div>
         </div>
+        @if (!lastRound) {
+        <div class="bracket-gutter" [style.width.px]="gutterWidth">
+            <div class="round-label" aria-hidden="true" style="visibility:hidden">&nbsp;</div>
+            <svg class="connector-svg"
+                [attr.width]="gutterWidth"
+                [attr.height]="totalGridRows(round.pos) * rowUnitPx"
+                [attr.viewBox]="'0 0 ' + gutterWidth + ' ' + (totalGridRows(round.pos) * rowUnitPx)">
+            @for (c of roundConnectors(round); track $index) {
+                <path [attr.d]="connectorPath(c)" class="connector-line" />
+                <circle [attr.cx]="0" [attr.cy]="c.y1" r="3" class="connector-dot" />
+                <circle [attr.cx]="0" [attr.cy]="c.y2" r="3" class="connector-dot" />
+                <circle [attr.cx]="gutterWidth / 2" [attr.cy]="c.mid" r="4" class="connector-node" />
+            }
+            </svg>
+        </div>
+        }
         }
 
         @if (tournament()?.status === 'complete') {

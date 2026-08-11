@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "beanbag-bracket": {
+    "bracketway": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": { "standalone": true, "style": "scss" }
@@ -28,6 +28,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/",
               "optimization": {
                 "fonts": false
               },
@@ -50,10 +51,24 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
-            "production": { "buildTarget": "beanbag-bracket:build:production" },
-            "development": { "buildTarget": "beanbag-bracket:build:development" }
+            "production": { "buildTarget": "bracketway:build:production" },
+            "development": { "buildTarget": "bracketway:build:development" }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "polyfills": ["zone.js", "zone.js/testing"],
+            "tsConfig": "tsconfig.spec.json",
+            "inlineStyleLanguage": "scss",
+            "assets": [
+              { "glob": "**/*", "input": "src/assets", "output": "assets" },
+              { "glob": ".htaccess", "input": "src", "output": "." }
+            ],
+            "styles": ["src/assets/styles/global.scss"],
+            "scripts": []
+          }
         }
       }
     }

@@ -1,15 +1,18 @@
 {
-  "name": "beanbag-bracket",
+  "name": "bracketway",
   "version": "1.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
-    "build:prod": "ng build --configuration production"
+    "build:prod": "ng build --configuration production",
+    "test": "ng test",
+    "test:ci": "ng test --watch=false --browsers=ChromeHeadless --code-coverage"
   },
   "private": true,
   "dependencies": {
     "@angular/animations": "^21.2.17",
+    "@angular/cdk": "^21.2.14",
     "@angular/common": "^21.2.17",
     "@angular/compiler": "^21.2.17",
     "@angular/core": "^21.2.17",
@@ -17,6 +20,7 @@
     "@angular/platform-browser": "^21.2.17",
     "@angular/platform-browser-dynamic": "^21.2.17",
     "@angular/router": "^21.2.17",
+    "qrcode": "^1.5.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.6.0",
     "zone.js": "~0.15.1"
@@ -25,6 +29,14 @@
     "@angular-devkit/build-angular": "^21.2.15",
     "@angular/cli": "^21.2.15",
     "@angular/compiler-cli": "^21.2.17",
+    "@types/jasmine": "^6.0.0",
+    "@types/qrcode": "^1.5.6",
+    "jasmine-core": "^6.3.0",
+    "karma": "^6.4.4",
+    "karma-chrome-launcher": "^3.2.0",
+    "karma-coverage": "^2.2.1",
+    "karma-jasmine": "^5.1.0",
+    "karma-jasmine-html-reporter": "^2.2.0",
     "sass": "^1.71.0",
     "typescript": "~5.9.3"
   }

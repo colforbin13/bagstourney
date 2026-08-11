@@ -1,7 +1,6 @@
 export const environment = {
   production: true,
-  // When deployed under /bags, the API is available at /bags/api
-  apiUrl: '/bags/api',
-  // Base href for the app when deployed under /bags
-  baseHref: '/bags/'
+  // Served from the domain root (bracketway.com) — see AGENTS.md/CLAUDE.md.
+  apiUrl: '/api',
+  baseHref: '/'
 };

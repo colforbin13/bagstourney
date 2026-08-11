@@ -1,4 +1,4 @@
-# Copilot instructions for Bag Bracket repository
+# Copilot instructions for Bracketway repository
 
 Purpose
 - Short, focused guide for future Copilot/assistant sessions to find build/test commands, high-level architecture, and repo-specific conventions.

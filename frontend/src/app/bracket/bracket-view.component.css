@@ -5,7 +5,6 @@ Bracket outer shell: one flex column per round
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 12px;
     overflow-x: auto;
     padding-bottom: 16px;
     min-width: min-content;
@@ -40,7 +39,6 @@ Bracket outer shell: one flex column per round
     height stays consistent across all rounds.
     ───────────────────────────────────────── */
 .bracket-matches {
-    --row-unit: 150px;
     display: grid;
     grid-template-columns: 1fr;
     grid-template-rows: repeat(var(--total-rows), var(--row-unit));
@@ -55,6 +53,39 @@ Bracket outer shell: one flex column per round
 }
 
 /* ─────────────────────────────────────────
+    Connector lines between rounds — the bracket-node mark, reused at bracket
+    scale. Each gutter's SVG coordinate space matches its round's match grid
+    exactly (see BracketViewComponent.matchCenterPx()), so lines land precisely
+    on match centers with no DOM measurement.
+    ───────────────────────────────────────── */
+.bracket-gutter {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.connector-svg {
+    display: block;
+    overflow: visible;
+}
+
+.connector-line {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.connector-dot {
+    fill: var(--accent);
+}
+
+.connector-node {
+    fill: var(--text);
+}
+
+/* ─────────────────────────────────────────
     Match card
     ───────────────────────────────────────── */
 .match-card {
@@ -65,7 +96,7 @@ Bracket outer shell: one flex column per round
     overflow: hidden;
     transition: border-color .15s;
 
-    &.match-complete { border-color: #2a2a2a; }
+    &.match-complete { border-color: rgba(var(--marker-rgb), 0.4); }
     &.match-pending  { opacity: .5; }
     &.match-bye      { opacity: .75; }
 }
@@ -78,9 +109,9 @@ Bracket outer shell: one flex column per round
     gap: 8px;
 
     &.winner {
-    background: rgba(37,99,235,0.06);
-    .team-name  { color: var(--accent); font-weight: 600; }
-    .team-score { color: var(--accent); }
+    background: rgba(var(--marker-rgb), 0.08);
+    .team-name  { color: var(--marker); font-weight: 600; }
+    .team-score { color: var(--marker); }
     }
     &.loser {
     .team-name  { color: var(--lose); }
@@ -88,12 +119,26 @@ Bracket outer shell: one flex column per round
     }
 }
 
+.team-name-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
 .team-name {
     font-size: 0.95rem;
     overflow-wrap: anywhere;
     white-space: normal;
     min-width: 0;
-    flex: 1 1 auto;
+}
+
+.team-participants {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .team-score {
@@ -151,13 +196,13 @@ Bracket outer shell: one flex column per round
 .champion-name {
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--accent);
+    color: var(--marker);
 }
 
 .champion-icon {
     font-size: 1.1rem;
     line-height: 1;
-    color: var(--accent);
+    color: var(--marker);
     display: inline-block;
     margin-left: 6px;
     vertical-align: middle;
@@ -175,6 +220,13 @@ Bracket outer shell: one flex column per round
     .bracket-round {
     min-width: unset;
     width: 100%;
+    }
+
+    /* No fixed-height grid to anchor connector math against once rounds stack
+       into a plain vertical list, so the gutters (and their lines) just aren't
+       rendered on mobile — same reasoning as dropping the grid itself below. */
+    .bracket-gutter {
+    display: none;
     }
 
     /* On mobile each round is just a plain flex column — no grid math needed */

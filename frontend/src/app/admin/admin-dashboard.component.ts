@@ -19,10 +19,24 @@ import { confirmService } from '../shared/services/confirm.service';
       <!-- New tournament -->
       <div class="card" style="margin-bottom:24px">
         <div class="section-label">New Tournament</div>
-        <div class="row">
-          <input class="input" type="text" [(ngModel)]="newName"
-            placeholder="Tournament name"
-            (keyup.enter)="create()" />
+        <input class="input" type="text" [(ngModel)]="newName"
+          placeholder="Tournament name"
+          (keyup.enter)="create()" style="margin-bottom:10px" />
+        <div class="row" style="flex-wrap:wrap">
+          <select class="input" style="flex:1;min-width:160px" [(ngModel)]="newVisibility">
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+          <select class="input" style="flex:1;min-width:160px" [(ngModel)]="newTeamEntryMode" title="How teams get created">
+            <option value="auto_draft">Auto-draft teams</option>
+            <option value="direct">Enter teams directly</option>
+          </select>
+          <select class="input" style="flex:1;min-width:160px" [(ngModel)]="newSeedingMode" title="How teams are seeded before the bracket is generated">
+            <option value="automatic">Automatic seeding</option>
+            <option value="manual">Manual seeding</option>
+          </select>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px">
           <button class="btn btn-primary" [disabled]="creating()" (click)="create()">
             @if (creating()) { <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> }
             Create
@@ -106,6 +120,9 @@ export class AdminDashboardComponent implements OnInit {
   createError = signal('');
   toast = signal('');
   newName = '';
+  newVisibility: 'public' | 'private' = 'public';
+  newSeedingMode: 'automatic' | 'manual' = 'automatic';
+  newTeamEntryMode: 'auto_draft' | 'direct' = 'auto_draft';
 
   constructor(private svc: TournamentService) {}
 
@@ -123,9 +140,12 @@ export class AdminDashboardComponent implements OnInit {
     if (!name) { this.createError.set('Enter a tournament name.'); return; }
     this.creating.set(true);
     this.createError.set('');
-    this.svc.createTournament(name).subscribe({
+    this.svc.createTournament(name, this.newVisibility, this.newSeedingMode, this.newTeamEntryMode).subscribe({
       next: t => {
         this.newName = '';
+        this.newVisibility = 'public';
+        this.newSeedingMode = 'automatic';
+        this.newTeamEntryMode = 'auto_draft';
         this.creating.set(false);
         this.tournaments.update(list => [t, ...list]);
         this.showToast('Tournament created!');
