@@ -44,6 +44,14 @@ export class TournamentService {
     return this.http.delete(`${this.api}/tournaments/${id}`);
   }
 
+  getDeletedTournaments() {
+    return this.http.get<Tournament[]>(`${this.api}/tournaments/deleted`);
+  }
+
+  restoreTournament(id: number) {
+    return this.http.post<Tournament>(`${this.api}/tournaments/${id}/restore`, {});
+  }
+
   getTournamentMembers(tournamentId: number) {
     return this.http.get<TournamentMember[]>(`${this.api}/tournament-members/${tournamentId}`);
   }

@@ -8,10 +8,10 @@ class TournamentController {
 
     public function list(?array $actor = null): void {
         if ($actor) {
-            $stmt = $this->db->query('SELECT * FROM tournaments ORDER BY created_at DESC');
+            $stmt = $this->db->query('SELECT * FROM tournaments WHERE deleted_at IS NULL ORDER BY created_at DESC');
         } else {
             // Public listing: hide tournaments still in setup (no bracket generated yet).
-            $stmt = $this->db->query("SELECT * FROM tournaments WHERE visibility = 'public' AND status != 'setup' ORDER BY created_at DESC");
+            $stmt = $this->db->query("SELECT * FROM tournaments WHERE visibility = 'public' AND status != 'setup' AND deleted_at IS NULL ORDER BY created_at DESC");
         }
         echo json_encode($stmt->fetchAll());
     }
@@ -20,7 +20,9 @@ class TournamentController {
         $stmt = $this->db->prepare('SELECT * FROM tournaments WHERE id = ?');
         $stmt->execute([$id]);
         $t = $stmt->fetch();
-        if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
+        // Soft-deleted is treated as gone here too, super admins included — the recovery
+        // screen uses listDeleted()/restore() instead of this endpoint.
+        if (!$t || $t['deleted_at'] !== null) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
 
         $capabilities = tournamentCapabilities($this->db, $id, $actor);
         // A private tournament is only reachable by numeric id for staff/super_admin;
@@ -38,8 +40,40 @@ class TournamentController {
         $stmt = $this->db->prepare('SELECT * FROM tournaments WHERE uuid = ?');
         $stmt->execute([$uuid]);
         $t = $stmt->fetch();
-        if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
+        if (!$t || $t['deleted_at'] !== null) { http_response_code(404); echo json_encode(['error' => 'Not found']); return; }
         $t['capabilities'] = tournamentCapabilities($this->db, (int)$t['id'], $actor);
+        echo json_encode($t);
+    }
+
+    // Super-admin only (enforced by the router). Powers the "recover a deleted
+    // tournament" screen — matches/teams/participants are never soft-deleted
+    // themselves (see migration 011), so restoring just the tournament row brings
+    // everything back automatically.
+    public function listDeleted(): void {
+        $stmt = $this->db->query('SELECT * FROM tournaments WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC');
+        echo json_encode($stmt->fetchAll());
+    }
+
+    public function restore(int $id, array $actor): void {
+        $stmt = $this->db->prepare('SELECT name, deleted_at FROM tournaments WHERE id = ?');
+        $stmt->execute([$id]);
+        $tournament = $stmt->fetch();
+        if (!$tournament || $tournament['deleted_at'] === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Not found']);
+            return;
+        }
+
+        // Recovered tournaments come back private, regardless of their visibility before
+        // deletion — an owner shouldn't have a tournament silently reappear in the public
+        // list without deciding to make it public again.
+        $this->db->prepare("UPDATE tournaments SET deleted_at = NULL, visibility = 'private' WHERE id = ?")->execute([$id]);
+        writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_restored', 'tournament', (string)$id, ['name' => $tournament['name']]);
+
+        $stmt = $this->db->prepare('SELECT * FROM tournaments WHERE id = ?');
+        $stmt->execute([$id]);
+        $t = $stmt->fetch();
+        $t['capabilities'] = tournamentCapabilities($this->db, $id, $actor);
         echo json_encode($t);
     }
 
@@ -158,8 +192,11 @@ class TournamentController {
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
+    // Soft-delete: sets deleted_at rather than removing the row, and leaves
+    // matches/teams/participants untouched (see migration 011) so a super admin can
+    // recover the tournament — with its full bracket data intact — via restore().
     public function delete(int $id, array $actor): void {
-        $stmt = $this->db->prepare('SELECT name FROM tournaments WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT name FROM tournaments WHERE id = ? AND deleted_at IS NULL');
         $stmt->execute([$id]);
         $tournament = $stmt->fetch();
         if (!$tournament) {
@@ -170,10 +207,7 @@ class TournamentController {
 
         writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_deleted', 'tournament', (string)$id, ['name' => $tournament['name']]);
 
-        $this->db->prepare('DELETE FROM matches WHERE tournament_id = ?')->execute([$id]);
-        $this->db->prepare('DELETE FROM teams WHERE tournament_id = ?')->execute([$id]);
-        $this->db->prepare('DELETE FROM participants WHERE tournament_id = ?')->execute([$id]);
-        $this->db->prepare('DELETE FROM tournaments WHERE id = ?')->execute([$id]);
+        $this->db->prepare('UPDATE tournaments SET deleted_at = NOW() WHERE id = ?')->execute([$id]);
         echo json_encode(['success' => true]);
     }
 }

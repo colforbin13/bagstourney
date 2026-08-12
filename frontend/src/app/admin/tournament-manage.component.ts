@@ -802,7 +802,7 @@ export class TournamentManageComponent implements OnInit {
   async deleteTournamentAction() {
     const t = this.tournament();
     if (!t) return;
-    const ok = await confirmService.confirm(`Delete "${t.name}"? This cannot be undone.`);
+    const ok = await confirmService.confirm(`Delete "${t.name}"? A super admin can restore it later from Deleted Tournaments.`);
     if (!ok) return;
     this.deletingTournament.set(true);
     this.svc.deleteTournament(this.tournamentId).subscribe({

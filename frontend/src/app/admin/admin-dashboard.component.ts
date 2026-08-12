@@ -155,7 +155,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   async delete(t: Tournament) {
-    const ok = await confirmService.confirm(`Delete "${t.name}"? This cannot be undone.`);
+    const ok = await confirmService.confirm(`Delete "${t.name}"? A super admin can restore it later from Deleted Tournaments.`);
     if (!ok) return;
     this.svc.deleteTournament(t.id).subscribe({
       next: () => {

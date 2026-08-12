@@ -54,6 +54,20 @@ function requireSuperAdmin(PDO $db): array {
 
 function requireTournamentRole(PDO $db, int $tournamentId, array $allowedRoles): array {
     $user = requireCurrentUser($db);
+
+    // Checked before the super_admin bypass below, on purpose: a soft-deleted
+    // tournament's matches/teams/participants should be untouchable by anyone,
+    // including super admins, until it's explicitly restored — otherwise "deleted"
+    // wouldn't actually stop further edits via these per-child-row endpoints.
+    $stmt = $db->prepare('SELECT deleted_at FROM tournaments WHERE id = ?');
+    $stmt->execute([$tournamentId]);
+    $tournament = $stmt->fetch();
+    if (!$tournament || $tournament['deleted_at'] !== null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+
     if ($user['role'] === 'super_admin') return $user;
 
     $stmt = $db->prepare('SELECT role FROM tournament_members WHERE tournament_id = ? AND user_id = ?');
@@ -121,7 +135,9 @@ function requireTournamentVisible(PDO $db, int $tournamentId, ?array $actor): ar
     $stmt = $db->prepare('SELECT * FROM tournaments WHERE id = ?');
     $stmt->execute([$tournamentId]);
     $t = $stmt->fetch();
-    if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
+    // A soft-deleted tournament is treated as gone for everyone, super admins included —
+    // recovery is a deliberate action via the restore endpoint, not implicit read access.
+    if (!$t || $t['deleted_at'] !== null) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
     if ($t['visibility'] === 'private') {
         $caps = tournamentCapabilities($db, $tournamentId, $actor);
         if (!$caps['role'] && !$caps['is_super_admin']) {

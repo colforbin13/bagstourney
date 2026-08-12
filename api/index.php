@@ -65,7 +65,10 @@ try {
         case 'tournaments':
             $db = getDB();
             $ctrl = new TournamentController($db);
-            if ($method === 'GET' && !$id && !$idInvalid) {
+            if ($method === 'GET' && !$id && $action === 'deleted') {
+                requireSuperAdmin($db);
+                $ctrl->listDeleted();
+            } elseif ($method === 'GET' && !$id && !$idInvalid) {
                 $ctrl->list(currentUserOrNull($db));
             } elseif ($method === 'GET' && !$id && $action === 'by-uuid' && isset($segments[2])) {
                 $ctrl->getByUuid($segments[2], currentUserOrNull($db));
@@ -73,6 +76,9 @@ try {
                 $ctrl->get($id, currentUserOrNull($db));
             } elseif ($method === 'POST' && !$id) {
                 $ctrl->create($body, requireCurrentUser($db));
+            } elseif ($method === 'POST' && $id && $action === 'restore') {
+                $actor = requireSuperAdmin($db);
+                $ctrl->restore($id, $actor);
             } elseif ($method === 'PUT' && $id) {
                 $actor = requireTournamentRole($db, $id, ['owner', 'manager']);
                 $ctrl->update($id, $body, $actor);
