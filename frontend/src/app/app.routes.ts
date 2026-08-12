@@ -25,6 +25,10 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/reset-password.component').then(m => m.ResetPasswordComponent),
   },
   {
+    path: 'verify-email',
+    loadComponent: () => import('./admin/verify-email.component').then(m => m.VerifyEmailComponent),
+  },
+  {
     path: 'notifications/confirm',
     loadComponent: () => import('./notifications/confirm-subscription.component').then(m => m.ConfirmSubscriptionComponent),
   },

@@ -1,6 +1,8 @@
 <?php
 // api/controllers/AuthController.php
 
+require_once __DIR__ . '/../services/PostmarkClient.php';
+
 class AuthController {
     public function __construct(PDO $db) {
 		$this->db = $db;
@@ -61,22 +63,103 @@ class AuthController {
             return;
         }
 
+        // Fail closed rather than open: if verification email can't be sent, don't create
+        // a live account the security control was meant to gate (FEATURE_TRACKER item 9).
+        $postmark = new PostmarkClient(POSTMARK_API_TOKEN, POSTMARK_FROM_EMAIL, POSTMARK_MESSAGE_STREAM);
+        if (!$postmark->isConfigured()) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Account registration is temporarily unavailable. Please try again later.']);
+            return;
+        }
+
+        $verifyToken = bin2hex(random_bytes(32));
+        $verifyTokenHash = hash('sha256', $verifyToken);
+        $expiresAt = date('Y-m-d H:i:s', time() + 72 * 3600);
+
         try {
-            $stmt = $this->db->prepare('INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, "organizer")');
-            $stmt->execute([$username, $email, password_hash($password, PASSWORD_DEFAULT)]);
-            $user = [
-                'id' => (int)$this->db->lastInsertId(),
-                'username' => $username,
-                'email' => $email,
-                'role' => 'organizer',
-                'status' => 'active',
-            ];
-            $token = generateJWT($user['id'], $username, 'organizer');
-            echo json_encode(['token' => $token, 'user' => $this->publicUser($user)]);
+            $stmt = $this->db->prepare('
+                INSERT INTO users (username, email, password_hash, role, status, email_verify_token_hash, email_verify_token_expires_at)
+                VALUES (?, ?, ?, "organizer", "disabled", ?, ?)
+            ');
+            $stmt->execute([$username, $email, password_hash($password, PASSWORD_DEFAULT), $verifyTokenHash, $expiresAt]);
+            $userId = (int)$this->db->lastInsertId();
         } catch (PDOException $e) {
             http_response_code(409);
             echo json_encode(['error' => 'That username or email address is already registered']);
+            return;
         }
+
+        $verifyUrl = rtrim(APP_PUBLIC_URL, '/') . '/verify-email?token=' . $verifyToken;
+        $content = $this->buildVerificationEmail($username, $verifyUrl);
+        $result = $postmark->send($email, $content['subject'], $content['html'], $content['text'], 'organizer_verification');
+
+        if (!$result['success']) {
+            // No resend flow exists yet, so a stuck 'disabled' row with no way to activate
+            // it is worse than failing the request — undo the insert instead.
+            $this->db->prepare('DELETE FROM users WHERE id = ?')->execute([$userId]);
+            http_response_code(500);
+            echo json_encode(['error' => 'Could not send the verification email. Please try again later.']);
+            return;
+        }
+
+        http_response_code(201);
+        echo json_encode(['message' => 'Account created. Check your email to verify your address before signing in.']);
+    }
+
+    public function verifyEmail(array $body): void {
+        $token = $body['token'] ?? '';
+
+        if (!$token) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Verification token is required']);
+            return;
+        }
+
+        $tokenHash = hash('sha256', $token);
+        $stmt = $this->db->prepare('
+            SELECT id FROM users WHERE email_verify_token_hash = ? AND email_verify_token_expires_at > NOW()
+        ');
+        $stmt->execute([$tokenHash]);
+        $user = $stmt->fetch();
+
+        // Same generic error for an unknown, expired, or already-used token so a caller
+        // cannot distinguish those cases, matching the password-reset endpoint's convention.
+        if (!$user) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid or expired verification link']);
+            return;
+        }
+
+        $this->db->prepare('
+            UPDATE users
+            SET status = "active", email_verify_token_hash = NULL, email_verify_token_expires_at = NULL
+            WHERE id = ?
+        ')->execute([$user['id']]);
+
+        writeAuditLog($this->db, null, (int)$user['id'], 'organizer_email_verified', 'user', (string)$user['id']);
+
+        http_response_code(200);
+        echo json_encode(['message' => 'Email verified. You can now sign in.']);
+    }
+
+    private function buildVerificationEmail(string $username, string $verifyUrl): array {
+        $accent = '#BC3A1C';
+        $ink = '#FFF8EF';
+        $text = '#22261F';
+        $textDim = '#5B5A4E';
+        $font = "Arial,Helvetica,sans-serif";
+
+        $html = '<div style="font-family:' . $font . ';font-size:15px;line-height:1.6;color:' . $text . ';max-width:480px;">' .
+            '<p style="margin:0 0 16px;font-weight:700;">Bracketway</p>' .
+            '<p style="margin:0 0 16px;">Hi ' . htmlspecialchars($username) . ',</p>' .
+            '<p style="margin:0 0 20px;">Confirm your email address to activate your organizer account.</p>' .
+            '<p style="margin:0 0 20px;"><a href="' . htmlspecialchars($verifyUrl) . '" style="display:inline-block;background:' . $accent . ';color:' . $ink . ';font-weight:700;text-decoration:none;padding:11px 22px;border-radius:4px;">Verify email address</a></p>' .
+            '<p style="margin:0;font-size:13px;color:' . $textDim . ';">This link expires in 72 hours. If you did not create this account, you can ignore this email.</p>' .
+            '</div>';
+
+        $plainText = "Hi {$username},\n\nConfirm your email address to activate your Bracketway organizer account:\n{$verifyUrl}\n\nThis link expires in 72 hours. If you did not create this account, you can ignore this email.\n\n— Bracketway";
+
+        return ['subject' => 'Verify your Bracketway account', 'html' => $html, 'text' => $plainText];
     }
 
     private function publicUser(array $user): array {

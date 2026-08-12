@@ -106,6 +106,12 @@ export class TournamentService {
     });
   }
 
+  // Organizer self-registration email verification (public, token-based, no login) —
+  // FEATURE_TRACKER item 9.
+  verifyEmail(token: string) {
+    return this.http.post<{ message: string }>(`${this.api}/auth/verify-email`, { token });
+  }
+
   // Participants
   getParticipants(tournamentId: number) {
     return this.http.get<Participant[]>(`${this.api}/participants/${tournamentId}`);

@@ -55,6 +55,8 @@ try {
                 $ctrl->changePassword($body, $actor);
             } elseif ($action === 'reset-password' && $method === 'POST') {
                 $ctrl->resetPassword($body);
+            } elseif ($action === 'verify-email' && $method === 'POST') {
+                $ctrl->verifyEmail($body);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);

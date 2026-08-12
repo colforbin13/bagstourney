@@ -42,11 +42,15 @@ export class AuthService {
     );
   }
 
+  // Registration no longer logs the caller in immediately — the account is created
+  // 'disabled' pending email verification (FEATURE_TRACKER item 9), and the backend
+  // rejects any non-active user on every authenticated request, so storing a session
+  // here would just produce a confusing forced logout on the very next API call.
   register(username: string, email: string, password: string) {
-    return this.http.post<{ token: string; user: AuthenticatedUser }>(
+    return this.http.post<{ message: string }>(
       `${environment.apiUrl}/auth/register`,
       { username, email, password }
-    ).pipe(tap(res => this.storeSession(res)));
+    );
   }
 
   logout(redirect: string = '/') {
