@@ -155,6 +155,13 @@ class TeamController {
                 throw new Exception('This tournament uses auto-draft team entry — add participants and draw teams instead');
             }
 
+            $cap = effectiveParticipantCap($this->db, $tournamentId);
+            $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+            $countStmt->execute([$tournamentId]);
+            if ((int)$countStmt->fetchColumn() + 2 > $cap) {
+                throw new Exception("This tournament has reached its {$cap}-participant plan limit. Upgrade to add more.");
+            }
+
             $insertParticipant = $this->db->prepare('INSERT INTO participants (tournament_id, name) VALUES (?, ?)');
             $insertParticipant->execute([$tournamentId, $p1Name]);
             $p1Id = (int)$this->db->lastInsertId();

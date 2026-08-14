@@ -15,6 +15,7 @@ describe('TournamentService', () => {
     email: 'test@example.com',
     role: 'organizer',
     status: 'active',
+    plan: 'free',
     created_at: '2026-01-01'
   };
 
@@ -26,7 +27,8 @@ describe('TournamentService', () => {
     visibility: 'public',
     seeding_mode: 'automatic',
     team_entry_mode: 'auto_draft',
-    created_at: '2026-01-01'
+    created_at: '2026-01-01',
+    paid_override: false
   };
 
   beforeEach(() => {
@@ -76,6 +78,7 @@ describe('TournamentService', () => {
         email: 'new@example.com',
         role: 'organizer',
         status: 'active',
+        plan: 'free',
         created_at: '2026-01-01'
       };
 

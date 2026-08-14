@@ -54,6 +54,20 @@ function requireSuperAdmin(PDO $db): array {
 
 function requireTournamentRole(PDO $db, int $tournamentId, array $allowedRoles): array {
     $user = requireCurrentUser($db);
+
+    // Checked before the super_admin bypass below, on purpose: a soft-deleted
+    // tournament's matches/teams/participants should be untouchable by anyone,
+    // including super admins, until it's explicitly restored — otherwise "deleted"
+    // wouldn't actually stop further edits via these per-child-row endpoints.
+    $stmt = $db->prepare('SELECT deleted_at FROM tournaments WHERE id = ?');
+    $stmt->execute([$tournamentId]);
+    $tournament = $stmt->fetch();
+    if (!$tournament || $tournament['deleted_at'] !== null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+
     if ($user['role'] === 'super_admin') return $user;
 
     $stmt = $db->prepare('SELECT role FROM tournament_members WHERE tournament_id = ? AND user_id = ?');
@@ -102,6 +116,17 @@ function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array
     $isManager = $isSuperAdmin || in_array($role, ['owner', 'manager'], true);
     $canScore = $isSuperAdmin || in_array($role, ['owner', 'manager', 'scorekeeper'], true);
 
+    // Only computed for staff — an anonymous public-bracket viewer doesn't need it, and
+    // it would otherwise add two extra queries to the highest-traffic read path here.
+    $participantCap = null;
+    $participantCount = null;
+    if ($isManager) {
+        $participantCap = effectiveParticipantCap($db, $tournamentId);
+        $countStmt = $db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+        $countStmt->execute([$tournamentId]);
+        $participantCount = (int)$countStmt->fetchColumn();
+    }
+
     return [
         'role' => $role,
         'is_super_admin' => $isSuperAdmin,
@@ -109,7 +134,29 @@ function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array
         'can_manage_staff' => $isOwner,
         'can_score' => $canScore,
         'can_delete' => $isOwner,
+        'participant_cap' => $participantCap,
+        'participant_count' => $participantCount,
     ];
+}
+
+// Freemium participant cap (FEATURE_TRACKER.md item 12/13 plumbing). No billing exists
+// yet — users.plan and tournaments.paid_override (migration 013) are both set manually
+// by a super admin for now, standing in for what Stripe will flip automatically once
+// payment integration ships; either one raised to 'paid'/1 lifts the cap.
+const FREEMIUM_FREE_TIER_MAX_PARTICIPANTS = 32;
+const FREEMIUM_PAID_TIER_MAX_PARTICIPANTS = 256;
+
+function effectiveParticipantCap(PDO $db, int $tournamentId): int {
+    $stmt = $db->prepare('
+        SELECT t.paid_override, u.plan
+        FROM tournaments t
+        LEFT JOIN users u ON u.id = t.created_by_user_id
+        WHERE t.id = ?
+    ');
+    $stmt->execute([$tournamentId]);
+    $row = $stmt->fetch();
+    $isPaid = $row && ((int)$row['paid_override'] === 1 || $row['plan'] === 'paid');
+    return $isPaid ? FREEMIUM_PAID_TIER_MAX_PARTICIPANTS : FREEMIUM_FREE_TIER_MAX_PARTICIPANTS;
 }
 
 // Like requireTournamentRole() but for anonymous-allowed GET endpoints: public
@@ -121,7 +168,9 @@ function requireTournamentVisible(PDO $db, int $tournamentId, ?array $actor): ar
     $stmt = $db->prepare('SELECT * FROM tournaments WHERE id = ?');
     $stmt->execute([$tournamentId]);
     $t = $stmt->fetch();
-    if (!$t) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
+    // A soft-deleted tournament is treated as gone for everyone, super admins included —
+    // recovery is a deliberate action via the restore endpoint, not implicit read access.
+    if (!$t || $t['deleted_at'] !== null) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
     if ($t['visibility'] === 'private') {
         $caps = tournamentCapabilities($db, $tournamentId, $actor);
         if (!$caps['role'] && !$caps['is_super_admin']) {

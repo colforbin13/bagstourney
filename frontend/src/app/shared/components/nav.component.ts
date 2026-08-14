@@ -27,20 +27,34 @@ import { AuthService } from '../services/auth.service';
       <div class="nav-links" [class.open]="menuOpen()" (click)="closeMenu()">
         @if (auth.isLoggedIn()) {
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Tournaments</a>
-          <a routerLink="/admin" routerLinkActive="active">Admin</a>
-          @if (auth.isSuperAdmin()) {
-            <a routerLink="/admin/users" routerLinkActive="active">Users</a>
-          }
-          <div class="nav-profile" [class.open]="profileMenuOpen()">
-            <button type="button" class="nav-user-trigger" (click)="toggleProfileMenu($event)">
+
+          <div class="nav-dropdown" [class.open]="adminMenuOpen()">
+            <button type="button" class="nav-dropdown-trigger" (click)="toggleAdminMenu($event)">
+              Admin <span class="caret" aria-hidden="true">▾</span>
+            </button>
+            @if (adminMenuOpen()) {
+              <div class="nav-dropdown-backdrop" (click)="closeAdminMenu()"></div>
+            }
+            <div class="nav-dropdown-menu">
+              <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeAdminMenu()">Active Tournaments</a>
+              @if (auth.isSuperAdmin()) {
+                <a routerLink="/admin/users" routerLinkActive="active" (click)="closeAdminMenu()">Users</a>
+                <a routerLink="/admin/deleted-tournaments" routerLinkActive="active" (click)="closeAdminMenu()">Deleted Tournaments</a>
+                <a routerLink="/admin/audit-log" routerLinkActive="active" (click)="closeAdminMenu()">Audit Log</a>
+              }
+            </div>
+          </div>
+
+          <div class="nav-dropdown" [class.open]="profileMenuOpen()">
+            <button type="button" class="nav-dropdown-trigger" (click)="toggleProfileMenu($event)">
               {{ auth.username() }} <span class="caret" aria-hidden="true">▾</span>
             </button>
             @if (profileMenuOpen()) {
-              <div class="nav-profile-backdrop" (click)="closeProfileMenu()"></div>
+              <div class="nav-dropdown-backdrop" (click)="closeProfileMenu()"></div>
             }
-            <div class="nav-profile-menu">
+            <div class="nav-dropdown-menu">
               <a routerLink="/admin/profile" routerLinkActive="active" (click)="closeProfileMenu()">Profile</a>
-              <button type="button" class="nav-profile-item" (click)="auth.logout(); closeProfileMenu()">Sign out</button>
+              <button type="button" class="nav-dropdown-item" (click)="auth.logout(); closeProfileMenu()">Sign out</button>
             </div>
           </div>
         } @else {
@@ -91,8 +105,8 @@ import { AuthService } from '../services/auth.service';
       text-decoration: none;
       &:hover, &.active { color: var(--text); }
     }
-    .nav-profile { position: relative; }
-    .nav-user-trigger {
+    .nav-dropdown { position: relative; }
+    .nav-dropdown-trigger {
       display: flex;
       align-items: center;
       gap: 4px;
@@ -105,19 +119,27 @@ import { AuthService } from '../services/auth.service';
       border-right: 1px solid var(--border);
       background: transparent;
       cursor: pointer;
+      /* Above the sibling backdrop (z-index 105) so a second dropdown's trigger stays
+         clickable while the first is open, instead of the backdrop swallowing the click
+         and just closing it. */
+      position: relative;
+      z-index: 106;
       &:hover { color: var(--text); }
     }
-    .nav-profile.open .nav-user-trigger { color: var(--text); }
+    /* Two dropdowns sit side by side (Admin, then Profile) — the shared border would
+       otherwise double up between them. */
+    .nav-dropdown + .nav-dropdown .nav-dropdown-trigger { border-left: none; }
+    .nav-dropdown.open .nav-dropdown-trigger { color: var(--text); }
     .caret { font-size: 0.6rem; }
-    .nav-profile-backdrop { position: fixed; inset: 0; z-index: 105; }
-    .nav-profile-menu {
+    .nav-dropdown-backdrop { position: fixed; inset: 0; z-index: 105; }
+    .nav-dropdown-menu {
       display: none;
       flex-direction: column;
       gap: 1px;
       position: absolute;
       top: calc(100% + 8px);
       right: 0;
-      min-width: 160px;
+      min-width: 180px;
       padding: 4px;
       background: var(--surface);
       border: 1px solid var(--border);
@@ -125,8 +147,8 @@ import { AuthService } from '../services/auth.service';
       box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
       z-index: 110;
     }
-    .nav-profile.open .nav-profile-menu { display: flex; }
-    .nav-profile-menu a, .nav-profile-menu .nav-profile-item {
+    .nav-dropdown.open .nav-dropdown-menu { display: flex; }
+    .nav-dropdown-menu a, .nav-dropdown-menu .nav-dropdown-item {
       display: block;
       width: 100%;
       text-align: left;
@@ -181,16 +203,16 @@ import { AuthService } from '../services/auth.service';
         &.open { display: flex; }
       }
 
-      .nav-profile { position: static; width: 100%; }
-      .nav-user-trigger {
+      .nav-dropdown { position: static; width: 100%; }
+      .nav-dropdown-trigger {
         border: none;
         padding: 0;
         font-size: 0.85rem;
         pointer-events: none;
       }
       .caret { display: none; }
-      .nav-profile-backdrop { display: none; }
-      .nav-profile-menu {
+      .nav-dropdown-backdrop { display: none; }
+      .nav-dropdown-menu {
         display: flex !important;
         position: static;
         flex-direction: column;
@@ -204,7 +226,7 @@ import { AuthService } from '../services/auth.service';
         box-shadow: none;
         background: transparent;
       }
-      .nav-profile-menu a, .nav-profile-menu .nav-profile-item {
+      .nav-dropdown-menu a, .nav-dropdown-menu .nav-dropdown-item {
         padding: 0;
         font-size: 0.85rem;
         color: var(--text-dim);
@@ -215,6 +237,7 @@ import { AuthService } from '../services/auth.service';
 })
 export class NavComponent {
   menuOpen = signal(false);
+  adminMenuOpen = signal(false);
   profileMenuOpen = signal(false);
 
   constructor(public auth: AuthService) {}
@@ -223,10 +246,21 @@ export class NavComponent {
     this.menuOpen.set(false);
   }
 
-  toggleProfileMenu(event: Event) {
+  toggleAdminMenu(event: Event) {
     // Stop this from bubbling to the .nav-links click handler, which would
     // otherwise collapse the mobile hamburger menu the trigger lives inside.
     event.stopPropagation();
+    this.profileMenuOpen.set(false);
+    this.adminMenuOpen.update(open => !open);
+  }
+
+  closeAdminMenu() {
+    this.adminMenuOpen.set(false);
+  }
+
+  toggleProfileMenu(event: Event) {
+    event.stopPropagation();
+    this.adminMenuOpen.set(false);
     this.profileMenuOpen.update(open => !open);
   }
 

@@ -167,7 +167,7 @@ class NotificationController {
     }
 
     public function webhookBounce(array $body): void {
-        if (!$this->checkWebhookAuth()) {
+        if (!$this->checkWebhookAuth(POSTMARK_WEBHOOK_USER, POSTMARK_WEBHOOK_PASS)) {
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return;
@@ -185,7 +185,7 @@ class NotificationController {
     }
 
     public function webhookComplaint(array $body): void {
-        if (!$this->checkWebhookAuth()) {
+        if (!$this->checkWebhookAuth(POSTMARK_WEBHOOK_USER, POSTMARK_WEBHOOK_PASS)) {
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
             return;
@@ -196,6 +196,42 @@ class NotificationController {
             $this->suppressEmail($email, 'spam_complaint');
         }
 
+        http_response_code(200);
+        echo json_encode(['ok' => true]);
+    }
+
+    // Brevo posts every subscribed event type to a single URL, unlike Postmark which has a
+    // separate endpoint per event — so this one handler switches on the payload's event
+    // field. Only permanently-undeliverable outcomes suppress the address; a soft bounce
+    // or a deferral is transient and Brevo retries those itself.
+    public function webhookBrevo(array $body): void {
+        if (!$this->checkWebhookAuth(BREVO_WEBHOOK_USER, BREVO_WEBHOOK_PASS)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return;
+        }
+
+        // Brevo's payload uses lowercase 'email', where Postmark's uses 'Email'.
+        $email = strtolower(trim($body['email'] ?? ''));
+        // Brevo names events in camelCase when subscribing to them but snake_case in the
+        // delivered payload ('hardBounce' vs 'hard_bounce'), so normalize both to match.
+        $event = str_replace('_', '', strtolower(trim($body['event'] ?? '')));
+
+        $suppressReasons = [
+            'hardbounce' => 'bounce',
+            'spam' => 'spam_complaint',
+            'invalid' => 'invalid_address',
+            'invalidemail' => 'invalid_address',
+            'blocked' => 'blocked',
+        ];
+
+        if ($email && isset($suppressReasons[$event])) {
+            $this->suppressEmail($email, $suppressReasons[$event]);
+        }
+
+        // Answer 200 even for events this does not act on: this single URL receives every
+        // subscribed event type, and Brevo retries non-2xx responses and will eventually
+        // disable a webhook that keeps failing.
         http_response_code(200);
         echo json_encode(['ok' => true]);
     }
@@ -212,7 +248,10 @@ class NotificationController {
         writeAuditLog($this->db, null, null, 'participant_notification_suppressed', 'email', $email, ['reason' => $reason]);
     }
 
-    private function checkWebhookAuth(): bool {
+    // Takes the expected credentials rather than reading a constant directly, so Postmark
+    // and Brevo can be given separate webhook logins — rotating one provider's credentials
+    // then never disturbs the other's.
+    private function checkWebhookAuth(string $expectedUser, string $expectedPass): bool {
         $user = $_SERVER['PHP_AUTH_USER'] ?? null;
         $pass = $_SERVER['PHP_AUTH_PW'] ?? null;
 
@@ -230,8 +269,8 @@ class NotificationController {
         }
 
         return $user !== null && $pass !== null
-            && hash_equals(POSTMARK_WEBHOOK_USER, $user)
-            && hash_equals(POSTMARK_WEBHOOK_PASS, $pass);
+            && hash_equals($expectedUser, $user)
+            && hash_equals($expectedPass, $pass);
     }
 
     private function verifyManageToken(array $participant, string $token): bool {

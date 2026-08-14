@@ -21,6 +21,7 @@ require_once __DIR__ . '/controllers/MatchController.php';
 require_once __DIR__ . '/controllers/TournamentAccessController.php';
 require_once __DIR__ . '/controllers/UserController.php';
 require_once __DIR__ . '/controllers/NotificationController.php';
+require_once __DIR__ . '/controllers/AuditLogController.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -55,6 +56,8 @@ try {
                 $ctrl->changePassword($body, $actor);
             } elseif ($action === 'reset-password' && $method === 'POST') {
                 $ctrl->resetPassword($body);
+            } elseif ($action === 'verify-email' && $method === 'POST') {
+                $ctrl->verifyEmail($body);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
@@ -65,7 +68,10 @@ try {
         case 'tournaments':
             $db = getDB();
             $ctrl = new TournamentController($db);
-            if ($method === 'GET' && !$id && !$idInvalid) {
+            if ($method === 'GET' && !$id && $action === 'deleted') {
+                requireSuperAdmin($db);
+                $ctrl->listDeleted();
+            } elseif ($method === 'GET' && !$id && !$idInvalid) {
                 $ctrl->list(currentUserOrNull($db));
             } elseif ($method === 'GET' && !$id && $action === 'by-uuid' && isset($segments[2])) {
                 $ctrl->getByUuid($segments[2], currentUserOrNull($db));
@@ -73,6 +79,9 @@ try {
                 $ctrl->get($id, currentUserOrNull($db));
             } elseif ($method === 'POST' && !$id) {
                 $ctrl->create($body, requireCurrentUser($db));
+            } elseif ($method === 'POST' && $id && $action === 'restore') {
+                $actor = requireSuperAdmin($db);
+                $ctrl->restore($id, $actor);
             } elseif ($method === 'PUT' && $id) {
                 $actor = requireTournamentRole($db, $id, ['owner', 'manager']);
                 $ctrl->update($id, $body, $actor);
@@ -235,6 +244,10 @@ try {
                 $ctrl->webhookBounce($body);
             } elseif ($method === 'POST' && $notifAction === 'webhook' && $notifSubAction === 'spam-complaint') {
                 $ctrl->webhookComplaint($body);
+            } elseif ($method === 'POST' && $notifAction === 'webhook' && $notifSubAction === 'brevo') {
+                // One endpoint for every Brevo event type — Brevo posts them all to a
+                // single URL rather than one per event the way Postmark does.
+                $ctrl->webhookBrevo($body);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
@@ -254,6 +267,15 @@ try {
                 $ctrl->update($id, $body);
             } elseif ($method === 'POST' && $id && $action === 'password-reset') {
                 $ctrl->resetPassword($id);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        case 'audit-log':
+            if ($method === 'GET' && !$id) {
+                (new AuditLogController(getDB()))->list($_GET);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);

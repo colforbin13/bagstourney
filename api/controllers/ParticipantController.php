@@ -9,11 +9,6 @@ class ParticipantController {
         notify_match_completed, notify_round_completed, notify_tournament_finalized,
         notification_confirmed_at, notification_manage_token_version, created_at';
 
-    // Soft cap on self-registration so a scripted flood (or a bored attendee mashing the
-    // button) can't blow up a tournament's roster. Organizer-added participants are not
-    // capped — this only guards the public, unauthenticated self-register endpoint.
-    const MAX_PARTICIPANTS_PER_TOURNAMENT = 64;
-
     public function __construct(PDO $db) {
 		$this->db = $db;
 	}
@@ -54,6 +49,15 @@ class ParticipantController {
             // for a lone participant to join.
             http_response_code(400);
             echo json_encode(['error' => 'This tournament uses direct team entry — add teams directly instead']);
+            return;
+        }
+
+        $cap = effectiveParticipantCap($this->db, $tournamentId);
+        $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+        $countStmt->execute([$tournamentId]);
+        if ((int)$countStmt->fetchColumn() >= $cap) {
+            http_response_code(400);
+            echo json_encode(['error' => "This tournament has reached its {$cap}-participant plan limit. Upgrade to add more."]);
             return;
         }
 
@@ -254,9 +258,12 @@ class ParticipantController {
             return;
         }
 
+        // Same freemium cap organizer-added participants are held to (effectiveParticipantCap()
+        // in api/middleware/auth.php) — this used to be a separate, higher, self-registration-only
+        // abuse cap, but the freemium ceiling now supersedes it for both paths.
         $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
         $countStmt->execute([$tournamentId]);
-        if ((int)$countStmt->fetchColumn() >= self::MAX_PARTICIPANTS_PER_TOURNAMENT) {
+        if ((int)$countStmt->fetchColumn() >= effectiveParticipantCap($this->db, $tournamentId)) {
             http_response_code(400);
             echo json_encode(['error' => 'This tournament has reached its participant limit. Contact the organizer.']);
             return;
