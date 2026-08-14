@@ -18,23 +18,39 @@ import { confirmService } from '../shared/services/confirm.service';
 
       <!-- New tournament -->
       <div class="card" style="margin-bottom:24px">
-        <div class="section-label">New Tournament</div>
+        <div class="card-head">
+          <div class="section-label">New Tournament</div>
+          <a class="card-head-link" routerLink="/how-it-works">How it works →</a>
+        </div>
         <input class="input" type="text" [(ngModel)]="newName"
           placeholder="Tournament name"
           (keyup.enter)="create()" style="margin-bottom:10px" />
+        <!-- Each choice carries a hint that reflects the current selection. These used to
+             be title-attribute tooltips, which never fire on touch — and this is a
+             mobile-first app, so on the primary platform they explained nothing at all.
+             Two of the three are also effectively one-way once teams are drawn. -->
         <div class="row" style="flex-wrap:wrap">
-          <select class="input" style="flex:1;min-width:160px" [(ngModel)]="newVisibility">
-            <option value="public">Public</option>
-            <option value="private">Private</option>
-          </select>
-          <select class="input" style="flex:1;min-width:160px" [(ngModel)]="newTeamEntryMode" title="How teams get created">
-            <option value="auto_draft">Auto-draft teams</option>
-            <option value="direct">Enter teams directly</option>
-          </select>
-          <select class="input" style="flex:1;min-width:160px" [(ngModel)]="newSeedingMode" title="How teams are seeded before the bracket is generated">
-            <option value="automatic">Automatic seeding</option>
-            <option value="manual">Manual seeding</option>
-          </select>
+          <label class="field">
+            <select class="input" [(ngModel)]="newVisibility">
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+            </select>
+            <span class="field-hint">{{ visibilityHint() }}</span>
+          </label>
+          <label class="field">
+            <select class="input" [(ngModel)]="newTeamEntryMode">
+              <option value="auto_draft">Auto-draft teams</option>
+              <option value="direct">Enter teams directly</option>
+            </select>
+            <span class="field-hint">{{ teamEntryHint() }}</span>
+          </label>
+          <label class="field">
+            <select class="input" [(ngModel)]="newSeedingMode">
+              <option value="automatic">Automatic seeding</option>
+              <option value="manual">Manual seeding</option>
+            </select>
+            <span class="field-hint">{{ seedingHint() }}</span>
+          </label>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:14px">
           <button class="btn btn-primary" [disabled]="creating()" (click)="create()">
@@ -52,7 +68,10 @@ import { confirmService } from '../shared/services/confirm.service';
       @if (loading()) {
         <div class="empty"><span class="spinner"></span></div>
       } @else if (tournaments().length === 0) {
-        <div class="empty">No tournaments yet.</div>
+        <div class="empty">
+          No tournaments yet — create one above.
+          <div style="margin-top:6px">New to this? <a routerLink="/how-it-works">See how it works.</a></div>
+        </div>
       } @else {
         <div class="list">
           @for (t of tournaments(); track t.id) {
@@ -86,6 +105,23 @@ import { confirmService } from '../shared/services/confirm.service';
       margin-bottom: 10px;
     }
     .row { display: flex; gap: 8px; }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .card-head .section-label { margin-bottom: 0; }
+    .card-head-link { font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1;
+      min-width: 160px;
+    }
+    .field-hint { font-size: 0.7rem; line-height: 1.4; color: var(--muted); }
     .form-error { font-size: 0.8rem; color: var(--danger); margin-top: 8px; }
     .list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .list-item {
@@ -127,6 +163,26 @@ export class AdminDashboardComponent implements OnInit {
   constructor(private svc: TournamentService) {}
 
   ngOnInit() { this.load(); }
+
+  visibilityHint(): string {
+    return this.newVisibility === 'public'
+      ? 'Listed on the home page for anyone to follow.'
+      : 'Unlisted — only reachable by its link, which anyone can then watch.';
+  }
+
+  // The self-registration link being auto-draft-only is enforced server-side
+  // (ParticipantController::selfRegister) but was invisible at the point of choosing.
+  teamEntryHint(): string {
+    return this.newTeamEntryMode === 'auto_draft'
+      ? 'Players enter individually and get paired at random. Required for the QR sign-up link.'
+      : 'You enter each team yourself. No random pairing, and player self sign-up is unavailable.';
+  }
+
+  seedingHint(): string {
+    return this.newSeedingMode === 'automatic'
+      ? 'Seeds assigned for you at the draw. Locked once teams are drawn.'
+      : 'Drag teams into the seed order you want, then generate the bracket. Locked once teams are drawn.';
+  }
 
   load() {
     this.svc.getTournaments().subscribe({

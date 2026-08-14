@@ -722,4 +722,82 @@ describe('TournamentManageComponent', () => {
       expect(generateBtn.disabled).toBe(true);
     });
   });
+
+  describe('setup checklist', () => {
+    // managerCapabilities keeps can_manage_setup true while skipping the members request.
+    function setModes(seeding: 'automatic' | 'manual', entry: 'auto_draft' | 'direct') {
+      component.tournament.update(t => ({ ...t!, seeding_mode: seeding, team_entry_mode: entry }));
+    }
+
+    it('should be two steps for auto-draft with automatic seeding, where the draw starts play', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('automatic', 'auto_draft');
+
+      const steps = component.setupSteps();
+      expect(steps.map(s => s.label)).toEqual(['Add your players', 'Draw the teams']);
+      expect(steps[1].detail).toContain('all at once');
+    });
+
+    it('should add a generate step for manual seeding', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('manual', 'auto_draft');
+
+      expect(component.setupSteps().map(s => s.label))
+        .toEqual(['Add your players', 'Draw the teams', 'Set the seed order, then generate']);
+    });
+
+    it('should drop the draw step for direct entry, where teams are the roster', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('automatic', 'direct');
+
+      expect(component.setupSteps().map(s => s.label)).toEqual(['Add your teams', 'Generate the bracket']);
+    });
+
+    it('should mark the first unfinished step as current and the rest as todo', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('manual', 'auto_draft');
+
+      expect(component.setupSteps().map(s => s.state)).toEqual(['current', 'todo', 'todo']);
+    });
+
+    it('should advance the current step once teams are drawn', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('manual', 'auto_draft');
+      component.teams.set([
+        { id: 1, tournament_id: tournamentId, name: 'A & B', participant1_id: 1, participant2_id: 2, participant1_name: 'A', participant2_name: 'B', seed: 1 },
+        { id: 2, tournament_id: tournamentId, name: 'C & D', participant1_id: 3, participant2_id: 4, participant1_name: 'C', participant2_name: 'D', seed: 2 },
+      ] as Team[]);
+
+      expect(component.setupSteps().map(s => s.state)).toEqual(['done', 'done', 'current']);
+    });
+
+    it('should surface a pending self sign-up count in the first step', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('automatic', 'auto_draft');
+      component.participants.set([
+        { id: 1, tournament_id: tournamentId, name: 'Walkup', registration_status: 'pending' },
+      ] as Participant[]);
+
+      expect(component.setupSteps()[0].detail).toContain('1 self sign-up waiting');
+    });
+
+    it('should pluralise the pending sign-up count', () => {
+      bootstrapCore(managerCapabilities);
+      setModes('automatic', 'auto_draft');
+      component.participants.set([
+        { id: 1, tournament_id: tournamentId, name: 'One', registration_status: 'pending' },
+        { id: 2, tournament_id: tournamentId, name: 'Two', registration_status: 'pending' },
+      ] as Participant[]);
+
+      expect(component.setupSteps()[0].detail).toContain('2 self sign-ups waiting');
+    });
+
+    it('should render the checklist and point an empty roster at the sign-up link', () => {
+      bootstrapCore(managerCapabilities);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelectorAll('.setup-step').length).toBe(2);
+      expect(fixture.nativeElement.querySelector('.empty').textContent).toContain('copy the sign-up link');
+    });
+  });
 });

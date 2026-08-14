@@ -6,14 +6,61 @@ class TournamentController {
 		$this->db = $db;
 	}
 
+    // Per-row summary stats for the tournament list, so a row can say "Round 3 of 4 ·
+     // 11 of 15 matches" or name a champion without the client fetching each bracket.
+    // Correlated subqueries rather than GROUP BY joins: the counts come from three
+    // different filters over `matches`, and the list is small enough (tens of rows) that
+    // the extra clarity is worth more than the join gymnastics.
+    //
+    // Byes are deliberately excluded from both sides of the match progress fraction —
+    // they're auto-advanced bracket placeholders, never played, and never reach
+    // 'complete' (see TeamController::generateBracket), so counting them would leave
+    // every tournament stuck short of 100%.
+    const LIST_STATS_SQL = "
+        (SELECT COUNT(*) FROM teams tm WHERE tm.tournament_id = t.id) AS team_count,
+        (SELECT COUNT(*) FROM matches m WHERE m.tournament_id = t.id AND m.status <> 'bye') AS match_count,
+        (SELECT COUNT(*) FROM matches m WHERE m.tournament_id = t.id AND m.status = 'complete') AS matches_played,
+        (SELECT MAX(m.round) FROM matches m WHERE m.tournament_id = t.id) AS total_rounds,
+        (SELECT MIN(m.round) FROM matches m WHERE m.tournament_id = t.id AND m.status IN ('pending', 'ready')) AS current_round,
+        (SELECT w.name FROM matches m JOIN teams w ON w.id = m.winner_id
+            WHERE m.tournament_id = t.id AND m.next_match_id IS NULL AND m.winner_id IS NOT NULL
+            ORDER BY m.round DESC LIMIT 1) AS champion_name
+    ";
+
     public function list(?array $actor = null): void {
         if ($actor) {
-            $stmt = $this->db->query('SELECT * FROM tournaments WHERE deleted_at IS NULL ORDER BY created_at DESC');
+            $stmt = $this->db->query('SELECT t.*, ' . self::LIST_STATS_SQL . ' FROM tournaments t WHERE t.deleted_at IS NULL ORDER BY t.created_at DESC');
         } else {
             // Public listing: hide tournaments still in setup (no bracket generated yet).
-            $stmt = $this->db->query("SELECT * FROM tournaments WHERE visibility = 'public' AND status != 'setup' AND deleted_at IS NULL ORDER BY created_at DESC");
+            $stmt = $this->db->query("SELECT t.*, " . self::LIST_STATS_SQL . " FROM tournaments t WHERE t.visibility = 'public' AND t.status <> 'setup' AND t.deleted_at IS NULL ORDER BY t.created_at DESC");
         }
-        echo json_encode($stmt->fetchAll());
+
+        $rows = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $rows[] = $this->withListStats($row);
+        }
+        echo json_encode($rows);
+    }
+
+    // Moves the flat stats columns off the tournament row and into a nested `stats`
+    // object, casting them to numbers — an unprepared query() returns every column as a
+    // string, and the frontend does arithmetic on these. `current_round` and
+    // `champion_name` stay nullable: a tournament with no bracket yet has neither, and a
+    // finished one has no current round.
+    private function withListStats(array $row): array {
+        $stats = [
+            'team_count'     => (int)$row['team_count'],
+            'match_count'    => (int)$row['match_count'],
+            'matches_played' => (int)$row['matches_played'],
+            'total_rounds'   => (int)$row['total_rounds'],
+            'current_round'  => $row['current_round'] === null ? null : (int)$row['current_round'],
+            'champion_name'  => $row['champion_name'],
+        ];
+        foreach (array_keys($stats) as $key) {
+            unset($row[$key]);
+        }
+        $row['stats'] = $stats;
+        return $row;
     }
 
     public function get(int $id, ?array $actor = null): void {

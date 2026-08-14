@@ -63,6 +63,73 @@ describe('SelfRegisterComponent', () => {
     expect(component.closed()).toBe(true);
   });
 
+  it('should show a closed message for a direct-entry tournament, matching the backend gate', async () => {
+    await setup();
+
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`)
+      .flush({ ...activeTournament, team_entry_mode: 'direct' });
+    fixture.detectChanges();
+
+    expect(component.closed()).toBe(true);
+    expect(fixture.nativeElement.querySelector('.reg-notes')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.notif-error').textContent).toContain('Registration is closed');
+  });
+
+  it('should stay open for an auto-draft tournament in setup', async () => {
+    await setup();
+
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`)
+      .flush({ ...activeTournament, team_entry_mode: 'auto_draft' });
+
+    expect(component.closed()).toBe(false);
+  });
+
+  it('should tell players teams are drawn at random and that approval is required', async () => {
+    await setup();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`).flush(activeTournament);
+    fixture.detectChanges();
+
+    const notes: string = fixture.nativeElement.querySelector('.reg-notes').textContent;
+    expect(notes).toContain('drawn at random');
+    expect(notes).toContain('approves the list');
+  });
+
+  it('should warn that the optional email needs a confirmation tap', async () => {
+    await setup();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`).flush(activeTournament);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.reg-hint').textContent).toContain('confirmation link');
+  });
+
+  it('should tell a registrant not to sign up twice', async () => {
+    await setup();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`).flush(activeTournament);
+
+    component.name = 'Alice';
+    component.submit();
+    httpMock.expectOne(`${environment.apiUrl}/participants/self-register`).flush({ success: true, name: 'Alice' });
+    fixture.detectChanges();
+
+    const success: string = fixture.nativeElement.querySelector('.notif-success').textContent;
+    expect(success).toContain('No need to register again');
+    // No email given, so the confirmation-tap prompt should stay hidden.
+    expect(success).not.toContain('confirmation link');
+  });
+
+  it('should prompt for the email confirmation tap only when an email was given', async () => {
+    await setup();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`).flush(activeTournament);
+
+    component.name = 'Alice';
+    component.email = 'alice@example.com';
+    component.submit();
+    httpMock.expectOne(`${environment.apiUrl}/participants/self-register`).flush({ success: true, name: 'Alice' });
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.notif-success').textContent).toContain('confirmation link');
+  });
+
   it('should show not-found when the uuid does not resolve', async () => {
     await setup();
 

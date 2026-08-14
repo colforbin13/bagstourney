@@ -9,6 +9,12 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
+interface SetupStep {
+  label: string;
+  detail: string;
+  state: 'done' | 'current' | 'todo';
+}
+
 @Component({
   selector: 'app-tournament-manage',
   standalone: true,
@@ -152,6 +158,26 @@ import * as QRCode from 'qrcode';
 
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
+        <!-- Where-am-I checklist. The individual controls below already explain themselves
+             well; what was missing was the shape of the whole sequence, and how many steps
+             are left — which varies by entry and seeding mode. -->
+        @if (canManageSetup() && setupSteps().length > 0) {
+          <div class="card setup-guide" style="margin-bottom:24px">
+            <div class="section-label">Getting this tournament started</div>
+            <ol class="setup-steps">
+              @for (step of setupSteps(); track step.label; let i = $index) {
+                <li class="setup-step" [class.is-done]="step.state === 'done'" [class.is-current]="step.state === 'current'">
+                  <span class="setup-step-mark" aria-hidden="true">{{ step.state === 'done' ? '✓' : i + 1 }}</span>
+                  <div>
+                    <div class="setup-step-label">{{ step.label }}</div>
+                    <div class="setup-step-detail">{{ step.detail }}</div>
+                  </div>
+                </li>
+              }
+            </ol>
+          </div>
+        }
+
         <!-- Mode selectors: only choosable before teams exist -->
         @if (canManageSetup() && teams().length === 0) {
           <div class="card" style="margin-bottom:24px">
@@ -226,7 +252,14 @@ import * as QRCode from 'qrcode';
           </div>
 
           @if (participants().length === 0) {
-            <div class="empty" style="padding:24px 0">No participants yet.</div>
+            <div class="empty" style="padding:24px 0">
+              No players yet — add them above.
+              @if (canManageSetup()) {
+                <div style="margin-top:6px">
+                  Or let them add themselves: <button type="button" class="link-btn" (click)="copyRegistrationLink()">copy the sign-up link</button>.
+                </div>
+              }
+            </div>
           } @else {
             <div class="participant-list">
               @for (p of participants(); track p.id) {
@@ -475,6 +508,47 @@ import * as QRCode from 'qrcode';
       align-items: center;
       gap: 8px;
     }
+    /* ── Setup checklist ── */
+    .setup-steps { display: flex; flex-direction: column; gap: 12px; list-style: none; }
+    .setup-step { display: flex; gap: 10px; align-items: flex-start; }
+    .setup-step-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--surface-2);
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+    .setup-step-label { font-size: 0.875rem; font-weight: 500; color: var(--text-dim); }
+    .setup-step-detail { font-size: 0.78rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+    .setup-step.is-done .setup-step-mark {
+      background: var(--marker);
+      border-color: var(--marker);
+      color: var(--marker-ink);
+    }
+    .setup-step.is-done .setup-step-label { color: var(--muted); }
+    .setup-step.is-current .setup-step-mark {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+    }
+    .setup-step.is-current .setup-step-label { color: var(--text); }
+    .link-btn {
+      border: none;
+      background: transparent;
+      padding: 0;
+      font-family: inherit;
+      font-size: inherit;
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
+    }
     .count {
       background: var(--border);
       color: var(--text-dim);
@@ -703,6 +777,62 @@ export class TournamentManageComponent implements OnInit {
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
   isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
+
+  // The setup sequence is a different length depending on the two modes: auto-draft with
+  // automatic seeding is two steps (the draw seeds and starts the tournament in one go),
+  // while manual seeding or direct entry adds an explicit generate-the-bracket step.
+  // Only ever rendered while status is 'setup', so the final step is never 'done' here —
+  // completing it is what ends the setup phase and removes this list from the page.
+  setupSteps = computed<SetupStep[]>(() => {
+    if (!this.tournament()) return [];
+
+    const direct = this.isDirectEntry();
+    const manual = this.isManualSeeding();
+    const teamsDrawn = this.teams().length > 0;
+    const pending = this.pendingParticipants().length;
+
+    const steps: Array<{ label: string; detail: string; done: boolean }> = [];
+
+    if (direct) {
+      steps.push({
+        label: 'Add your teams',
+        detail: 'Give each team a name and both members. Two teams minimum.',
+        done: this.teams().length >= 2,
+      });
+    } else {
+      steps.push({
+        label: 'Add your players',
+        detail: pending > 0
+          ? `${pending} self sign-up${pending === 1 ? '' : 's'} waiting on your approval below.`
+          : 'Add them by name, or share the sign-up link. You need an even number, four or more.',
+        done: teamsDrawn,
+      });
+      steps.push({
+        label: 'Draw the teams',
+        detail: manual
+          ? 'Randomly pairs your players into teams. You set the seed order afterwards.'
+          : 'Randomly pairs and seeds your players, builds the bracket, and starts play — all at once.',
+        done: teamsDrawn,
+      });
+    }
+
+    if (direct || manual) {
+      steps.push({
+        label: manual ? 'Set the seed order, then generate' : 'Generate the bracket',
+        detail: manual
+          ? 'Drag teams into the order you want, then generate the bracket to start play.'
+          : 'Builds the bracket from your teams and starts play.',
+        done: false,
+      });
+    }
+
+    const firstUndone = steps.findIndex(s => !s.done);
+    return steps.map((s, i) => ({
+      label: s.label,
+      detail: s.detail,
+      state: s.done ? 'done' : (i === firstUndone ? 'current' : 'todo'),
+    }));
+  });
   approvingParticipantId = signal<number | null>(null);
   visibilityBusy = signal(false);
   seedingModeBusy = signal(false);

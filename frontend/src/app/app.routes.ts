@@ -4,9 +4,23 @@ import { authGuard } from './shared/services/auth.guard';
 import { superAdminGuard } from './shared/services/superadmin.guard';
 
 export const routes: Routes = [
+  // Both paths render the same component; `landing` decides whether the hero and
+  // how-it-works content appear above the list. `/` is the full landing page for
+  // everyone, signed in or not — `/tournaments` is the bare list the nav links to.
   {
     path: '',
     loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
+    data: { landing: true },
+  },
+  {
+    path: 'tournaments',
+    loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
+    data: { landing: false },
+  },
+  // Public on purpose: it's most useful to someone deciding whether to sign up at all.
+  {
+    path: 'how-it-works',
+    loadComponent: () => import('./bracket/how-it-works.component').then(m => m.HowItWorksComponent),
   },
   {
     path: 'bracket/:id',
