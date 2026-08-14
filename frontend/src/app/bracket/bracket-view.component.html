@@ -1,4 +1,135 @@
-<div class="page-wide">
+<!-- One definition of a match card, used by both the mirrored layout and the plain
+     single-column one, so the two can never drift apart. `roundPos` is only needed to
+     decide whether a winner here is the champion. -->
+<ng-template #matchCard let-match="match" let-roundPos="roundPos">
+    <div class="match-card"
+            [class.match-complete]="match.status === 'complete'"
+            [class.match-pending]="match.status === 'pending'"
+            [class.match-bye]="match.status === 'bye'">
+        <!-- Team 1 -->
+        <div class="match-team"
+            [class.winner]="match.winner_id === match.team1_id && match.status === 'complete'"
+            [class.loser]="match.winner_id === match.team2_id && match.status === 'complete'">
+        <div class="team-name-wrap">
+        <span class="team-name">
+            {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
+            @if (tournament()?.status === 'complete' && roundPos === totalRounds() && match.winner_id === match.team1_id) {
+            <span class="champion-icon" aria-hidden="true">🏆</span>
+            }
+        </span>
+        @if (teamParticipants(match.team1_name, match.team1_participant1_name, match.team1_participant2_name); as participants) {
+            <span class="team-participants">{{ participants }}</span>
+        }
+        </div>
+        @if (match.status === 'complete' && this.editingMatch !== match.id) {
+            <span class="team-score">{{ match.team1_score }}</span>
+        } @else if (showScoring() && (match.status === 'ready' || this.editingMatch === match.id)) {
+            <input class="input score-input" type="number" min="0"
+            [(ngModel)]="scores[match.id].team1"
+            [attr.aria-label]="'Score for ' + (match.team1_name ?? 'team 1')"
+            placeholder="0" />
+        }
+        </div>
+        <!-- Divider -->
+        <div class="match-divider"></div>
+        <!-- Team 2 -->
+        <div class="match-team"
+            [class.winner]="match.winner_id === match.team2_id && match.status === 'complete'"
+            [class.loser]="match.winner_id === match.team1_id && match.status === 'complete'">
+        <div class="team-name-wrap">
+        <span class="team-name">
+            {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
+            @if (tournament()?.status === 'complete' && roundPos === totalRounds() && match.winner_id === match.team2_id) {
+            <span class="champion-icon" aria-hidden="true">🏆</span>
+            }
+        </span>
+        @if (teamParticipants(match.team2_name, match.team2_participant1_name, match.team2_participant2_name); as participants) {
+            <span class="team-participants">{{ participants }}</span>
+        }
+        </div>
+        @if (match.status === 'complete' && this.editingMatch !== match.id) {
+            <span class="team-score">{{ match.team2_score }}</span>
+        } @else if (showScoring() && (match.status === 'ready' || this.editingMatch === match.id)) {
+            <input class="input score-input" type="number" min="0"
+            [(ngModel)]="scores[match.id].team2"
+            [attr.aria-label]="'Score for ' + (match.team2_name ?? 'team 2')"
+            placeholder="0" />
+        }
+        </div>
+
+        <!-- Score submit: only for viewers who actually have a role on this tournament -->
+        @if (showScoring()) {
+        <div class="score-actions">
+            @if (match.status === 'ready' && this.editingMatch !== match.id) {
+            <button class="btn btn-primary btn-sm"
+                [disabled]="submitting() === match.id"
+                (click)="submitScore(match)">
+                @if (submitting() === match.id) {
+                <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
+                } @else {
+                Save
+                }
+            </button>
+            } @else if (match.status === 'complete' && this.editingMatch !== match.id) {
+            <button class="btn btn-sm" (click)="startEdit(match)">Edit</button>
+            } @else if (this.editingMatch === match.id) {
+            <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
+            <button class="btn btn-primary btn-sm" (click)="submitScore(match)" [disabled]="submitting() === match.id">
+                Save
+            </button>
+            }
+        </div>
+        }
+        @if (match.status === 'bye') {
+        <div class="bye-note">Bye — auto-advanced</div>
+        }
+    </div>
+</ng-template>
+
+<!-- One half-round column of the mirrored layout, plus the gutter that carries its
+     connectors inward. `flip` mirrors the connector SVG for the right-hand side, whose
+     geometry is the left's reflection. -->
+<ng-template #mirrorRound let-round="round" let-rows="rows" let-flip="flip">
+    <div class="bracket-round">
+        <div class="round-label" [class.label-right]="flip">{{ round.label }}</div>
+        <div class="bracket-matches" [style.--total-rows]="rows" [style.--row-unit.px]="rowUnitPx">
+        @for (entry of round.matches; track entry.match.id) {
+            <div class="match-wrapper" [style.grid-row]="entry.gridRow">
+            <ng-container *ngTemplateOutlet="matchCard; context: { match: entry.match, roundPos: round.pos }"></ng-container>
+            </div>
+        }
+        </div>
+    </div>
+</ng-template>
+
+<ng-template #mirrorGutter let-round="round" let-rows="rows" let-flip="flip">
+    <div class="bracket-gutter" [style.width.px]="gutterWidth">
+        <div class="round-label" aria-hidden="true" style="visibility:hidden">&nbsp;</div>
+        <svg class="connector-svg" [class.flip]="flip"
+            [attr.width]="gutterWidth"
+            [attr.height]="rows * rowUnitPx"
+            [attr.viewBox]="'0 0 ' + gutterWidth + ' ' + (rows * rowUnitPx)">
+        @for (c of round.connectors; track $index) {
+            <path [attr.d]="connectorPath(c)" class="connector-line" />
+            <circle [attr.cx]="0" [attr.cy]="c.y1" r="3" class="connector-dot" />
+            <circle [attr.cx]="0" [attr.cy]="c.y2" r="3" class="connector-dot" />
+            <circle [attr.cx]="gutterWidth / 2" [attr.cy]="c.mid" r="4" class="connector-node" />
+        }
+        </svg>
+    </div>
+</ng-template>
+
+<div class="page-wide" [class.kiosk]="kiosk()">
+    @if (kiosk()) {
+    <!-- Slim bar: every pixel spent here is a pixel the bracket can't have. -->
+    <div class="kiosk-bar">
+        <h1 class="kiosk-title">{{ tournament()?.name }}</h1>
+        @if (tournament()) {
+        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
+        }
+        <button type="button" class="btn btn-sm kiosk-exit" (click)="setKiosk(false)">Exit TV mode</button>
+    </div>
+    } @else {
     <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div style="min-width:0;">
         <a routerLink="/" style="color:var(--text-dim);font-size:.8rem;">← All tournaments</a>
@@ -16,14 +147,61 @@
             Auto-refresh every {{ autoReloadIntervalMs / 1000 }}s
         </label>
         }
+
+        <button type="button" class="btn btn-sm" (click)="setKiosk(true)"
+            title="Scale the bracket to fill the screen — for a TV or projector">TV mode</button>
     </div>
     </div>
+    }
 
     @if (loading()) {
     <div class="empty"><span class="spinner"></span></div>
     } @else if (!rounds().length) {
     <div class="empty">Bracket not generated yet.</div>
     } @else {
+    <!-- fit-stage is the box we have; fit-inner is scaled to fit inside it in kiosk mode.
+         Both are inert in normal mode, where fitScale() stays 1. -->
+    <div class="fit-stage">
+    <div class="fit-inner" [style.transform]="kiosk() ? 'scale(' + fitScale() + ')' : null">
+
+    @if (useMirrorLayout() && mirrorLayout(); as layout) {
+    <!-- Mirrored: both halves of round 1 start at the outside edges and play inward to
+         the final in the middle. Half the height of a single-sided bracket, so the cards
+         and text can be much bigger on the same screen. -->
+    <div class="bracket bracket-mirrored">
+        @for (round of layout.left; track round.pos) {
+            <ng-container *ngTemplateOutlet="mirrorRound; context: { round: round, rows: layout.rows, flip: false }"></ng-container>
+            <ng-container *ngTemplateOutlet="mirrorGutter; context: { round: round, rows: layout.rows, flip: false }"></ng-container>
+        }
+
+        <div class="bracket-round bracket-final">
+            <div class="round-label label-center">{{ roundLabel(totalRounds(), totalRounds()) }}</div>
+            <div class="bracket-matches" [style.--total-rows]="layout.rows" [style.--row-unit.px]="rowUnitPx">
+            @if (layout.final; as final) {
+                <div class="match-wrapper" [style.grid-row]="'1 / span ' + layout.rows">
+                <ng-container *ngTemplateOutlet="matchCard; context: { match: final, roundPos: totalRounds() }"></ng-container>
+                </div>
+            }
+            </div>
+            @if (tournament()?.status === 'complete') {
+            <div class="champion">
+                <div class="champion-name">
+                <span class="champion-icon" aria-hidden="true">🏆</span>
+                {{ champion() }}
+                </div>
+            </div>
+            }
+        </div>
+
+        <!-- Right half runs inward-out: gutter first, then its round column. -->
+        @for (round of layout.right; track round.pos) {
+            <ng-container *ngTemplateOutlet="mirrorGutter; context: { round: round, rows: layout.rows, flip: true }"></ng-container>
+            <ng-container *ngTemplateOutlet="mirrorRound; context: { round: round, rows: layout.rows, flip: true }"></ng-container>
+        }
+    </div>
+    } @else {
+    <!-- Single-column layout: mobile, and 2-team brackets where there is nothing to
+         mirror because round 1 is already the final. -->
     <div class="bracket">
         @for (round of rounds(); track round.num; let lastRound = $last) {
         <div class="bracket-round">
@@ -36,88 +214,7 @@
             @for (match of round.matches; track match.id) {
                 <div class="match-wrapper"
                     [style.grid-row]="matchGridRow(match.match_number, round.pos)">
-                <div class="match-card"
-                        [class.match-complete]="match.status === 'complete'"
-                        [class.match-pending]="match.status === 'pending'"
-                        [class.match-bye]="match.status === 'bye'">
-                    <!-- Team 1 -->
-                    <div class="match-team"
-                        [class.winner]="match.winner_id === match.team1_id && match.status === 'complete'"
-                        [class.loser]="match.winner_id === match.team2_id && match.status === 'complete'">
-                    <div class="team-name-wrap">
-                    <span class="team-name">
-                        {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
-                        @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team1_id) {
-                        <span class="champion-icon" aria-hidden="true">🏆</span>
-                        }
-                    </span>
-                    @if (teamParticipants(match.team1_name, match.team1_participant1_name, match.team1_participant2_name); as participants) {
-                        <span class="team-participants">{{ participants }}</span>
-                    }
-                    </div>
-                    @if (match.status === 'complete' && this.editingMatch !== match.id) {
-                        <span class="team-score">{{ match.team1_score }}</span>
-                    } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
-                        <input class="input score-input" type="number" min="0"
-                        [(ngModel)]="scores[match.id].team1"
-                        [attr.aria-label]="'Score for ' + (match.team1_name ?? 'team 1')"
-                        placeholder="0" />
-                    }
-                    </div>
-                    <!-- Divider -->
-                    <div class="match-divider"></div>
-                    <!-- Team 2 -->
-                    <div class="match-team"
-                        [class.winner]="match.winner_id === match.team2_id && match.status === 'complete'"
-                        [class.loser]="match.winner_id === match.team1_id && match.status === 'complete'">
-                    <div class="team-name-wrap">
-                    <span class="team-name">
-                        {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
-                        @if (tournament()?.status === 'complete' && round.pos === totalRounds() && match.winner_id === match.team2_id) {
-                        <span class="champion-icon" aria-hidden="true">🏆</span>
-                        }
-                    </span>
-                    @if (teamParticipants(match.team2_name, match.team2_participant1_name, match.team2_participant2_name); as participants) {
-                        <span class="team-participants">{{ participants }}</span>
-                    }
-                    </div>
-                    @if (match.status === 'complete' && this.editingMatch !== match.id) {
-                        <span class="team-score">{{ match.team2_score }}</span>
-                    } @else if (canScore() && (match.status === 'ready' || this.editingMatch === match.id)) {
-                        <input class="input score-input" type="number" min="0"
-                        [(ngModel)]="scores[match.id].team2"
-                        [attr.aria-label]="'Score for ' + (match.team2_name ?? 'team 2')"
-                        placeholder="0" />
-                    }
-                    </div>
-
-                    <!-- Score submit: only for viewers who actually have a role on this tournament -->
-                    @if (canScore()) {
-                    <div class="score-actions">
-                        @if (match.status === 'ready' && this.editingMatch !== match.id) {
-                        <button class="btn btn-primary btn-sm"
-                            [disabled]="submitting() === match.id"
-                            (click)="submitScore(match)">
-                            @if (submitting() === match.id) {
-                            <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
-                            } @else {
-                            Save
-                            }
-                        </button>
-                        } @else if (match.status === 'complete' && this.editingMatch !== match.id) {
-                        <button class="btn btn-sm" (click)="startEdit(match)">Edit</button>
-                        } @else if (this.editingMatch === match.id) {
-                        <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
-                        <button class="btn btn-primary btn-sm" (click)="submitScore(match)" [disabled]="submitting() === match.id">
-                            Save
-                        </button>
-                        }
-                    </div>
-                    }
-                    @if (match.status === 'bye') {
-                    <div class="bye-note">Bye — auto-advanced</div>
-                    }
-                </div>
+                <ng-container *ngTemplateOutlet="matchCard; context: { match: match, roundPos: round.pos }"></ng-container>
                 </div>
             }
             </div>
@@ -148,6 +245,10 @@
             </div>
         </div>
         }
+    </div>
+    }
+
+    </div>
     </div>
 
     @if (error()) {

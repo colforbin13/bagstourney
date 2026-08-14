@@ -243,4 +243,113 @@ Bracket outer shell: one flex column per round
 
     .champion { padding: 6px 8px; }
     .champion-icon { font-size: 1rem; }
+
+    /* Kiosk mode opts back out of the phone layout. A TV or stick browser that reports a
+       narrow CSS viewport would otherwise get the stacked list, which defeats the whole
+       point — the bracket shape is what people are standing there reading. It gets
+       scaled to fit regardless of how big the viewport claims to be. */
+    .kiosk .bracket { flex-direction: row; }
+    .kiosk .bracket-round { min-width: 200px; width: auto; }
+    .kiosk .bracket-gutter { display: flex; }
+    .kiosk .bracket-matches {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(var(--total-rows), var(--row-unit));
+    gap: 0;
+    }
+    .kiosk .match-wrapper { display: flex; align-items: center; }
+}
+
+/* ─────────────────────────────────────────
+    Mirrored layout — both halves of round 1 begin at the outside edges and play
+    inward to the final in the middle. Structurally it is the same round columns and
+    gutters as the single-sided layout; the right half is simply built from the
+    second half of each round's matches and rendered inner-to-outer, with its
+    connector SVGs reflected. See BracketViewComponent.mirrorLayout().
+    ───────────────────────────────────────── */
+.bracket-mirrored {
+    align-items: flex-start;
+}
+
+/* The right half's connectors are the left's mirror image, so the same computed paths
+   are reused and flipped rather than deriving a second set of geometry. */
+.connector-svg.flip {
+    transform: scaleX(-1);
+}
+
+/* Round labels sit above their column; on the right half they read better aligned to
+   the outside edge, mirroring the left. */
+.round-label.label-right { text-align: right; padding-left: 0; padding-right: 2px; }
+.round-label.label-center { text-align: center; padding-left: 0; }
+
+/* The final's card is vertically centred by spanning every row of the grid, so it lines
+   up exactly with the two connectors arriving from either side. */
+.bracket-final .champion {
+    margin-top: 12px;
+}
+
+/* ─────────────────────────────────────────
+    TV / kiosk mode — scale the whole bracket to the viewport so nothing needs
+    scrolling. See BracketViewComponent.recomputeFit(): .fit-stage is the space
+    available, .fit-inner is what gets scaled inside it. Both are inert in normal
+    mode, where fitScale() stays 1 and no transform is bound at all.
+    ───────────────────────────────────────── */
+.fit-inner {
+    transform-origin: center center;
+}
+
+.page-wide.kiosk {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg);
+}
+
+.kiosk-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.kiosk-title {
+    font-size: 1.4rem;
+    line-height: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kiosk-exit {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.kiosk .fit-stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* Without this a flex child refuses to shrink below its content height, and the
+       stage would report the bracket's full height as "available". */
+    min-height: 0;
+}
+
+/* Must report its natural size for the fit maths — no internal scrolling, no shrinking. */
+.kiosk .fit-inner {
+    flex: 0 0 auto;
+}
+
+.kiosk .bracket {
+    overflow: visible;
+    width: max-content;
+    padding-bottom: 0;
 }

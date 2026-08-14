@@ -1,6 +1,7 @@
 // src/app/bracket/bracket-view.component.ts
 import { Component, OnInit, AfterViewInit, OnDestroy, signal, computed } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
@@ -8,10 +9,30 @@ import { Tournament, Match, BracketData } from '../shared/models/tournament.mode
 
 interface ScoreEntry { team1: string; team2: string; }
 
+interface Connector { y1: number; y2: number; mid: number; }
+
+/** One round column of one half of the mirrored (TV) layout. */
+interface MirrorRound {
+  pos: number;
+  label: string;
+  matches: { match: Match; gridRow: string }[];
+  connectors: Connector[];
+}
+
+interface MirrorLayout {
+  /** Row units per side — half the height the single-sided layout would need. */
+  rows: number;
+  /** Outer → inner: round 1 first, the round before the final last. */
+  left: MirrorRound[];
+  /** Inner → outer, i.e. already reversed for left-to-right rendering. */
+  right: MirrorRound[];
+  final: Match | null;
+}
+
 @Component({
   selector: 'app-bracket-view',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, NgTemplateOutlet],
   templateUrl: './bracket-view.component.html',
   styleUrl: './bracket-view.component.css'
 })
@@ -26,11 +47,35 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   scores: Record<number, ScoreEntry> = {};
   editingMatch: number | null = null;
 
-  autoReload = false;
+  autoReload = true;
   private autoReloadTimer: number | null = null;
-  readonly autoReloadIntervalMs = 30000;
+  readonly autoReloadIntervalMs = 60000;
 
-  private resizeCenter = () => this.centerBracket();
+  // ── TV / kiosk mode ────────────────────────────────────────────────────────
+  // Driven by the ?kiosk=1 query parameter rather than component state alone, so the
+  // whole thing is a bookmarkable URL — which is the only practical way to get a Fire TV
+  // stick or similar onto the right screen, since typing a URL once beats hunting for a
+  // toggle with a remote.
+  kiosk = signal(false);
+  fitScale = signal(1);
+
+  // Must stay in step with the max-width used by the mobile block in the component's CSS.
+  private static readonly NARROW_QUERY = '(max-width: 600px)';
+  private narrowMedia = window.matchMedia(BracketViewComponent.NARROW_QUERY);
+  isNarrow = signal(window.matchMedia(BracketViewComponent.NARROW_QUERY).matches);
+  private onNarrowChange = (e: MediaQueryListEvent) => this.isNarrow.set(e.matches);
+
+  // Breathing room around the scaled bracket. Generous on purpose: many TVs overscan and
+  // crop a few percent off every edge, which would otherwise clip the outer rounds.
+  private readonly kioskMarginPx = 28;
+  // Cap on enlargement for small brackets on big screens. Beyond roughly this, scaled
+  // text starts to look soft, and a four-team bracket filling a 65" screen is silly.
+  private readonly maxKioskScale = 2.5;
+
+  private resizeCenter = () => { this.centerBracket(); this.recomputeFit(); };
+  private onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && this.kiosk()) this.setKiosk(false);
+  };
 
   // ── Computed bracket data ──────────────────────────────────────────────────
 
@@ -62,6 +107,11 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   // distinct from auth.isLoggedIn(), which only says they're logged in as *someone*,
   // not that they have a role on *this* tournament.
   canScore = computed(() => this.tournament()?.capabilities?.can_score ?? false);
+
+  // Kiosk mode is a display, not a console — score inputs and Save/Edit buttons are
+  // suppressed even for staff, so nothing on a screen in a crowded room is one stray
+  // click away from rewriting a result.
+  showScoring = computed(() => this.canScore() && !this.kiosk());
 
   // ── Grid helpers ───────────────────────────────────────────────────────────
 
@@ -104,6 +154,79 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     return (rowStart - 1 + span / 2) * this.rowUnitPx;
   }
 
+  // ── Mirrored layout ────────────────────────────────────────────────────────
+  // The bracket plays inward from both edges toward the final in the middle, the way a
+  // printed tournament bracket reads: half of round 1 down the left, half down the right.
+  // That halves the height and roughly doubles the width, which is the whole point — a
+  // 16-slot bracket was 899×1231 and had to be shrunk to fit any screen, where mirrored
+  // it is about 1592×630 and fits with room to spare, so the text lands much larger.
+  //
+  // Not used for a 2-team bracket (round 1 *is* the final, nothing to mirror), nor on a
+  // narrow screen, which keeps the existing stacked layout untouched. That switch has to
+  // happen in the markup rather than in CSS: collapsing the mirrored DOM into one column
+  // would read round 1, round 2, final, round 2, round 1 down the page, instead of
+  // grouping each round together the way the phone layout always has. Kiosk mode ignores
+  // the width entirely — a stick browser reporting a narrow viewport still wants the real
+  // bracket, and it gets scaled to fit regardless.
+  useMirrorLayout = computed(() => this.totalRounds() >= 2 && (this.kiosk() || !this.isNarrow()));
+
+  mirrorLayout = computed<MirrorLayout | null>(() => {
+    const rs = this.rounds();
+    const n = rs.length;
+    if (n < 2) return null;
+
+    // Every round contributes the same number of row units per side:
+    // (matches per side) × (span each) = 2^(n-pos-1) × 2^(pos-1) = 2^(n-2).
+    const rows = Math.pow(2, n - 2);
+
+    const buildSide = (side: 'left' | 'right'): MirrorRound[] => {
+      const out: MirrorRound[] = [];
+      for (let pos = 1; pos <= n - 1; pos++) {
+        const round = rs[pos - 1];
+        const perSide = Math.pow(2, n - pos - 1);
+        const span = Math.pow(2, pos - 1);
+        // The left half takes match numbers 1..perSide, the right half the rest — the
+        // same split a printed bracket makes, so pairings stay intact on both sides.
+        const offset = side === 'left' ? 0 : perSide;
+
+        const matches: { match: Match; gridRow: string }[] = [];
+        for (let k = 1; k <= perSide; k++) {
+          const match = round.matches.find(m => m.match_number === k + offset);
+          if (!match) continue;
+          matches.push({ match, gridRow: `${(k - 1) * span + 1} / span ${span}` });
+        }
+
+        out.push({ pos, label: this.roundLabel(pos, n), matches, connectors: this.mirrorConnectors(perSide, span) });
+      }
+      return out;
+    };
+
+    return {
+      rows,
+      left: buildSide('left'),
+      right: buildSide('right').reverse(),
+      final: rs[n - 1]?.matches[0] ?? null,
+    };
+  });
+
+  /**
+   * Connectors for one half of one round, in that half's own coordinates. Identical
+   * geometry to roundConnectors() but indexed within the half rather than the whole
+   * round. The last round before the final has a single match per side, which falls out
+   * of this as y1 === y2 === mid — a straight line into the final, exactly right, since
+   * that match spans every row and so shares the final's vertical center.
+   */
+  private mirrorConnectors(perSide: number, span: number): Connector[] {
+    const centerOf = (k: number) => ((k - 1) * span + span / 2) * this.rowUnitPx;
+    const out: Connector[] = [];
+    for (let k = 1; k <= perSide; k += 2) {
+      const y1 = centerOf(k);
+      const y2 = k + 1 <= perSide ? centerOf(k + 1) : y1;
+      out.push({ y1, y2, mid: (y1 + y2) / 2 });
+    }
+    return out;
+  }
+
   /**
    * One entry per match-pair in this round, describing where its connector into the
    * next round should be drawn: y1/y2 are the two matches' own centers (where their
@@ -143,6 +266,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private svc: TournamentService,
     public auth: AuthService,
   ) {}
@@ -154,17 +278,79 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     } else {
       this.uuid = param;
     }
+
+    // Subscribed rather than read from the snapshot so toggling the mode (which just
+    // rewrites the query string) drives the same code path as arriving on the URL cold.
+    this.route.queryParamMap.subscribe(params => {
+      const on = params.get('kiosk') === '1';
+      this.kiosk.set(on);
+      document.body.classList.toggle('kiosk-mode', on);
+      setTimeout(() => this.recomputeFit(), 0);
+    });
+
     this.load();
+
+    // A bracket on a wall during a tournament is worthless if it's showing the score from
+    // an hour ago. The checkbox has always rendered ticked by default, but nothing ever
+    // started the timer unless you toggled it off and on again — so the default state was
+    // a lie. Start it here to match what the checkbox claims.
+    if (this.autoReload) this.startAutoReload(false);
   }
 
   ngAfterViewInit() {
-    setTimeout(() => this.centerBracket(), 0);
+    setTimeout(() => { this.centerBracket(); this.recomputeFit(); }, 0);
     window.addEventListener('resize', this.resizeCenter);
+    window.addEventListener('keydown', this.onKeydown);
+    this.narrowMedia.addEventListener('change', this.onNarrowChange);
   }
 
   ngOnDestroy() {
     window.removeEventListener('resize', this.resizeCenter);
+    window.removeEventListener('keydown', this.onKeydown);
+    this.narrowMedia.removeEventListener('change', this.onNarrowChange);
+    document.body.classList.remove('kiosk-mode');
     this.stopAutoReload();
+  }
+
+  // ── TV / kiosk mode ────────────────────────────────────────────────────────
+
+  setKiosk(on: boolean) {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { kiosk: on ? 1 : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /**
+   * Scales the bracket so the whole thing fits the viewport at once — the point of the
+   * mode, since a bracket beyond about eight teams is taller than a 1080p screen and no
+   * one is going to scroll a television.
+   *
+   * A CSS transform is the tool here because it scales the connector SVGs and the text
+   * along with the layout, keeping the bracket's proportions exactly as designed. Note
+   * that offsetWidth/offsetHeight report the *pre-transform* box, so re-fitting never has
+   * to reset the scale and measure again.
+   */
+  private recomputeFit() {
+    if (!this.kiosk()) { this.fitScale.set(1); return; }
+    try {
+      const stage = document.querySelector('.fit-stage') as HTMLElement | null;
+      const inner = document.querySelector('.fit-inner') as HTMLElement | null;
+      if (!stage || !inner) return;
+
+      const naturalW = inner.offsetWidth;
+      const naturalH = inner.offsetHeight;
+      if (!naturalW || !naturalH) return;
+
+      const availW = stage.clientWidth - this.kioskMarginPx * 2;
+      const availH = stage.clientHeight - this.kioskMarginPx * 2;
+      if (availW <= 0 || availH <= 0) return;
+
+      const scale = Math.min(availW / naturalW, availH / naturalH);
+      this.fitScale.set(Math.min(this.maxKioskScale, Math.max(0.1, scale)));
+    } catch { /* ignore */ }
   }
 
   // ── Data loading ───────────────────────────────────────────────────────────
@@ -208,6 +394,9 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
     this.loading.set(false);
+    // The bracket's natural size changes as rounds arrive (and can change again on an
+    // auto-reload, once byes resolve into real matchups), so re-fit after each render.
+    setTimeout(() => { this.centerBracket(); this.recomputeFit(); }, 0);
   }
 
   // ── Labels ─────────────────────────────────────────────────────────────────
@@ -238,9 +427,11 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.autoReload ? this.startAutoReload() : this.stopAutoReload();
   }
 
-  private startAutoReload() {
+  // `immediate` is false when starting up, where ngOnInit has already issued the first
+  // load — ticking the checkbox by hand, on the other hand, should refresh right away.
+  private startAutoReload(immediate = true) {
     if (this.autoReloadTimer != null) return;
-    this.load();
+    if (immediate) this.load();
     this.autoReloadTimer = window.setInterval(() => {
       if (!this.loading()) this.load();
     }, this.autoReloadIntervalMs) as unknown as number;
