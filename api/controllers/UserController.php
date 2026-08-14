@@ -10,7 +10,7 @@ class UserController {
 
     public function list(): void {
         requireSuperAdmin($this->db);
-        $stmt = $this->db->query('SELECT id, username, email, role, status, created_at FROM users ORDER BY created_at DESC');
+        $stmt = $this->db->query('SELECT id, username, email, role, status, plan, created_at FROM users ORDER BY created_at DESC');
         echo json_encode($stmt->fetchAll());
     }
 
@@ -59,7 +59,7 @@ class UserController {
             $userId = (int)$this->db->lastInsertId();
             writeAuditLog($this->db, null, (int)$actor['id'], 'user_account_created', 'user', (string)$userId, ['role' => $role]);
             http_response_code(201);
-            echo json_encode(['id' => $userId, 'username' => $username, 'email' => $email, 'role' => $role, 'status' => 'active']);
+            echo json_encode(['id' => $userId, 'username' => $username, 'email' => $email, 'role' => $role, 'status' => 'active', 'plan' => 'free']);
         } catch (PDOException $e) {
             http_response_code(409);
             echo json_encode(['error' => 'That username or email address is already registered']);
@@ -100,6 +100,17 @@ class UserController {
             $fields[] = 'status = ?';
             $params[] = $body['status'];
         }
+        if (isset($body['plan'])) {
+            // FEATURE_TRACKER item 12 plumbing: no billing exists yet, so this is a
+            // manual stand-in for what Stripe will flip automatically once it ships.
+            if (!in_array($body['plan'], ['free', 'paid'], true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid plan']);
+                return;
+            }
+            $fields[] = 'plan = ?';
+            $params[] = $body['plan'];
+        }
         if (!$fields) {
             http_response_code(400);
             echo json_encode(['error' => 'Nothing to update']);
@@ -126,7 +137,7 @@ class UserController {
             return;
         }
 
-        $stmt = $this->db->prepare('SELECT id, username, email, role, status, created_at FROM users WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT id, username, email, role, status, plan, created_at FROM users WHERE id = ?');
         $stmt->execute([$id]);
         echo json_encode($stmt->fetch());
     }

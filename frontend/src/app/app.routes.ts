@@ -65,6 +65,11 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/deleted-tournaments.component').then(m => m.DeletedTournamentsComponent),
   },
   {
+    path: 'admin/audit-log',
+    canActivate: [authGuard, superAdminGuard],
+    loadComponent: () => import('./admin/audit-log.component').then(m => m.AuditLogComponent),
+  },
+  {
     path: 'admin/tournament/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/tournament-manage.component').then(m => m.TournamentManageComponent),

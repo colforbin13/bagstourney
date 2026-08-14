@@ -26,11 +26,13 @@ describe('TournamentManageComponent', () => {
   const ownerCapabilities: TournamentCapabilities = {
     role: 'owner', is_super_admin: false,
     can_manage_setup: true, can_manage_staff: true, can_score: true, can_delete: true,
+    participant_cap: 32, participant_count: 0,
   };
 
   const managerCapabilities: TournamentCapabilities = {
     role: 'manager', is_super_admin: false,
     can_manage_setup: true, can_manage_staff: false, can_score: true, can_delete: false,
+    participant_cap: 32, participant_count: 0,
   };
 
   beforeEach(async () => {
@@ -63,7 +65,7 @@ describe('TournamentManageComponent', () => {
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
       .flush({
         id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
-        visibility, seeding_mode: 'automatic', created_at: '2026-01-01', capabilities,
+        visibility, seeding_mode: 'automatic', created_at: '2026-01-01', paid_override: false, capabilities,
       });
     httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
     httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
@@ -104,6 +106,7 @@ describe('TournamentManageComponent', () => {
     const scorekeeperCapabilities: TournamentCapabilities = {
       role: 'scorekeeper', is_super_admin: false,
       can_manage_setup: false, can_manage_staff: false, can_score: true, can_delete: false,
+      participant_cap: null, participant_count: null,
     };
     bootstrapCore(scorekeeperCapabilities);
 
@@ -261,6 +264,51 @@ describe('TournamentManageComponent', () => {
 
     expect(component.tournament()?.visibility).toBe('private');
     expect(component.visibilityBusy()).toBe(false);
+  });
+
+  it('should expose the freemium participant cap from capabilities for staff', () => {
+    bootstrapCore(ownerCapabilities);
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+    expect(component.participantCap()).toBe(32);
+    expect(component.participantCount()).toBe(0);
+    expect(component.isSuperAdmin()).toBe(false);
+  });
+
+  it('should not show the plan override control for a non-super-admin owner', () => {
+    bootstrapCore(ownerCapabilities);
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+    expect(component.isSuperAdmin()).toBe(false);
+  });
+
+  it('should grant a plan override for a super admin', () => {
+    const superAdminCapabilities: TournamentCapabilities = {
+      role: null, is_super_admin: true,
+      can_manage_setup: true, can_manage_staff: true, can_score: true, can_delete: true,
+      participant_cap: 32, participant_count: 0,
+    };
+    bootstrapCore(superAdminCapabilities);
+    httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+    expect(component.isSuperAdmin()).toBe(true);
+    expect(component.tournament()?.paid_override).toBe(false);
+
+    component.togglePaidOverride();
+    expect(component.paidOverrideBusy()).toBe(true);
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ paid_override: true });
+    req.flush({
+      id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+      visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01', paid_override: true,
+      capabilities: superAdminCapabilities,
+    });
+
+    expect(component.tournament()?.paid_override).toBe(true);
+    expect(component.paidOverrideBusy()).toBe(false);
+    expect(component.toast()).toBe('Plan override granted.');
   });
 
   it('should copy the public bracket link to the clipboard', async () => {

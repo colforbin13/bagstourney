@@ -116,6 +116,17 @@ function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array
     $isManager = $isSuperAdmin || in_array($role, ['owner', 'manager'], true);
     $canScore = $isSuperAdmin || in_array($role, ['owner', 'manager', 'scorekeeper'], true);
 
+    // Only computed for staff — an anonymous public-bracket viewer doesn't need it, and
+    // it would otherwise add two extra queries to the highest-traffic read path here.
+    $participantCap = null;
+    $participantCount = null;
+    if ($isManager) {
+        $participantCap = effectiveParticipantCap($db, $tournamentId);
+        $countStmt = $db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+        $countStmt->execute([$tournamentId]);
+        $participantCount = (int)$countStmt->fetchColumn();
+    }
+
     return [
         'role' => $role,
         'is_super_admin' => $isSuperAdmin,
@@ -123,7 +134,29 @@ function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array
         'can_manage_staff' => $isOwner,
         'can_score' => $canScore,
         'can_delete' => $isOwner,
+        'participant_cap' => $participantCap,
+        'participant_count' => $participantCount,
     ];
+}
+
+// Freemium participant cap (FEATURE_TRACKER.md item 12/13 plumbing). No billing exists
+// yet — users.plan and tournaments.paid_override (migration 013) are both set manually
+// by a super admin for now, standing in for what Stripe will flip automatically once
+// payment integration ships; either one raised to 'paid'/1 lifts the cap.
+const FREEMIUM_FREE_TIER_MAX_PARTICIPANTS = 32;
+const FREEMIUM_PAID_TIER_MAX_PARTICIPANTS = 256;
+
+function effectiveParticipantCap(PDO $db, int $tournamentId): int {
+    $stmt = $db->prepare('
+        SELECT t.paid_override, u.plan
+        FROM tournaments t
+        LEFT JOIN users u ON u.id = t.created_by_user_id
+        WHERE t.id = ?
+    ');
+    $stmt->execute([$tournamentId]);
+    $row = $stmt->fetch();
+    $isPaid = $row && ((int)$row['paid_override'] === 1 || $row['plan'] === 'paid');
+    return $isPaid ? FREEMIUM_PAID_TIER_MAX_PARTICIPANTS : FREEMIUM_FREE_TIER_MAX_PARTICIPANTS;
 }
 
 // Like requireTournamentRole() but for anonymous-allowed GET endpoints: public

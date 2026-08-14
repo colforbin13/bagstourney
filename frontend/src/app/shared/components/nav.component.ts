@@ -40,6 +40,7 @@ import { AuthService } from '../services/auth.service';
               @if (auth.isSuperAdmin()) {
                 <a routerLink="/admin/users" routerLinkActive="active" (click)="closeAdminMenu()">Users</a>
                 <a routerLink="/admin/deleted-tournaments" routerLinkActive="active" (click)="closeAdminMenu()">Deleted Tournaments</a>
+                <a routerLink="/admin/audit-log" routerLinkActive="active" (click)="closeAdminMenu()">Audit Log</a>
               }
             </div>
           </div>

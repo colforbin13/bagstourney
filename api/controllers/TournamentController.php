@@ -176,6 +176,19 @@ class TournamentController {
             $fields[] = 'team_entry_mode = ?';
             $params[] = $body['team_entry_mode'];
         }
+        if (isset($body['paid_override'])) {
+            // FEATURE_TRACKER item 13 plumbing: a one-time per-tournament unlock, set
+            // manually by a super admin until real billing exists. Super-admin only —
+            // requireTournamentRole() lets an owner/manager reach update() too, and
+            // letting either self-grant this would let any organizer unlock their own cap.
+            if ($actor['role'] !== 'super_admin') {
+                http_response_code(403);
+                echo json_encode(['error' => 'Only a super admin can change this tournament\'s plan override']);
+                return;
+            }
+            $fields[] = 'paid_override = ?';
+            $params[] = !empty($body['paid_override']) ? 1 : 0;
+        }
         if (!$fields) { http_response_code(400); echo json_encode(['error' => 'Nothing to update']); return; }
         $params[] = $id;
         $this->db->prepare('UPDATE tournaments SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);

@@ -47,6 +47,7 @@ import { UserAccount } from '../shared/models/tournament.models';
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th>Plan</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -57,8 +58,8 @@ import { UserAccount } from '../shared/models/tournament.models';
                   <td class="username">{{ user.username }}</td>
                   <td class="email">{{ user.email }}</td>
                   <td class="role">
-                    <select 
-                      [value]="user.role" 
+                    <select
+                      [value]="user.role"
                       (change)="changeRole(user, $event)"
                       [disabled]="isUpdating(user.id)"
                       class="role-select">
@@ -70,6 +71,17 @@ import { UserAccount } from '../shared/models/tournament.models';
                     <span class="badge" [class.badge-active]="user.status === 'active'" [class.badge-disabled]="user.status === 'disabled'">
                       {{ user.status }}
                     </span>
+                  </td>
+                  <td class="plan">
+                    <select
+                      [value]="user.plan"
+                      (change)="changePlan(user, $event)"
+                      [disabled]="isUpdating(user.id)"
+                      class="role-select"
+                      title="Manual plan override — no billing exists yet">
+                      <option value="free">Free</option>
+                      <option value="paid">Paid</option>
+                    </select>
                   </td>
                   <td class="created">{{ formatDate(user.created_at) }}</td>
                   <td class="actions">
@@ -121,6 +133,18 @@ import { UserAccount } from '../shared/models/tournament.models';
                   class="role-select">
                   <option value="organizer">Organizer</option>
                   <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+              <div class="user-card-row">
+                <span class="field-label">Plan</span>
+                <select
+                  [value]="user.plan"
+                  (change)="changePlan(user, $event)"
+                  [disabled]="isUpdating(user.id)"
+                  class="role-select"
+                  title="Manual plan override — no billing exists yet">
+                  <option value="free">Free</option>
+                  <option value="paid">Paid</option>
                 </select>
               </div>
               <div class="created">Joined {{ formatDate(user.created_at) }}</div>
@@ -389,6 +413,15 @@ export class UserManagementComponent implements OnInit {
     this.updateUser(user.id, { role: newRole });
   }
 
+  // FEATURE_TRACKER item 12 plumbing: no billing exists yet, so this is a manual stand-in
+  // for what Stripe will flip automatically once payment integration ships.
+  changePlan(user: UserAccount, event: Event) {
+    const target = event.target as HTMLSelectElement;
+    const newPlan = target.value as 'free' | 'paid';
+    if (newPlan === user.plan) return;
+    this.updateUser(user.id, { plan: newPlan });
+  }
+
   async toggleStatus(user: UserAccount) {
     const newStatus = user.status === 'active' ? 'disabled' : 'active';
     const action = newStatus === 'active' ? 'enable' : 'disable';
@@ -429,7 +462,7 @@ export class UserManagementComponent implements OnInit {
     });
   }
 
-  private updateUser(userId: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled' }) {
+  private updateUser(userId: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled'; plan?: 'free' | 'paid' }) {
     this.updatingUserIds.update(ids => [...ids, userId]);
     this.svc.updateUser(userId, data).subscribe({
       next: updated => {

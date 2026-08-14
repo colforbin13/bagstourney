@@ -37,6 +37,22 @@ import * as QRCode from 'qrcode';
             @if (tournament()!.seeding_mode === 'manual') {
               <span class="badge badge-visibility-private">manual seeding</span>
             }
+            @if (participantCap() !== null) {
+              <span class="badge" [class.badge-cap-warning]="participantCount()! >= participantCap()!"
+                title="Freemium plan limit — plumbing ahead of real billing">
+                {{ participantCount() }}/{{ participantCap() }} participants
+              </span>
+            }
+            @if (isSuperAdmin()) {
+              <button class="btn btn-sm" [disabled]="paidOverrideBusy()" (click)="togglePaidOverride()"
+                title="Manual plan override for this tournament — no billing exists yet">
+                @if (paidOverrideBusy()) {
+                  <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
+                } @else {
+                  {{ tournament()!.paid_override ? 'Remove plan override' : 'Grant plan override' }}
+                }
+              </button>
+            }
           </div>
 
           <div class="tm-actions-row">
@@ -634,6 +650,7 @@ import * as QRCode from 'qrcode';
     .member-name { font-weight: 500; font-size: .875rem; }
     .member-meta { font-size: .75rem; color: var(--text-dim); }
     .badge-owner { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+    .badge-cap-warning { background: rgba(var(--danger-rgb), 0.1); color: var(--danger); border: 1px solid rgba(var(--danger-rgb), 0.35); }
     .badge-visibility-public  { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
     .badge-visibility-private { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
     .user-search { position: relative; }
@@ -674,6 +691,12 @@ export class TournamentManageComponent implements OnInit {
   champion = signal<string | null>(null);
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
   canDelete = computed(() => this.tournament()?.capabilities?.can_delete ?? false);
+  isSuperAdmin = computed(() => this.tournament()?.capabilities?.is_super_admin ?? false);
+  // Freemium participant cap (FEATURE_TRACKER item 12/13 plumbing) — null for a
+  // scorekeeper-only role, since the backend only computes it for staff who manage setup.
+  participantCap = computed(() => this.tournament()?.capabilities?.participant_cap ?? null);
+  participantCount = computed(() => this.tournament()?.capabilities?.participant_count ?? null);
+  paidOverrideBusy = signal(false);
   deletingTournament = signal(false);
   actionsMenuOpen = signal(false);
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
@@ -787,6 +810,26 @@ export class TournamentManageComponent implements OnInit {
       error: () => {
         this.visibilityBusy.set(false);
         this.showToast('Failed to update visibility.');
+      },
+    });
+  }
+
+  // FEATURE_TRACKER item 13 plumbing: no billing exists yet, so this is a manual
+  // stand-in for what a one-time Stripe purchase will flip automatically once it ships.
+  togglePaidOverride() {
+    const t = this.tournament();
+    if (!t) return;
+    const next = !t.paid_override;
+    this.paidOverrideBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { paid_override: next }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.paidOverrideBusy.set(false);
+        this.showToast(next ? 'Plan override granted.' : 'Plan override removed.');
+      },
+      error: err => {
+        this.paidOverrideBusy.set(false);
+        this.showToast(err?.error?.error ?? 'Failed to update plan override.');
       },
     });
   }

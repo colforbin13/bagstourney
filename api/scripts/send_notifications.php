@@ -1,18 +1,22 @@
 <?php
 // api/scripts/send_notifications.php
 //
-// Worker for FEATURE_TRACKER.md item 1 (score-update notifications). Run on a schedule
-// (Windows Scheduled Task hitting the deployed host — see FEATURE_TRACKER.md, this repo
-// has no persistent worker process or cron). Not wired into api/index.php; CLI only.
-// Recommended interval: every 2-5 minutes, since the double opt-in confirmation email
-// goes through this same queue rather than sending synchronously.
+// Worker for FEATURE_TRACKER.md item 1 (score-update notifications) and, as of the
+// scheduled_jobs table, any due once-daily job too (currently just the organizer
+// pending-approval digest). Run on a schedule — in production, /etc/cron.d/bags-notifications
+// invokes this every 3 minutes. Not wired into api/index.php; CLI only.
 //
 //   php api/scripts/send_notifications.php
 //
-// Processes pending rows in notification_queue, one of four event types: confirmation
-// (double opt-in), match_completed, round_completed, tournament_finalized. Enqueueing is
-// done elsewhere (ParticipantController::setNotificationEmail(), MatchController's three
-// enqueue*Notifications() helpers) — this script only sends what's already queued.
+// Two independent jobs share this one process/cron entry:
+// 1. Processes pending rows in notification_queue, one of four event types: confirmation
+//    (double opt-in), match_completed, round_completed, tournament_finalized. Enqueueing
+//    is done elsewhere (ParticipantController::setNotificationEmail(), MatchController's
+//    three enqueue*Notifications() helpers) — this script only sends what's already queued.
+// 2. Checks scheduled_jobs for anything due and runs it (see runDueScheduledJobs() below)
+//    — deliberately piggybacked on this same cron entry rather than adding a new one;
+//    crontab setup has bitten us before (missing username field, a missing trailing
+//    newline silently disabling the whole file).
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
@@ -21,22 +25,49 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
-require_once __DIR__ . '/../services/PostmarkClient.php';
+require_once __DIR__ . '/../services/BrevoClient.php';
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 50;
 
-$db = getDB();
-$postmark = new PostmarkClient(POSTMARK_API_TOKEN, POSTMARK_FROM_EMAIL, POSTMARK_MESSAGE_STREAM);
+// Email visual layer constants — pulled up here (rather than staying next to the
+// emailWordmark()/emailLayout()/etc. helper functions that use them, further down) since
+// plain top-level `const` statements execute in file position, not hoisted like function
+// declarations. Placed after those functions, they'd still be undefined the first time a
+// scheduled job (which can run before any of the per-row email building below) needs them.
+// Colors/type below are pulled straight from frontend/src/assets/styles/global.scss so
+// notification emails read as the same product as the web app rather than a generic
+// transactional template.
+const EMAIL_COLOR_BG         = '#EAE3D3';
+const EMAIL_COLOR_SURFACE    = '#FAF7F0';
+const EMAIL_COLOR_SURFACE_2  = '#F1ECDF';
+const EMAIL_COLOR_BORDER     = '#D9D0BC';
+const EMAIL_COLOR_MUTED      = '#8A8371';
+const EMAIL_COLOR_TEXT       = '#22261F';
+const EMAIL_COLOR_TEXT_DIM   = '#5B5A4E';
+const EMAIL_COLOR_ACCENT     = '#BC3A1C';
+const EMAIL_COLOR_ACCENT_INK = '#FFF8EF';
+const EMAIL_COLOR_MARKER     = '#3F7A52';
+const EMAIL_FONT_SANS = "Arial,Helvetica,sans-serif";
+const EMAIL_FONT_MONO = "Consolas,'Courier New',monospace";
 
-if (!$postmark->isConfigured()) {
-    fwrite(STDERR, "Postmark is not configured (POSTMARK_API_TOKEN/POSTMARK_FROM_EMAIL); nothing to do.\n");
+$db = getDB();
+
+// Bulk mail goes through Brevo; auth mail (AuthController::register) stays on Postmark so
+// exhausting this quota can never block account registration.
+$mailer = new BrevoClient(BREVO_API_KEY, BREVO_FROM_EMAIL, BREVO_FROM_NAME);
+
+if (!$mailer->isConfigured()) {
+    fwrite(STDERR, "Brevo is not configured (BREVO_API_KEY/BREVO_FROM_EMAIL); nothing to do.\n");
     exit(0);
 }
 
+// next_attempt_at is set when a send is parked against a rate/quota limit — those rows are
+// passed over until the limit is due to have reset, without having spent an attempt.
 $stmt = $db->prepare('
     SELECT * FROM notification_queue
     WHERE status = "pending" AND attempts < ?
+      AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
     ORDER BY created_at ASC
     LIMIT ?
 ');
@@ -48,17 +79,31 @@ $rows = $stmt->fetchAll();
 $sent = 0;
 $skipped = 0;
 $failed = 0;
+$parked = 0;
 
 foreach ($rows as $row) {
-    $result = processRow($db, $postmark, $row);
-    if ($result === 'sent') $sent++;
-    elseif ($result === 'skipped') $skipped++;
-    else $failed++;
+    $result = processRow($db, $mailer, $row);
+    if ($result === 'sent') {
+        $sent++;
+    } elseif ($result === 'rate_limited') {
+        // Every remaining row in this batch would hit the same limit, so stop here rather
+        // than spending an API call (and Brevo's daily request budget) to park each one.
+        // They keep next_attempt_at NULL and are simply retried on the next cron run.
+        $parked++;
+        fwrite(STDERR, "Brevo rate/quota limit reached; deferring the rest of this batch.\n");
+        break;
+    } elseif ($result === 'skipped') {
+        $skipped++;
+    } else {
+        $failed++;
+    }
 }
 
-echo "Processed " . count($rows) . " queued notification(s): {$sent} sent, {$skipped} skipped, {$failed} failed.\n";
+echo "Processed " . count($rows) . " queued notification(s): {$sent} sent, {$skipped} skipped, {$failed} failed, {$parked} parked.\n";
 
-function processRow(PDO $db, PostmarkClient $postmark, array $row): string {
+runDueScheduledJobs($db, $mailer);
+
+function processRow(PDO $db, BrevoClient $mailer, array $row): string {
     $id = (int)$row['id'];
 
     $suppressed = $db->prepare('SELECT 1 FROM notification_suppressions WHERE email = ?');
@@ -118,16 +163,37 @@ function processRow(PDO $db, PostmarkClient $postmark, array $row): string {
         return 'skipped';
     }
 
-    $result = $postmark->send($row['email'], $content['subject'], $content['html'], $content['text'], $row['event_type']);
+    $result = $mailer->send($row['email'], $content['subject'], $content['html'], $content['text'], $row['event_type']);
 
     if ($result['success']) {
         $db->prepare('
             UPDATE notification_queue
-            SET status = "sent", sent_at = NOW(), postmark_message_id = ?,
-                token_plaintext = NULL, last_error = NULL
+            SET status = "sent", sent_at = NOW(), provider = "brevo", provider_message_id = ?,
+                token_plaintext = NULL, last_error = NULL, next_attempt_at = NULL
             WHERE id = ?
         ')->execute([$result['message_id'], $id]);
         return 'sent';
+    }
+
+    // A rate/quota limit is not this row's fault and clears on its own, so park the row
+    // until it lifts instead of spending one of its finite attempts. Without this, Brevo's
+    // 300/day free-tier cap would burn all MAX_ATTEMPTS within ~15 minutes of a 3-minute
+    // cron and drop the email permanently, hours before the quota actually reset.
+    if (!empty($result['retry_after'])) {
+        // Bound as an explicit int, not through execute()'s array: this connection runs
+        // with EMULATE_PREPARES off, so INTERVAL needs an unambiguously numeric parameter
+        // for the same reason the LIMIT above does. Computed with MySQL's NOW() rather
+        // than PHP's clock so it stays comparable to the SELECT that reads it back.
+        $park = $db->prepare('
+            UPDATE notification_queue
+            SET next_attempt_at = DATE_ADD(NOW(), INTERVAL ? SECOND), last_error = ?
+            WHERE id = ?
+        ');
+        $park->bindValue(1, (int)$result['retry_after'], PDO::PARAM_INT);
+        $park->bindValue(2, $result['error']);
+        $park->bindValue(3, $id, PDO::PARAM_INT);
+        $park->execute();
+        return 'rate_limited';
     }
 
     $attempts = (int)$row['attempts'] + 1;
@@ -149,6 +215,99 @@ function markTerminal(PDO $db, array $row, string $status, string $reason, ?int 
         SET status = ?, last_error = ?, attempts = COALESCE(?, attempts), token_plaintext = NULL
         WHERE id = ?
     ')->execute([$status, $reason, $attempts, (int)$row['id']]);
+}
+
+// Checks scheduled_jobs for anything due and runs it, then advances that job's
+// next_run_at. Not a generic worker-type framework — job_name is matched directly
+// against the one job that exists today. Generalize this if/when a second one shows up.
+function runDueScheduledJobs(PDO $db, BrevoClient $mailer): void {
+    $due = $db->query('SELECT * FROM scheduled_jobs WHERE next_run_at <= NOW()')->fetchAll();
+
+    foreach ($due as $job) {
+        if ($job['job_name'] === 'organizer_pending_digest') {
+            sendOrganizerPendingDigest($db, $mailer);
+        } else {
+            fwrite(STDERR, "Unknown scheduled job '{$job['job_name']}', skipping.\n");
+            continue;
+        }
+
+        $db->prepare('
+            UPDATE scheduled_jobs
+            SET last_run_at = NOW(), next_run_at = DATE_ADD(NOW(), INTERVAL interval_hours HOUR)
+            WHERE job_name = ?
+        ')->execute([$job['job_name']]);
+    }
+}
+
+// Reminds every owner/manager of a tournament with at least one unapproved
+// self-registration (participants.registration_status = 'pending') — sent as a running
+// reminder of *current* state, not a delta since the last digest, so an organizer who
+// ignores it keeps hearing about it daily until they act. One email per recipient,
+// batched across all of that recipient's tournaments with pending rows.
+function sendOrganizerPendingDigest(PDO $db, BrevoClient $mailer): void {
+    $stmt = $db->query('
+        SELECT t.id AS tournament_id, t.name AS tournament_name, COUNT(p.id) AS pending_count
+        FROM tournaments t
+        JOIN participants p ON p.tournament_id = t.id AND p.registration_status = "pending"
+        WHERE t.deleted_at IS NULL
+        GROUP BY t.id
+    ');
+    $pendingTournaments = $stmt->fetchAll();
+    if (!$pendingTournaments) return;
+
+    // recipientEmail => ['username' => ..., 'tournaments' => [[name, id, pending_count], ...]]
+    $recipients = [];
+    $recipientStmt = $db->prepare('
+        SELECT u.email, u.username
+        FROM tournament_members tm
+        JOIN users u ON u.id = tm.user_id
+        WHERE tm.tournament_id = ? AND tm.role IN ("owner", "manager") AND u.status = "active"
+    ');
+    foreach ($pendingTournaments as $t) {
+        $recipientStmt->execute([$t['tournament_id']]);
+        foreach ($recipientStmt->fetchAll() as $r) {
+            if (!$r['email']) continue;
+            $recipients[$r['email']]['username'] = $r['username'];
+            $recipients[$r['email']]['tournaments'][] = $t;
+        }
+    }
+
+    foreach ($recipients as $email => $data) {
+        $suppressed = $db->prepare('SELECT 1 FROM notification_suppressions WHERE email = ?');
+        $suppressed->execute([$email]);
+        if ($suppressed->fetchColumn()) continue;
+
+        $content = buildOrganizerDigestEmail($data['username'], $data['tournaments']);
+        $mailer->send($email, $content['subject'], $content['html'], $content['text'], 'organizer_pending_digest');
+    }
+}
+
+function buildOrganizerDigestEmail(string $username, array $tournaments): array {
+    $count = count($tournaments);
+    $subject = $count === 1
+        ? "1 tournament has registrations awaiting approval"
+        : "{$count} tournaments have registrations awaiting approval";
+
+    $rows = '';
+    $lines = [];
+    foreach ($tournaments as $t) {
+        $url = rtrim(APP_PUBLIC_URL, '/') . '/admin/tournament/' . $t['tournament_id'];
+        $label = $t['pending_count'] == 1 ? '1 pending registration' : "{$t['pending_count']} pending registrations";
+        $rows .= '<div style="padding:10px 0;border-top:1px solid ' . EMAIL_COLOR_BORDER . ';font-family:' . EMAIL_FONT_SANS . ';font-size:14px;color:' . EMAIL_COLOR_TEXT . ';">' .
+            '<a href="' . htmlspecialchars($url) . '" style="color:' . EMAIL_COLOR_ACCENT . ';text-decoration:none;font-weight:700;">' . htmlspecialchars($t['tournament_name']) . '</a>' .
+            ' &mdash; ' . htmlspecialchars($label) . '</div>';
+        $lines[] = "{$t['tournament_name']} — {$label}: {$url}";
+    }
+
+    $inner = emailEyebrow('Pending Approvals') .
+        emailHeading('Hi ' . $username) .
+        '<p style="margin:0 0 16px;">The following tournaments have self-registered participants waiting for your approval:</p>' .
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE_2 . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';border-radius:4px;"><tr><td style="padding:0 16px;">' . $rows . '</td></tr></table>';
+    $html = emailLayout($inner, 'Bracketway · This is a daily reminder while approvals remain pending.');
+    $text = "Hi {$username},\n\nThe following tournaments have self-registered participants waiting for your approval:\n\n" .
+        implode("\n", $lines) . "\n\nThis is a daily reminder while approvals remain pending.\n\n— Bracketway";
+
+    return ['subject' => $subject, 'html' => $html, 'text' => $text];
 }
 
 function buildEmailContent(PDO $db, array $row, array $participant): ?array {
@@ -173,19 +332,6 @@ function buildEmailContent(PDO $db, array $row, array $participant): ?array {
 // frontend/src/assets/styles/global.scss so notification emails read as the same
 // product as the web app rather than a generic transactional template.
 // ---------------------------------------------------------------------------
-
-const EMAIL_COLOR_BG         = '#EAE3D3';
-const EMAIL_COLOR_SURFACE    = '#FAF7F0';
-const EMAIL_COLOR_SURFACE_2  = '#F1ECDF';
-const EMAIL_COLOR_BORDER     = '#D9D0BC';
-const EMAIL_COLOR_MUTED      = '#8A8371';
-const EMAIL_COLOR_TEXT       = '#22261F';
-const EMAIL_COLOR_TEXT_DIM   = '#5B5A4E';
-const EMAIL_COLOR_ACCENT     = '#BC3A1C';
-const EMAIL_COLOR_ACCENT_INK = '#FFF8EF';
-const EMAIL_COLOR_MARKER     = '#3F7A52';
-const EMAIL_FONT_SANS = "Arial,Helvetica,sans-serif";
-const EMAIL_FONT_MONO = "Consolas,'Courier New',monospace";
 
 function emailWordmark(): string {
     return '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' . EMAIL_COLOR_ACCENT . ';margin-right:7px;"></span>' .

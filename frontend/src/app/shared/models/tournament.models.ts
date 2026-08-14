@@ -1,5 +1,26 @@
 // src/app/shared/models/tournament.models.ts
 
+export interface AuditLogEntry {
+  id: number;
+  created_at: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: Record<string, unknown> | null;
+  tournament_id: number | null;
+  tournament_name: string | null;
+  actor_user_id: number | null;
+  actor_username: string | null;
+  actor_email: string | null;
+}
+
+export interface AuditLogResponse {
+  rows: AuditLogEntry[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface TournamentCapabilities {
   role: 'owner' | 'manager' | 'scorekeeper' | null;
   is_super_admin: boolean;
@@ -7,6 +28,10 @@ export interface TournamentCapabilities {
   can_manage_staff: boolean;
   can_score: boolean;
   can_delete: boolean;
+  // Freemium participant cap (FEATURE_TRACKER item 12/13 plumbing) — only populated for
+  // staff (owner/manager/super_admin); null for a scorekeeper-only role or anonymous view.
+  participant_cap: number | null;
+  participant_count: number | null;
 }
 
 export interface Tournament {
@@ -18,6 +43,9 @@ export interface Tournament {
   seeding_mode: 'automatic' | 'manual';
   team_entry_mode: 'auto_draft' | 'direct';
   created_at: string;
+  // FEATURE_TRACKER item 13 plumbing: a per-tournament plan unlock, settable only by a
+  // super admin (see TournamentController::update()) until real billing exists.
+  paid_override: boolean;
   // Only present via GET /tournaments/deleted (super admin recovery screen) — active
   // tournaments never carry this field.
   deleted_at?: string;
@@ -48,6 +76,9 @@ export interface UserAccount {
   email: string;
   role: 'super_admin' | 'organizer';
   status: 'active' | 'disabled';
+  // FEATURE_TRACKER item 12 plumbing: account-level plan, settable only by a super admin
+  // until real billing exists.
+  plan: 'free' | 'paid';
   created_at?: string;
 }
 

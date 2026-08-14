@@ -14,9 +14,9 @@ describe('UserManagementComponent', () => {
   let tournamentService: TournamentService;
 
   const mockUsers: UserAccount[] = [
-    { id: 1, username: 'admin1', email: 'admin1@example.com', role: 'super_admin', status: 'active', created_at: '2026-01-01' },
-    { id: 2, username: 'user1', email: 'user1@example.com', role: 'organizer', status: 'active', created_at: '2026-01-02' },
-    { id: 3, username: 'user2', email: 'user2@example.com', role: 'organizer', status: 'disabled', created_at: '2026-01-03' },
+    { id: 1, username: 'admin1', email: 'admin1@example.com', role: 'super_admin', status: 'active', plan: 'free', created_at: '2026-01-01' },
+    { id: 2, username: 'user1', email: 'user1@example.com', role: 'organizer', status: 'active', plan: 'free', created_at: '2026-01-02' },
+    { id: 3, username: 'user2', email: 'user2@example.com', role: 'organizer', status: 'disabled', plan: 'paid', created_at: '2026-01-03' },
   ];
 
   beforeEach(async () => {
@@ -163,6 +163,34 @@ describe('UserManagementComponent', () => {
     expect(component.users().find(u => u.id === user.id)?.role).toBe('organizer');
   });
 
+  it('should change plan', () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[1]; // plan: 'free'
+    const event = { target: { value: 'paid' } } as any;
+
+    component.changePlan(user, event);
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/users/${user.id}`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ plan: 'paid' });
+
+    const updatedUser = { ...user, plan: 'paid' as const };
+    req.flush(updatedUser);
+
+    expect(component.users().find(u => u.id === user.id)?.plan).toBe('paid');
+  });
+
+  it('should not call the API when the plan is unchanged', () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[1]; // plan: 'free'
+    const event = { target: { value: 'free' } } as any;
+
+    component.changePlan(user, event);
+
+    httpMock.expectNone(`${environment.apiUrl}/users/${user.id}`);
+    expect(component.updatingUserIds()).toEqual([]);
+  });
+
   it('should generate password reset token', async () => {
     component.users.set(mockUsers);
     const user = mockUsers[1];
@@ -245,7 +273,7 @@ describe('UserManagementComponent', () => {
         password: 'newPassword1234', role: 'organizer',
       });
 
-      const created: UserAccount = { id: 4, username: 'newperson', email: 'newperson@example.com', role: 'organizer', status: 'active', created_at: '2026-01-04' };
+      const created: UserAccount = { id: 4, username: 'newperson', email: 'newperson@example.com', role: 'organizer', status: 'active', plan: 'free', created_at: '2026-01-04' };
       req.flush(created, { status: 201, statusText: 'Created' });
 
       expect(component.users()[0]).toEqual(created);

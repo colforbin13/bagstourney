@@ -93,6 +93,16 @@ describe('NavComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Users');
   });
 
+  it('should not show the Audit Log link for a non-super-admin', () => {
+    setup(true, false);
+    expect(fixture.nativeElement.textContent).not.toContain('Audit Log');
+  });
+
+  it('should show the Audit Log link for a super admin', () => {
+    setup(true, true);
+    expect(fixture.nativeElement.textContent).toContain('Audit Log');
+  });
+
   it('should show sign in / create account links when logged out', () => {
     setup(false);
     const text = fixture.nativeElement.textContent;

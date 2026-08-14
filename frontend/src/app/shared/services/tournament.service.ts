@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences } from '../models/tournament.models';
+import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -48,6 +48,18 @@ export class TournamentService {
     return this.http.get<Tournament[]>(`${this.api}/tournaments/deleted`);
   }
 
+  getAuditLog(params: { page: number; page_size: number; sort: string; dir: 'asc' | 'desc'; search?: string; action?: string }) {
+    const query: Record<string, string> = {
+      page: String(params.page),
+      page_size: String(params.page_size),
+      sort: params.sort,
+      dir: params.dir,
+    };
+    if (params.search) query['search'] = params.search;
+    if (params.action) query['action'] = params.action;
+    return this.http.get<AuditLogResponse>(`${this.api}/audit-log`, { params: query });
+  }
+
   restoreTournament(id: number) {
     return this.http.post<Tournament>(`${this.api}/tournaments/${id}/restore`, {});
   }
@@ -84,7 +96,7 @@ export class TournamentService {
     return this.http.post<UserAccount>(`${this.api}/users`, data);
   }
 
-  updateUser(id: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled' }) {
+  updateUser(id: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled'; plan?: 'free' | 'paid' }) {
     return this.http.put<UserAccount>(`${this.api}/users/${id}`, data);
   }
 
