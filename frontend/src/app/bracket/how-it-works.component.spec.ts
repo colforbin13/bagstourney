@@ -32,9 +32,24 @@ describe('HowItWorksComponent', () => {
     setup();
     const chapters: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.chapter h2'))
       .map(h => h.textContent!.trim());
-    expect(chapters.length).toBe(6);
+    expect(chapters.length).toBe(7);
     expect(chapters[0]).toContain('Create the tournament');
     expect(chapters[chapters.length - 1]).toContain('Someone wins');
+  });
+
+  it('should number the steps consecutively', () => {
+    setup();
+    const numbers: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.chapter-num'))
+      .map(el => el.textContent!.trim());
+    expect(numbers).toEqual(['Step 01', 'Step 02', 'Step 03', 'Step 04', 'Step 05', 'Step 06', 'Step 07']);
+  });
+
+  it('should cover the venue setup — screen on the wall, signs by the door', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('TV mode');
+    expect(text).toContain('nothing to install');
+    expect(text).toContain('save as a PDF');
   });
 
   it('should explain all three creation choices', () => {

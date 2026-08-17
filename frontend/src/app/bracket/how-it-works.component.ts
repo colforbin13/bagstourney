@@ -107,10 +107,32 @@ import { AuthService } from '../shared/services/auth.service';
             them as rounds complete. It's opt-in on their end: they confirm once by tapping a
             link, and can unsubscribe from any message after that.
           </p>
+          <p>
+            Running the scores is its own screen, too — it lists just the matches that can be
+            played right now, so whoever's working the boards isn't hunting through a bracket
+            on their phone between throws.
+          </p>
         </li>
 
         <li class="chapter">
           <span class="chapter-num">Step 06</span>
+          <h2>Put it on the wall</h2>
+          <p>
+            Open the bracket on any TV, streaming stick, or laptop plugged into a screen and
+            switch on <strong>TV mode</strong>: the site's own furniture disappears and the
+            bracket scales up to fill the display, refreshing itself as scores land. No app,
+            no cast, nothing to install — it's a web page, so bookmark it once and the screen
+            looks after itself for the rest of the day.
+          </p>
+          <p>
+            For everyone not standing in front of that screen, print a sign. Bracketway makes
+            you a full-page QR sheet — one to follow the bracket from a phone, one to sign up
+            — ready to print or save as a PDF.
+          </p>
+        </li>
+
+        <li class="chapter">
+          <span class="chapter-num">Step 07</span>
           <h2>Someone wins</h2>
           <p>
             Score the final and the tournament closes itself out, champion and all. It stays

@@ -267,6 +267,17 @@ body.kiosk-mode {
   app-nav, app-footer { display: none; }
 }
 
+/* ── Printing ──
+   Nav and footer are screen furniture; nothing in the app benefits from them on paper.
+   `.no-print` marks in-page controls (buttons, tips) that shouldn't print either. */
+@media print {
+  app-nav, app-footer, .no-print { display: none !important; }
+
+  body { background: #fff; }
+
+  @page { margin: 12mm; }
+}
+
 /* ── Drag & drop (CDK, e.g. manual-seed reordering) ── */
 .cdk-drag-preview {
   box-sizing: border-box;

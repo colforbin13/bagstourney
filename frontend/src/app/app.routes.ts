@@ -58,6 +58,17 @@ export const routes: Routes = [
     path: 'register/:uuid',
     loadComponent: () => import('./register/self-register.component').then(m => m.SelfRegisterComponent),
   },
+  // Printable venue sign. Public by uuid for the same reason the bracket and sign-up
+  // pages are: the uuid is itself the access grant, so this exposes nothing new.
+  // :kind is optional and defaults to the bracket (watch-along) version.
+  {
+    path: 'poster/:uuid',
+    loadComponent: () => import('./bracket/poster.component').then(m => m.PosterComponent),
+  },
+  {
+    path: 'poster/:uuid/:kind',
+    loadComponent: () => import('./bracket/poster.component').then(m => m.PosterComponent),
+  },
   {
     path: 'admin',
     canActivate: [authGuard],
@@ -87,6 +98,14 @@ export const routes: Routes = [
     path: 'admin/tournament/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/tournament-manage.component').then(m => m.TournamentManageComponent),
+  },
+  // Scorekeeper-facing: only authGuard here, since scorekeepers are ordinary organizers
+  // with a role on this one tournament. The component checks can_score, and the backend
+  // enforces it on every PUT regardless.
+  {
+    path: 'admin/tournament/:id/score',
+    canActivate: [authGuard],
+    loadComponent: () => import('./admin/score-entry.component').then(m => m.ScoreEntryComponent),
   },
   { path: '**', redirectTo: '' },
 ];

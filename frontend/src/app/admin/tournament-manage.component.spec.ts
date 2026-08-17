@@ -800,4 +800,93 @@ describe('TournamentManageComponent', () => {
       expect(fixture.nativeElement.querySelector('.empty').textContent).toContain('copy the sign-up link');
     });
   });
+
+  describe('QR codes', () => {
+    it('should start with no QR modal open', () => {
+      bootstrapCore(managerCapabilities);
+      expect(component.qrKind()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.qr-modal')).toBeNull();
+    });
+
+    it('should point the bracket QR at the uuid link, which needs no account', () => {
+      bootstrapCore(managerCapabilities);
+
+      component.openQrModal('bracket');
+
+      expect(component.qrKind()).toBe('bracket');
+      expect(component.qrUrl()).toContain('bracket/test-uuid-1234');
+      expect(component.qrUrl()).not.toContain('register/');
+    });
+
+    it('should point the registration QR at the sign-up link', () => {
+      bootstrapCore(managerCapabilities);
+
+      component.openQrModal('registration');
+
+      expect(component.qrKind()).toBe('registration');
+      expect(component.qrUrl()).toContain('register/test-uuid-1234');
+    });
+
+    it('should label the modal for whichever QR is showing', () => {
+      bootstrapCore(managerCapabilities);
+
+      component.openQrModal('bracket');
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.qr-modal-title').textContent).toContain('Bracket');
+      expect(fixture.nativeElement.querySelector('.qr-modal-hint').textContent).toContain('No sign-up needed');
+
+      component.openQrModal('registration');
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.qr-modal-title').textContent).toContain('Registration');
+    });
+
+    it('should close back to no modal', () => {
+      bootstrapCore(managerCapabilities);
+      component.openQrModal('bracket');
+
+      component.closeQrModal();
+      fixture.detectChanges();
+
+      expect(component.qrKind()).toBeNull();
+      expect(fixture.nativeElement.querySelector('.qr-modal')).toBeNull();
+    });
+
+    it('should offer the bracket QR for the whole tournament, not just during setup', () => {
+      // The registration QR is gated on setup-with-no-teams; watching stays useful after
+      // sign-up closes, so the bracket QR must not carry the same gate.
+      bootstrapCore(managerCapabilities);
+      component.tournament.update(t => ({ ...t!, status: 'active' }));
+      fixture.detectChanges();
+
+      component.toggleActionsMenu();   // the menu only renders once opened
+      fixture.detectChanges();
+
+      const items: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.dropdown-item'))
+        .map(el => el.textContent!.trim());
+
+      expect(items).toContain('Show bracket QR code');
+      expect(items).not.toContain('Show registration QR code');
+    });
+  });
+
+  describe('score entry link', () => {
+    it('should offer the score screen to someone who can score an active tournament', () => {
+      bootstrapCore(managerCapabilities);
+      component.tournament.update(t => ({ ...t!, status: 'active' }));
+      fixture.detectChanges();
+
+      const href = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.tm-actions-row a'))
+        .map(a => a.getAttribute('href'));
+      expect(href).toContain(`/admin/tournament/${tournamentId}/score`);
+    });
+
+    it('should not offer it while the tournament is still in setup', () => {
+      bootstrapCore(managerCapabilities);   // bootstrapCore leaves status as 'setup'
+      fixture.detectChanges();
+
+      const href = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.tm-actions-row a'))
+        .map(a => a.getAttribute('href'));
+      expect(href).not.toContain(`/admin/tournament/${tournamentId}/score`);
+    });
+  });
 });

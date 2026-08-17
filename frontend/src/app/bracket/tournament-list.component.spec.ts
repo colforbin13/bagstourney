@@ -93,6 +93,16 @@ describe('TournamentListComponent', () => {
     expect(fixture.nativeElement.querySelector('.hero')).toBeNull();
   });
 
+  it('should advertise the venue features, which are the differentiated ones', () => {
+    setup([makeTournament()]);
+    const features: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.features li'))
+      .map(li => li.textContent!.trim());
+
+    expect(features).toContain('Bracket on the TV');
+    expect(features).toContain('Printable QR signs');
+    expect(features.length).toBe(6);
+  });
+
   it('should point the hero actions at register/sign-in for an anonymous visitor', () => {
     setup([makeTournament()]);
     const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.hero-actions a'))

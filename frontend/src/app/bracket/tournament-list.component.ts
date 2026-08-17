@@ -86,9 +86,14 @@ interface TournamentGroup {
             </p>
           </li>
         </ol>
+        <!-- Weighted toward what Bracketway puts *in the room* — a screen on the wall,
+             signs by the door — since that's the part people don't expect from a bracket
+             tool, and the part they can picture. -->
         <ul class="features">
-          <li>Shareable public bracket</li>
-          <li>QR code sign-up</li>
+          <li>Bracket on the TV</li>
+          <li>Printable QR signs</li>
+          <li>Phone sign-up</li>
+          <li>Live public bracket</li>
           <li>Email score updates</li>
           <li>Scorekeeper accounts</li>
         </ul>

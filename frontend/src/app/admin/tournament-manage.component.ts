@@ -62,7 +62,11 @@ interface SetupStep {
           </div>
 
           <div class="tm-actions-row">
-            <a class="btn btn-sm btn-primary" [routerLink]="['/bracket', tournamentId]">View bracket</a>
+            @if (canScore() && tournament()!.status === 'active') {
+              <a class="btn btn-sm btn-primary" [routerLink]="['/admin/tournament', tournamentId, 'score']">Enter scores</a>
+            }
+            <a class="btn btn-sm" [class.btn-primary]="!canScore() || tournament()!.status !== 'active'"
+              [routerLink]="['/bracket', tournamentId]">View bracket</a>
 
             @if (canManageSetup() || canDelete()) {
               <div class="dropdown">
@@ -72,9 +76,14 @@ interface SetupStep {
                   <div class="dropdown-menu">
                     @if (canManageSetup()) {
                       <button class="dropdown-item" (click)="copyPublicLink(); closeActionsMenu()">Copy link</button>
+                      <!-- For spectators: scanning this just opens the bracket to follow
+                           along. Unlike the registration QR it stays available for the
+                           whole tournament, since watching is useful long after sign-up
+                           has closed. -->
+                      <button class="dropdown-item" (click)="openQrModal('bracket'); closeActionsMenu()">Show bracket QR code</button>
                       @if (tournament()!.status === 'setup' && !isDirectEntry() && teams().length === 0) {
                         <button class="dropdown-item" (click)="copyRegistrationLink(); closeActionsMenu()">Copy registration link</button>
-                        <button class="dropdown-item" (click)="openQrModal(); closeActionsMenu()">Show registration QR code</button>
+                        <button class="dropdown-item" (click)="openQrModal('registration'); closeActionsMenu()">Show registration QR code</button>
                       }
                       <button class="dropdown-item" [disabled]="visibilityBusy()" (click)="toggleVisibility(); closeActionsMenu()">
                         Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
@@ -479,17 +488,25 @@ interface SetupStep {
         <div class="toast toast-success">{{ toast() }}</div>
       }
 
-      <!-- Registration QR code -->
-      @if (qrModalOpen()) {
+      <!-- QR code — registration (sign me up) or bracket (let me watch) -->
+      @if (qrKind(); as kind) {
         <div class="qr-modal-backdrop" (click)="closeQrModal()">
           <div class="qr-modal" (click)="$event.stopPropagation()">
-            <div class="qr-modal-title">Registration QR Code</div>
+            <div class="qr-modal-title">{{ kind === 'bracket' ? 'Bracket QR Code' : 'Registration QR Code' }}</div>
             <div class="qr-modal-sub">{{ tournament()?.name }}</div>
             <canvas #qrCanvas class="qr-canvas"></canvas>
-            <div class="qr-modal-actions">
-              <button class="btn btn-sm" (click)="downloadQrCode()">Download PNG</button>
-              <button class="btn btn-sm btn-primary" (click)="closeQrModal()">Close</button>
+            <div class="qr-modal-hint">
+              {{ kind === 'bracket'
+                ? 'Scan to follow the bracket. No sign-up needed.'
+                : 'Scan to add yourself to this tournament.' }}
             </div>
+            <div class="qr-modal-url">{{ qrUrl() }}</div>
+            <div class="qr-modal-actions">
+              <button class="btn btn-sm" (click)="copyQrLink()">Copy link</button>
+              <button class="btn btn-sm" (click)="downloadQrCode()">Download PNG</button>
+              <button class="btn btn-sm btn-primary" (click)="openPoster()">Printable sign</button>
+            </div>
+            <button class="btn btn-sm qr-modal-close" (click)="closeQrModal()">Close</button>
           </div>
         </div>
       }
@@ -636,8 +653,19 @@ interface SetupStep {
     }
     .qr-modal-title { font-weight: 600; font-size: 1rem; }
     .qr-modal-sub { font-size: .8rem; color: var(--text-dim); margin-bottom: 12px; }
+    .qr-modal-hint { font-size: .8rem; color: var(--text-dim); margin-top: 12px; text-align: center; }
+    .qr-modal-url {
+      font-family: var(--mono);
+      font-size: .68rem;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 240px;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
     .qr-canvas { max-width: 100%; height: auto; border-radius: calc(var(--radius) - 1px); }
-    .qr-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .qr-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+    .qr-modal-close { margin-top: 8px; border: none; color: var(--text-dim); }
 
     /* Participants */
     .participant-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
@@ -764,6 +792,7 @@ export class TournamentManageComponent implements OnInit {
   teams = signal<Team[]>([]);
   champion = signal<string | null>(null);
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
+  canScore = computed(() => this.tournament()?.capabilities?.can_score ?? false);
   canDelete = computed(() => this.tournament()?.capabilities?.can_delete ?? false);
   isSuperAdmin = computed(() => this.tournament()?.capabilities?.is_super_admin ?? false);
   // Freemium participant cap (FEATURE_TRACKER item 12/13 plumbing) — null for a
@@ -880,8 +909,10 @@ export class TournamentManageComponent implements OnInit {
   staffActionBusy = signal(false);
   private staffSearchDebounce?: ReturnType<typeof setTimeout>;
 
-  // Registration QR code
-  qrModalOpen = signal(false);
+  // QR codes. Two of them, pointing at different places: 'registration' is the sign-me-up
+  // link (auto-draft tournaments still in setup), 'bracket' is the watch-along link that
+  // needs no account and stays useful for the whole event. null means the modal is closed.
+  qrKind = signal<'registration' | 'bracket' | null>(null);
   @ViewChild('qrCanvas') qrCanvasRef?: ElementRef<HTMLCanvasElement>;
 
   constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router) {}
@@ -1045,10 +1076,24 @@ export class TournamentManageComponent implements OnInit {
     );
   }
 
-  openQrModal() {
-    const url = this.registrationUrl();
+  private bracketUrl(): string | null {
+    const uuid = this.tournament()?.uuid;
+    if (!uuid) return null;
+    // The uuid form, not the numeric id: this is what gets handed to people with no
+    // account, and it's the only form that works for a private tournament.
+    return `${location.origin}${environment.baseHref}bracket/${uuid}`;
+  }
+
+  qrUrl(): string {
+    const kind = this.qrKind();
+    if (!kind) return '';
+    return (kind === 'bracket' ? this.bracketUrl() : this.registrationUrl()) ?? '';
+  }
+
+  openQrModal(kind: 'registration' | 'bracket') {
+    const url = kind === 'bracket' ? this.bracketUrl() : this.registrationUrl();
     if (!url) return;
-    this.qrModalOpen.set(true);
+    this.qrKind.set(kind);
     // Wait a tick for the @if-gated <canvas> to actually exist in the DOM.
     setTimeout(() => {
       const canvas = this.qrCanvasRef?.nativeElement;
@@ -1060,7 +1105,28 @@ export class TournamentManageComponent implements OnInit {
   }
 
   closeQrModal() {
-    this.qrModalOpen.set(false);
+    this.qrKind.set(null);
+  }
+
+  // New tab rather than in-place: the print dialog fires on load there, and the organizer
+  // keeps this page exactly where they left it.
+  openPoster() {
+    const uuid = this.tournament()?.uuid;
+    const kind = this.qrKind();
+    if (!uuid || !kind) return;
+    // The poster route names the sign-up variant after its own route segment
+    // ('register'), where this modal calls it 'registration'.
+    const posterKind = kind === 'bracket' ? 'bracket' : 'register';
+    window.open(`${location.origin}${environment.baseHref}poster/${uuid}/${posterKind}`, '_blank');
+  }
+
+  copyQrLink() {
+    const url = this.qrUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(
+      () => this.showToast('Link copied!'),
+      () => this.showToast('Could not copy link.'),
+    );
   }
 
   downloadQrCode() {
@@ -1068,7 +1134,7 @@ export class TournamentManageComponent implements OnInit {
     if (!canvas) return;
     const link = document.createElement('a');
     const name = (this.tournament()?.name ?? 'tournament').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    link.download = `${name}-registration-qr.png`;
+    link.download = `${name}-${this.qrKind() ?? 'qr'}-qr.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }
