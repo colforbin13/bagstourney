@@ -26,7 +26,7 @@ import { AuthService } from '../services/auth.service';
       </button>
       <div class="nav-links" [class.open]="menuOpen()" (click)="closeMenu()">
         @if (auth.isLoggedIn()) {
-          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Tournaments</a>
+          <a routerLink="/tournaments" routerLinkActive="active">Tournaments</a>
 
           <div class="nav-dropdown" [class.open]="adminMenuOpen()">
             <button type="button" class="nav-dropdown-trigger" (click)="toggleAdminMenu($event)">

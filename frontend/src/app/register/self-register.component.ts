@@ -22,22 +22,46 @@ import { TournamentService } from '../shared/services/tournament.service';
         } @else if (notFound()) {
           <div class="notif-error">This registration link is invalid.</div>
         } @else if (closed()) {
-          <div class="notif-error">Registration is closed for this tournament.</div>
+          <div class="notif-error">
+            Registration is closed for this tournament — the teams have already been drawn.
+            Check with the organizer.
+          </div>
         } @else if (success()) {
           <div class="notif-success">
-            Thanks, {{ registeredName() }}! You're on the list, pending the organizer's approval.
+            Thanks, {{ registeredName() }} — you're on the list, pending the organizer's approval.
             @if (registeredEmail()) {
-              <p style="margin-top:8px">Check your email to confirm match updates.</p>
+              <p style="margin-top:8px">
+                One more step for match updates: tap the confirmation link in the email we just sent.
+              </p>
             }
+            <p style="margin-top:8px">
+              No need to register again — the organizer can see your name.
+            </p>
           </div>
         } @else {
+          <!-- Someone reaching this page has usually just scanned a QR code at the venue and
+               may never have heard of Bracketway. Two things need saying before they type:
+               they are signing up as an individual and will be paired with a stranger (self
+               registration is only open on auto-draft tournaments, so this is always true
+               here), and submitting the form does not by itself get them into the bracket. -->
+          <p class="reg-intro">Add your name to the player list for this tournament.</p>
+          <ul class="reg-notes">
+            <li>Teams are drawn at random — sign up as yourself, and the organizer pairs
+              everyone up before the bracket is built.</li>
+            <li>Your spot is confirmed once the organizer approves the list.</li>
+          </ul>
+
           <label style="display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--text-dim)">
             Name
             <input class="input" type="text" [(ngModel)]="name" placeholder="Full name" (keyup.enter)="submit()" [disabled]="submitting()" />
           </label>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:.85rem;color:var(--text-dim)">
-            Email (optional — get match updates)
+            Email (optional)
             <input class="input" type="email" [(ngModel)]="email" placeholder="you@example.com" (keyup.enter)="submit()" [disabled]="submitting()" />
+            <span class="reg-hint">
+              Match results for this tournament only. We'll send one confirmation link you'll
+              need to tap.
+            </span>
           </label>
           <!-- Honeypot: hidden from real users; bots that fill every field trip this. -->
           <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
@@ -53,6 +77,37 @@ import { TournamentService } from '../shared/services/tournament.service';
       </div>
     </div>
   `,
+  styles: [`
+    .reg-intro { font-size: 0.875rem; color: var(--text-dim); }
+    .reg-notes {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: -4px 0 4px;
+      padding: 12px;
+      list-style: none;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .reg-notes li {
+      display: flex;
+      gap: 8px;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: var(--text-dim);
+    }
+    .reg-notes li::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .reg-hint { font-size: 0.72rem; line-height: 1.45; color: var(--muted); }
+  `],
 })
 export class SelfRegisterComponent implements OnInit {
   loading = signal(true);
@@ -85,7 +140,13 @@ export class SelfRegisterComponent implements OnInit {
       next: t => {
         this.loading.set(false);
         this.tournamentName.set(t.name);
-        if (t.status !== 'setup') this.closed.set(true);
+        // Mirror the backend's gate (ParticipantController::selfRegister) rather than
+        // only checking status: a direct-entry tournament has no unpaired-participant
+        // pool for a walk-up to join, so its registrations are rejected server-side.
+        // Without this the form rendered happily and only failed on submit.
+        if (t.status !== 'setup' || (t.team_entry_mode ?? 'auto_draft') !== 'auto_draft') {
+          this.closed.set(true);
+        }
       },
       error: () => {
         this.loading.set(false);

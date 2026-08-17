@@ -1,7 +1,7 @@
 // src/app/admin/admin-dashboard.component.spec.ts
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AdminDashboardComponent } from './admin-dashboard.component';
 import { confirmService } from '../shared/services/confirm.service';
 import { Tournament } from '../shared/models/tournament.models';
@@ -21,7 +21,9 @@ describe('AdminDashboardComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AdminDashboardComponent, HttpClientTestingModule],
-      providers: [Router],
+      // ActivatedRoute is needed now that the card header carries a static routerLink,
+      // which RouterLink instantiates on construction rather than only when a row renders.
+      providers: [Router, { provide: ActivatedRoute, useValue: {} }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(AdminDashboardComponent);
@@ -108,5 +110,45 @@ describe('AdminDashboardComponent', () => {
 
     httpMock.expectNone(`${environment.apiUrl}/tournaments/1`);
     expect(component.tournaments()).toEqual([mockTournament]);
+  });
+
+  it('should explain each creation choice, and change the hint with the selection', () => {
+    bootstrap();
+
+    expect(component.visibilityHint()).toContain('Listed on the home page');
+    component.newVisibility = 'private';
+    expect(component.visibilityHint()).toContain('Unlisted');
+
+    expect(component.teamEntryHint()).toContain('paired at random');
+    component.newTeamEntryMode = 'direct';
+    expect(component.teamEntryHint()).toContain('self sign-up is unavailable');
+
+    expect(component.seedingHint()).toContain('assigned for you');
+    component.newSeedingMode = 'manual';
+    expect(component.seedingHint()).toContain('Drag teams');
+  });
+
+  it('should warn that seeding mode locks at the draw, in both modes', () => {
+    bootstrap();
+    expect(component.seedingHint()).toContain('Locked once teams are drawn');
+    component.newSeedingMode = 'manual';
+    expect(component.seedingHint()).toContain('Locked once teams are drawn');
+  });
+
+  it('should render the hints in the DOM rather than as hover-only tooltips', () => {
+    bootstrap();
+    fixture.detectChanges();
+
+    const hints: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.field-hint'));
+    expect(hints.length).toBe(3);
+    expect(fixture.nativeElement.querySelectorAll('select[title]').length).toBe(0);
+  });
+
+  it('should point a first-time organizer at the walkthrough', () => {
+    bootstrap([]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.card-head-link').getAttribute('href')).toBe('/how-it-works');
+    expect(fixture.nativeElement.querySelector('.empty').textContent).toContain('See how it works');
   });
 });

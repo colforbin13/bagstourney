@@ -4,9 +4,23 @@ import { authGuard } from './shared/services/auth.guard';
 import { superAdminGuard } from './shared/services/superadmin.guard';
 
 export const routes: Routes = [
+  // Both paths render the same component; `landing` decides whether the hero and
+  // how-it-works content appear above the list. `/` is the full landing page for
+  // everyone, signed in or not — `/tournaments` is the bare list the nav links to.
   {
     path: '',
     loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
+    data: { landing: true },
+  },
+  {
+    path: 'tournaments',
+    loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
+    data: { landing: false },
+  },
+  // Public on purpose: it's most useful to someone deciding whether to sign up at all.
+  {
+    path: 'how-it-works',
+    loadComponent: () => import('./bracket/how-it-works.component').then(m => m.HowItWorksComponent),
   },
   {
     path: 'bracket/:id',
@@ -44,6 +58,17 @@ export const routes: Routes = [
     path: 'register/:uuid',
     loadComponent: () => import('./register/self-register.component').then(m => m.SelfRegisterComponent),
   },
+  // Printable venue sign. Public by uuid for the same reason the bracket and sign-up
+  // pages are: the uuid is itself the access grant, so this exposes nothing new.
+  // :kind is optional and defaults to the bracket (watch-along) version.
+  {
+    path: 'poster/:uuid',
+    loadComponent: () => import('./bracket/poster.component').then(m => m.PosterComponent),
+  },
+  {
+    path: 'poster/:uuid/:kind',
+    loadComponent: () => import('./bracket/poster.component').then(m => m.PosterComponent),
+  },
   {
     path: 'admin',
     canActivate: [authGuard],
@@ -73,6 +98,14 @@ export const routes: Routes = [
     path: 'admin/tournament/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/tournament-manage.component').then(m => m.TournamentManageComponent),
+  },
+  // Scorekeeper-facing: only authGuard here, since scorekeepers are ordinary organizers
+  // with a role on this one tournament. The component checks can_score, and the backend
+  // enforces it on every PUT regardless.
+  {
+    path: 'admin/tournament/:id/score',
+    canActivate: [authGuard],
+    loadComponent: () => import('./admin/score-entry.component').then(m => m.ScoreEntryComponent),
   },
   { path: '**', redirectTo: '' },
 ];

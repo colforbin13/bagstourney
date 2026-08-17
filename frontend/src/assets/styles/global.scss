@@ -256,6 +256,28 @@ h1, h2, h3 {
   font-size: 0.875rem;
 }
 
+/* ── TV / kiosk mode ──
+   The bracket view sets this on <body> while kiosk mode is on (and clears it on
+   destroy). Nav and footer live in AppComponent, outside the bracket component, so
+   hiding them has to happen from here. Overflow is locked because the kiosk shell is
+   position:fixed and nothing behind it should scroll. */
+body.kiosk-mode {
+  overflow: hidden;
+
+  app-nav, app-footer { display: none; }
+}
+
+/* ── Printing ──
+   Nav and footer are screen furniture; nothing in the app benefits from them on paper.
+   `.no-print` marks in-page controls (buttons, tips) that shouldn't print either. */
+@media print {
+  app-nav, app-footer, .no-print { display: none !important; }
+
+  body { background: #fff; }
+
+  @page { margin: 12mm; }
+}
+
 /* ── Drag & drop (CDK, e.g. manual-seed reordering) ── */
 .cdk-drag-preview {
   box-sizing: border-box;

@@ -9,6 +9,12 @@ import { Tournament, Participant, Team, TournamentMember, UserSearchResult } fro
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
+interface SetupStep {
+  label: string;
+  detail: string;
+  state: 'done' | 'current' | 'todo';
+}
+
 @Component({
   selector: 'app-tournament-manage',
   standalone: true,
@@ -56,7 +62,11 @@ import * as QRCode from 'qrcode';
           </div>
 
           <div class="tm-actions-row">
-            <a class="btn btn-sm btn-primary" [routerLink]="['/bracket', tournamentId]">View bracket</a>
+            @if (canScore() && tournament()!.status === 'active') {
+              <a class="btn btn-sm btn-primary" [routerLink]="['/admin/tournament', tournamentId, 'score']">Enter scores</a>
+            }
+            <a class="btn btn-sm" [class.btn-primary]="!canScore() || tournament()!.status !== 'active'"
+              [routerLink]="['/bracket', tournamentId]">View bracket</a>
 
             @if (canManageSetup() || canDelete()) {
               <div class="dropdown">
@@ -66,9 +76,14 @@ import * as QRCode from 'qrcode';
                   <div class="dropdown-menu">
                     @if (canManageSetup()) {
                       <button class="dropdown-item" (click)="copyPublicLink(); closeActionsMenu()">Copy link</button>
+                      <!-- For spectators: scanning this just opens the bracket to follow
+                           along. Unlike the registration QR it stays available for the
+                           whole tournament, since watching is useful long after sign-up
+                           has closed. -->
+                      <button class="dropdown-item" (click)="openQrModal('bracket'); closeActionsMenu()">Show bracket QR code</button>
                       @if (tournament()!.status === 'setup' && !isDirectEntry() && teams().length === 0) {
                         <button class="dropdown-item" (click)="copyRegistrationLink(); closeActionsMenu()">Copy registration link</button>
-                        <button class="dropdown-item" (click)="openQrModal(); closeActionsMenu()">Show registration QR code</button>
+                        <button class="dropdown-item" (click)="openQrModal('registration'); closeActionsMenu()">Show registration QR code</button>
                       }
                       <button class="dropdown-item" [disabled]="visibilityBusy()" (click)="toggleVisibility(); closeActionsMenu()">
                         Make {{ tournament()!.visibility === 'private' ? 'Public' : 'Private' }}
@@ -152,6 +167,26 @@ import * as QRCode from 'qrcode';
 
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
+        <!-- Where-am-I checklist. The individual controls below already explain themselves
+             well; what was missing was the shape of the whole sequence, and how many steps
+             are left — which varies by entry and seeding mode. -->
+        @if (canManageSetup() && setupSteps().length > 0) {
+          <div class="card setup-guide" style="margin-bottom:24px">
+            <div class="section-label">Getting this tournament started</div>
+            <ol class="setup-steps">
+              @for (step of setupSteps(); track step.label; let i = $index) {
+                <li class="setup-step" [class.is-done]="step.state === 'done'" [class.is-current]="step.state === 'current'">
+                  <span class="setup-step-mark" aria-hidden="true">{{ step.state === 'done' ? '✓' : i + 1 }}</span>
+                  <div>
+                    <div class="setup-step-label">{{ step.label }}</div>
+                    <div class="setup-step-detail">{{ step.detail }}</div>
+                  </div>
+                </li>
+              }
+            </ol>
+          </div>
+        }
+
         <!-- Mode selectors: only choosable before teams exist -->
         @if (canManageSetup() && teams().length === 0) {
           <div class="card" style="margin-bottom:24px">
@@ -226,7 +261,14 @@ import * as QRCode from 'qrcode';
           </div>
 
           @if (participants().length === 0) {
-            <div class="empty" style="padding:24px 0">No participants yet.</div>
+            <div class="empty" style="padding:24px 0">
+              No players yet — add them above.
+              @if (canManageSetup()) {
+                <div style="margin-top:6px">
+                  Or let them add themselves: <button type="button" class="link-btn" (click)="copyRegistrationLink()">copy the sign-up link</button>.
+                </div>
+              }
+            </div>
           } @else {
             <div class="participant-list">
               @for (p of participants(); track p.id) {
@@ -446,17 +488,25 @@ import * as QRCode from 'qrcode';
         <div class="toast toast-success">{{ toast() }}</div>
       }
 
-      <!-- Registration QR code -->
-      @if (qrModalOpen()) {
+      <!-- QR code — registration (sign me up) or bracket (let me watch) -->
+      @if (qrKind(); as kind) {
         <div class="qr-modal-backdrop" (click)="closeQrModal()">
           <div class="qr-modal" (click)="$event.stopPropagation()">
-            <div class="qr-modal-title">Registration QR Code</div>
+            <div class="qr-modal-title">{{ kind === 'bracket' ? 'Bracket QR Code' : 'Registration QR Code' }}</div>
             <div class="qr-modal-sub">{{ tournament()?.name }}</div>
             <canvas #qrCanvas class="qr-canvas"></canvas>
-            <div class="qr-modal-actions">
-              <button class="btn btn-sm" (click)="downloadQrCode()">Download PNG</button>
-              <button class="btn btn-sm btn-primary" (click)="closeQrModal()">Close</button>
+            <div class="qr-modal-hint">
+              {{ kind === 'bracket'
+                ? 'Scan to follow the bracket. No sign-up needed.'
+                : 'Scan to add yourself to this tournament.' }}
             </div>
+            <div class="qr-modal-url">{{ qrUrl() }}</div>
+            <div class="qr-modal-actions">
+              <button class="btn btn-sm" (click)="copyQrLink()">Copy link</button>
+              <button class="btn btn-sm" (click)="downloadQrCode()">Download PNG</button>
+              <button class="btn btn-sm btn-primary" (click)="openPoster()">Printable sign</button>
+            </div>
+            <button class="btn btn-sm qr-modal-close" (click)="closeQrModal()">Close</button>
           </div>
         </div>
       }
@@ -474,6 +524,47 @@ import * as QRCode from 'qrcode';
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+    /* ── Setup checklist ── */
+    .setup-steps { display: flex; flex-direction: column; gap: 12px; list-style: none; }
+    .setup-step { display: flex; gap: 10px; align-items: flex-start; }
+    .setup-step-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--surface-2);
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+    .setup-step-label { font-size: 0.875rem; font-weight: 500; color: var(--text-dim); }
+    .setup-step-detail { font-size: 0.78rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+    .setup-step.is-done .setup-step-mark {
+      background: var(--marker);
+      border-color: var(--marker);
+      color: var(--marker-ink);
+    }
+    .setup-step.is-done .setup-step-label { color: var(--muted); }
+    .setup-step.is-current .setup-step-mark {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+    }
+    .setup-step.is-current .setup-step-label { color: var(--text); }
+    .link-btn {
+      border: none;
+      background: transparent;
+      padding: 0;
+      font-family: inherit;
+      font-size: inherit;
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
     }
     .count {
       background: var(--border);
@@ -562,8 +653,19 @@ import * as QRCode from 'qrcode';
     }
     .qr-modal-title { font-weight: 600; font-size: 1rem; }
     .qr-modal-sub { font-size: .8rem; color: var(--text-dim); margin-bottom: 12px; }
+    .qr-modal-hint { font-size: .8rem; color: var(--text-dim); margin-top: 12px; text-align: center; }
+    .qr-modal-url {
+      font-family: var(--mono);
+      font-size: .68rem;
+      color: var(--muted);
+      margin-top: 6px;
+      max-width: 240px;
+      overflow-wrap: anywhere;
+      text-align: center;
+    }
     .qr-canvas { max-width: 100%; height: auto; border-radius: calc(var(--radius) - 1px); }
-    .qr-modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+    .qr-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+    .qr-modal-close { margin-top: 8px; border: none; color: var(--text-dim); }
 
     /* Participants */
     .participant-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
@@ -690,6 +792,7 @@ export class TournamentManageComponent implements OnInit {
   teams = signal<Team[]>([]);
   champion = signal<string | null>(null);
   canManageSetup = computed(() => this.tournament()?.capabilities?.can_manage_setup ?? false);
+  canScore = computed(() => this.tournament()?.capabilities?.can_score ?? false);
   canDelete = computed(() => this.tournament()?.capabilities?.can_delete ?? false);
   isSuperAdmin = computed(() => this.tournament()?.capabilities?.is_super_admin ?? false);
   // Freemium participant cap (FEATURE_TRACKER item 12/13 plumbing) — null for a
@@ -703,6 +806,62 @@ export class TournamentManageComponent implements OnInit {
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
   isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
+
+  // The setup sequence is a different length depending on the two modes: auto-draft with
+  // automatic seeding is two steps (the draw seeds and starts the tournament in one go),
+  // while manual seeding or direct entry adds an explicit generate-the-bracket step.
+  // Only ever rendered while status is 'setup', so the final step is never 'done' here —
+  // completing it is what ends the setup phase and removes this list from the page.
+  setupSteps = computed<SetupStep[]>(() => {
+    if (!this.tournament()) return [];
+
+    const direct = this.isDirectEntry();
+    const manual = this.isManualSeeding();
+    const teamsDrawn = this.teams().length > 0;
+    const pending = this.pendingParticipants().length;
+
+    const steps: Array<{ label: string; detail: string; done: boolean }> = [];
+
+    if (direct) {
+      steps.push({
+        label: 'Add your teams',
+        detail: 'Give each team a name and both members. Two teams minimum.',
+        done: this.teams().length >= 2,
+      });
+    } else {
+      steps.push({
+        label: 'Add your players',
+        detail: pending > 0
+          ? `${pending} self sign-up${pending === 1 ? '' : 's'} waiting on your approval below.`
+          : 'Add them by name, or share the sign-up link. You need an even number, four or more.',
+        done: teamsDrawn,
+      });
+      steps.push({
+        label: 'Draw the teams',
+        detail: manual
+          ? 'Randomly pairs your players into teams. You set the seed order afterwards.'
+          : 'Randomly pairs and seeds your players, builds the bracket, and starts play — all at once.',
+        done: teamsDrawn,
+      });
+    }
+
+    if (direct || manual) {
+      steps.push({
+        label: manual ? 'Set the seed order, then generate' : 'Generate the bracket',
+        detail: manual
+          ? 'Drag teams into the order you want, then generate the bracket to start play.'
+          : 'Builds the bracket from your teams and starts play.',
+        done: false,
+      });
+    }
+
+    const firstUndone = steps.findIndex(s => !s.done);
+    return steps.map((s, i) => ({
+      label: s.label,
+      detail: s.detail,
+      state: s.done ? 'done' : (i === firstUndone ? 'current' : 'todo'),
+    }));
+  });
   approvingParticipantId = signal<number | null>(null);
   visibilityBusy = signal(false);
   seedingModeBusy = signal(false);
@@ -750,8 +909,10 @@ export class TournamentManageComponent implements OnInit {
   staffActionBusy = signal(false);
   private staffSearchDebounce?: ReturnType<typeof setTimeout>;
 
-  // Registration QR code
-  qrModalOpen = signal(false);
+  // QR codes. Two of them, pointing at different places: 'registration' is the sign-me-up
+  // link (auto-draft tournaments still in setup), 'bracket' is the watch-along link that
+  // needs no account and stays useful for the whole event. null means the modal is closed.
+  qrKind = signal<'registration' | 'bracket' | null>(null);
   @ViewChild('qrCanvas') qrCanvasRef?: ElementRef<HTMLCanvasElement>;
 
   constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router) {}
@@ -915,10 +1076,24 @@ export class TournamentManageComponent implements OnInit {
     );
   }
 
-  openQrModal() {
-    const url = this.registrationUrl();
+  private bracketUrl(): string | null {
+    const uuid = this.tournament()?.uuid;
+    if (!uuid) return null;
+    // The uuid form, not the numeric id: this is what gets handed to people with no
+    // account, and it's the only form that works for a private tournament.
+    return `${location.origin}${environment.baseHref}bracket/${uuid}`;
+  }
+
+  qrUrl(): string {
+    const kind = this.qrKind();
+    if (!kind) return '';
+    return (kind === 'bracket' ? this.bracketUrl() : this.registrationUrl()) ?? '';
+  }
+
+  openQrModal(kind: 'registration' | 'bracket') {
+    const url = kind === 'bracket' ? this.bracketUrl() : this.registrationUrl();
     if (!url) return;
-    this.qrModalOpen.set(true);
+    this.qrKind.set(kind);
     // Wait a tick for the @if-gated <canvas> to actually exist in the DOM.
     setTimeout(() => {
       const canvas = this.qrCanvasRef?.nativeElement;
@@ -930,7 +1105,28 @@ export class TournamentManageComponent implements OnInit {
   }
 
   closeQrModal() {
-    this.qrModalOpen.set(false);
+    this.qrKind.set(null);
+  }
+
+  // New tab rather than in-place: the print dialog fires on load there, and the organizer
+  // keeps this page exactly where they left it.
+  openPoster() {
+    const uuid = this.tournament()?.uuid;
+    const kind = this.qrKind();
+    if (!uuid || !kind) return;
+    // The poster route names the sign-up variant after its own route segment
+    // ('register'), where this modal calls it 'registration'.
+    const posterKind = kind === 'bracket' ? 'bracket' : 'register';
+    window.open(`${location.origin}${environment.baseHref}poster/${uuid}/${posterKind}`, '_blank');
+  }
+
+  copyQrLink() {
+    const url = this.qrUrl();
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(
+      () => this.showToast('Link copied!'),
+      () => this.showToast('Could not copy link.'),
+    );
   }
 
   downloadQrCode() {
@@ -938,7 +1134,7 @@ export class TournamentManageComponent implements OnInit {
     if (!canvas) return;
     const link = document.createElement('a');
     const name = (this.tournament()?.name ?? 'tournament').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    link.download = `${name}-registration-qr.png`;
+    link.download = `${name}-${this.qrKind() ?? 'qr'}-qr.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   }

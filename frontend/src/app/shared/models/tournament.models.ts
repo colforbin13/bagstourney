@@ -34,6 +34,22 @@ export interface TournamentCapabilities {
   participant_count: number | null;
 }
 
+// Summary counts for a tournament list row, so the public list can show progress and a
+// champion without fetching each bracket. Only present on GET /tournaments (the list
+// endpoint) — never on a single-tournament fetch.
+export interface TournamentStats {
+  team_count: number;
+  // Playable matches only — byes are excluded from both numbers, since they are never
+  // played and never complete.
+  match_count: number;
+  matches_played: number;
+  total_rounds: number;
+  // Lowest round still holding an unplayed match; null once every match is done (or
+  // before a bracket exists).
+  current_round: number | null;
+  champion_name: string | null;
+}
+
 export interface Tournament {
   id: number;
   uuid: string;
@@ -52,6 +68,8 @@ export interface Tournament {
   // Only present when GET /tournaments/:id is called with a valid session — omitted for
   // anonymous public bracket views, and never persisted (always read fresh per request).
   capabilities?: TournamentCapabilities;
+  // Only present on the GET /tournaments list response — see TournamentStats.
+  stats?: TournamentStats;
 }
 
 export interface TournamentMember {

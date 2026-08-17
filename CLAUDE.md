@@ -36,7 +36,9 @@ Repo-wide conventions — PHP 7 compatibility, backend/frontend patterns, migrat
 
 `frontend/` (Angular SPA) talks REST/JSON to `api/index.php`, a single front-controller router, which dispatches to `api/controllers/*.php`, which talk to MySQL via PDO.
 
-`api/index.php` splits the URL into `resource/id/action` segments (e.g. `/users/5/password-reset` → resource `users`, id `5`, action `password-reset`) and dispatches per resource with an if/elseif chain keyed on HTTP method. It strips an optional `/bags/api` or `/api` prefix, so the same router code serves the unprefixed local PHP built-in server and the Apache production deployment under `/bags/api`.
+`api/index.php` splits the URL into `resource/id/action` segments (e.g. `/users/5/password-reset` → resource `users`, id `5`, action `password-reset`) and dispatches per resource with an if/elseif chain keyed on HTTP method. It strips an optional `/bags/api` or `/api` prefix, so the same router code serves both the local PHP built-in server and the Apache production deployment.
+
+Note that despite the `/bags` deploy path, **production actually serves the API at `https://bracketway.com/api/...`, not `/bags/api/...`** — verified live 2026-08-13 by probing both (`/bags/api/...` returns the Angular app's `index.html` instead of the API). Use `/api/...` for any externally-registered callback URL, such as an email provider's webhook.
 
 ### Auth
 
