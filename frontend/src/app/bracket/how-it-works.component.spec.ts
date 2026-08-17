@@ -71,6 +71,12 @@ describe('HowItWorksComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('sign-up link only works with auto-draft');
   });
 
+  it('should send a reader wondering about their own game to the sports list', () => {
+    setup();
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.lede a');
+    expect(link.getAttribute('href')).toBe('/sports');
+  });
+
   it('should close with sign-up actions for an anonymous reader', () => {
     setup();
     const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))

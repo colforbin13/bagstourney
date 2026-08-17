@@ -22,6 +22,12 @@ export const routes: Routes = [
     path: 'how-it-works',
     loadComponent: () => import('./bracket/how-it-works.component').then(m => m.HowItWorksComponent),
   },
+  // Public for the same reason, and the answer to the first question a visitor has now
+  // that the rest of the copy no longer names a sport: "does this do my game?"
+  {
+    path: 'sports',
+    loadComponent: () => import('./bracket/sports.component').then(m => m.SportsComponent),
+  },
   {
     path: 'bracket/:id',
     loadComponent: () => import('./bracket/bracket-view.component').then(m => m.BracketViewComponent),

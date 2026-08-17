@@ -14,7 +14,10 @@ import { AuthService } from '../shared/services/auth.service';
         <h1>From a pile of players to a champion.</h1>
         <p class="lede">
           The whole run of a tournament, start to finish, so you know what you're getting into
-          before you set one up. It takes about five minutes of actual work.
+          before you set one up. It takes about five minutes of actual work. Nothing below
+          depends on which game you're playing — see
+          <a routerLink="/sports">the sports people run</a> if you're wondering whether yours
+          fits.
         </p>
       </header>
 
@@ -55,8 +58,8 @@ import { AuthService } from '../shared/services/auth.service';
           <h2>Get your players in</h2>
           <p>
             Type them in one at a time, or open the tournament's sign-up link — there's a QR
-            code for it — and let people add themselves from their phones while you set up the
-            boards.
+            code for it — and let people add themselves from their phones while you're still
+            setting up.
           </p>
           <p>
             Self sign-ups land as <em>pending</em> and don't join the roster until you approve
@@ -96,7 +99,7 @@ import { AuthService } from '../shared/services/auth.service';
 
         <li class="chapter">
           <span class="chapter-num">Step 05</span>
-          <h2>Score it from the boards</h2>
+          <h2>Score it as you play</h2>
           <p>
             Tap in each match's score as it finishes. The winner advances to the next round on
             its own — you never move anyone by hand — and the public bracket updates for
@@ -109,8 +112,8 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
           <p>
             Running the scores is its own screen, too — it lists just the matches that can be
-            played right now, so whoever's working the boards isn't hunting through a bracket
-            on their phone between throws.
+            played right now, so whoever's keeping score isn't hunting through a whole bracket
+            on their phone between games.
           </p>
         </li>
 
@@ -148,8 +151,8 @@ import { AuthService } from '../shared/services/auth.service';
           You don't have to run everything yourself. A tournament's owner can add other people
           as <strong>managers</strong> (full setup control) or <strong>scorekeepers</strong>
           (score entry only, no ability to change the roster or the bracket). Handy when you
-          want a friend on the far set of boards entering scores without being able to redraw
-          your teams by accident.
+          want a friend at the far end of the venue entering scores without being able to
+          redraw your teams by accident.
         </p>
       </section>
 

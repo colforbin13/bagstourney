@@ -12,8 +12,8 @@ interface ScoreEntry { team1: string; team2: string; }
 /**
  * A scorekeeper's screen: the matches that can be played right now, and nothing else.
  * The bracket view can already take scores, but it makes you find the right card inside a
- * whole bracket — awkward on a phone at the boards, which is where scores actually get
- * entered. This lists only what's playable, largest-first.
+ * whole bracket — awkward on a phone out where play is happening, which is where scores
+ * actually get entered. This lists only what's playable, largest-first.
  */
 @Component({
   selector: 'app-score-entry',
@@ -233,7 +233,7 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
   scores: Record<number, ScoreEntry> = {};
   tournamentId!: number;
 
-  // Another scorekeeper on the far set of boards may be filling the same bracket in, so
+  // Another scorekeeper at the far end of the venue may be filling the same bracket in, so
   // the list refreshes itself. Typed-but-unsaved scores survive it — see applyBracket().
   private refreshTimer: number | null = null;
   readonly refreshIntervalMs = 30000;

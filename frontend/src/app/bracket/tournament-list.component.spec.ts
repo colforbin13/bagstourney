@@ -103,6 +103,16 @@ describe('TournamentListComponent', () => {
     expect(features.length).toBe(6);
   });
 
+  // The rest of the landing copy is deliberately sport-neutral, so this line is the only
+  // thing telling a visitor their game is covered — it must not quietly disappear.
+  it('should name example sports in the hero and link to the full list', () => {
+    setup([makeTournament()]);
+    const sports: HTMLElement = fixture.nativeElement.querySelector('.hero-sports');
+    expect(sports).toBeTruthy();
+    expect(sports.textContent).toContain('KanJam');
+    expect(sports.querySelector('a')!.getAttribute('href')).toBe('/sports');
+  });
+
   it('should point the hero actions at register/sign-in for an anonymous visitor', () => {
     setup([makeTournament()]);
     const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.hero-actions a'))
