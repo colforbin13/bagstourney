@@ -77,6 +77,27 @@ and RxJS 7.8.
 
 ## Unit testing requirements
 
+### Backend (PHPUnit)
+
+Pure logic in `api/lib/` **must include unit tests** in `tests/`. Run them with
+`.\run-php-tests.ps1`, which fetches `tools/phpunit.phar` on first use — there is no
+Composer and no `vendor/` directory, deliberately: production runs PHP 7.2 on hardware
+that can't be upgraded yet.
+
+- **Nothing in `tests/` may touch a database, network, or credentials.** Extract the logic
+  worth testing into `api/lib/` as a pure function, and keep the controller as a thin layer
+  that persists the result. Where the persistence mapping itself is worth covering, use a
+  recording PDO double (see `tests/BracketPersistenceTest.php`), not a real connection.
+- Code under `api/` must stay PHP 7.2-compatible — no typed properties, arrow functions,
+  `??=`, `match`, constructor promotion, or union types. Declare class properties
+  explicitly (`private $db;`); dynamic properties are deprecated in PHP 8.2+.
+- Tests themselves run on your local PHP 8.x and are never deployed (`deploy.ps1` copies
+  `api/` and `dist/browser/`, not `tests/`), so they may use modern syntax.
+- Controllers' request/response handling remains outside this suite — `php -l` plus manual
+  API/browser smoke tests still cover it.
+
+### Frontend (Karma/Jasmine)
+
 All new frontend components, services, and guards **must include unit tests**. Use Karma/Jasmine:
 
 - **Test file location:** Place `.spec.ts` files in the same directory as the component/service
@@ -130,11 +151,13 @@ Code coverage reports are generated in `frontend/coverage/` (in `.gitignore`). R
 
 ## Verification
 
-Before handing off backend changes, run PHP syntax checks on changed files, for example:
+Before handing off backend changes, run PHP syntax checks on changed files, plus the PHP
+unit suite:
 
 ```powershell
 php -l api\controllers\AuthController.php
 php -l api\index.php
+.\run-php-tests.ps1                          # Verify PHP unit tests pass
 ```
 
 For frontend changes, **always include unit tests for new code**. Then run:

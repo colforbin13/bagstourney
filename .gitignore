@@ -27,3 +27,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# PHP test tooling (phpunit.phar is downloaded by run-php-tests.ps1)
+tools/
+.phpunit.cache/
+.phpunit.result.cache

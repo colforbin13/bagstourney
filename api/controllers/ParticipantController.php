@@ -9,6 +9,8 @@ class ParticipantController {
         notify_match_completed, notify_round_completed, notify_tournament_finalized,
         notification_confirmed_at, notification_manage_token_version, created_at';
 
+    private $db;
+
     public function __construct(PDO $db) {
 		$this->db = $db;
 	}

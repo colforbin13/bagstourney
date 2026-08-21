@@ -2,6 +2,8 @@
 // api/controllers/MatchController.php
 
 class MatchController {
+    private $db;
+
     public function __construct(PDO $db) {
 		$this->db = $db;
 	}
@@ -123,41 +125,28 @@ class MatchController {
                 $this->enqueueMatchCompletedNotifications($match, $matchId);
             }
 
-            // Advance winner to next match
+            // Advance winner to next match. cascadePropagate() places the winner, marks the
+            // target ready once both slots are filled, and follows any chained byes — this
+            // used to be duplicated inline here as well, which meant two copies of the
+            // advance rule to keep in step.
             if ($match['next_match_id']) {
-                $col = $match['next_match_slot'] === 1 ? 'team1_id' : 'team2_id';
-                $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
-                    ->execute([$winnerId, $match['next_match_id']]);
-
-                // Check if next match now has both teams → mark ready
-                $stmt = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
-                $stmt->execute([$match['next_match_id']]);
-                $next = $stmt->fetch();
-                if ($next && $next['team1_id'] && $next['team2_id']) {
-                    $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')
-                        ->execute([$match['next_match_id']]);
-                }
-
-                // Cascade-propagate winners through chained byes so a completed match advances properly.
                 $this->cascadePropagate($matchId);
 
                 if (!$wasComplete) {
                     $this->enqueueRoundCompletedNotifications($match);
                 }
             } else {
-                // No next match → this was the final, mark tournament complete
-                $stmt = $this->db->prepare('SELECT tournament_id FROM matches WHERE id = ?');
-                $stmt->execute([$matchId]);
-                $m = $stmt->fetch();
-                if ($m) {
-                    $this->db->prepare('UPDATE tournaments SET status = "complete" WHERE id = ?')
-                        ->execute([$m['tournament_id']]);
-                }
-
                 if (!$wasComplete) {
                     $this->enqueueTournamentFinalizedNotifications($match, $matchId);
                 }
             }
+
+            // A tournament is complete exactly when its final has a winner. Deriving the
+            // status here, rather than only setting it in the final's branch above, is what
+            // makes editing an earlier score reopen a finished tournament: that edit clears
+            // the final via cascadeClearDownstream(), which previously left the tournament
+            // marked 'complete' with no champion.
+            $this->syncTournamentStatus((int)$match['tournament_id']);
 
             $this->db->commit();
 
@@ -259,6 +248,32 @@ class MatchController {
         if ($nm && $nm['team1_id'] && $nm['team2_id']) {
             $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
         }
+    }
+
+    /**
+     * Derive the tournament's status from its final match: 'complete' once the final has a
+     * winner, 'active' while it does not. Deliberately only moves between those two — a
+     * tournament still in 'setup' has no bracket to read and must be left alone.
+     *
+     * Single elimination has exactly one match with no next_match_id, so that identifies
+     * the final. Double elimination (FEATURE_TRACKER.md item 16) breaks that assumption —
+     * a grand final may be followed by a reset match — which is precisely why the rule
+     * lives in one place instead of being inlined at the call site.
+     */
+    private function syncTournamentStatus(int $tournamentId): void {
+        $stmt = $this->db->prepare('
+            SELECT winner_id FROM matches
+            WHERE tournament_id = ? AND next_match_id IS NULL
+        ');
+        $stmt->execute([$tournamentId]);
+        $final = $stmt->fetch();
+        if (!$final) return;
+
+        $status = $final['winner_id'] ? 'complete' : 'active';
+        $this->db->prepare('
+            UPDATE tournaments SET status = ?
+            WHERE id = ? AND status IN ("active", "complete")
+        ')->execute([$status, $tournamentId]);
     }
 
     // Notifies the 4 participants (2 per team) of this specific match. $match is the

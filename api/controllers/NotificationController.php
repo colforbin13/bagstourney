@@ -8,6 +8,8 @@
 // session (see api/middleware/auth.php::notificationManageToken()).
 
 class NotificationController {
+    private $db;
+
     public function __construct(PDO $db) {
         $this->db = $db;
     }

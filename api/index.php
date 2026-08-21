@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
+require_once __DIR__ . '/lib/BracketBuilder.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/TournamentController.php';
 require_once __DIR__ . '/controllers/ParticipantController.php';

@@ -2,6 +2,8 @@
 // api/controllers/TeamController.php
 
 class TeamController {
+    private $db;
+
     public function __construct(PDO $db) {
 		$this->db = $db;
 	}
@@ -383,184 +385,53 @@ class TeamController {
     }
 
     /**
-     * Build a standard single-elimination bracket.
-     * Teams are seeded: 1v(last), 2v(last-1), etc.
+     * Persist a single-elimination bracket for $teams.
+     *
+     * The bracket's *shape* — pairings, byes, where winners advance — is computed by
+     * BracketBuilder, which is pure and unit-tested in tests/BracketBuilderTest.php. This
+     * method only writes that shape out. Keep the split: bracket logic that lives here
+     * cannot be tested without a database, which is what made this the riskiest code in
+     * the repo to change (see FEATURE_TRACKER.md item 16).
+     *
+     * @param array $teams Rows with at least 'id' and 'seed'.
      */
     private function generateBracket(int $tournamentId, array $teams): void {
-        $numTeams = count($teams);
-
-        // Round up to next power of 2 for bracket size
-        $bracketSize = 1;
-        while ($bracketSize < $numTeams) $bracketSize *= 2;
-
-        // Compute number of rounds (log base 2). Use safe formula to avoid relying on optional log($value, $base) overloads.
-        $numRounds = (int)(log($bracketSize) / log(2));
-
-        // Build seeded matchups using standard bracket seeding
-        // Seed 1 vs last, 2 vs second-last, etc.
-        $seeds = range(1, $bracketSize);
-        $matchups = $this->buildSeededMatchups($seeds);
-
-        // Map seed → team (null = bye)
-        $seedMap = [];
+        $seedToTeamId = [];
         foreach ($teams as $team) {
-            $seedMap[$team['seed']] = $team;
+            $seedToTeamId[(int)$team['seed']] = (int)$team['id'];
         }
 
-        // Create all matches for all rounds, starting from round 1
-        // matchNumber within a round determines bracket position
-        $matchesPerRound = [];
-        for ($r = 1; $r <= $numRounds; $r++) {
-            $matchesPerRound[$r] = $bracketSize / pow(2, $r);
+        // Throws on a field smaller than two teams or on gapped seeds. Both surface through
+        // the caller's catch block as a 400 instead of silently producing a wrong draw.
+        $plan = BracketBuilder::singleElimination($seedToTeamId);
+
+        $insert = $this->db->prepare('
+            INSERT INTO matches (tournament_id, round, match_number, team1_id, team2_id, winner_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ');
+        $matchIds = [];
+        foreach ($plan as $index => $match) {
+            $insert->execute([
+                $tournamentId,
+                $match['round'],
+                $match['match_number'],
+                $match['team1_id'],
+                $match['team2_id'],
+                $match['winner_id'],
+                $match['status'],
+            ]);
+            $matchIds[$index] = (int)$this->db->lastInsertId();
         }
 
-        // Insert round 1 matches first (without next_match_id links yet)
-        $round1Matches = [];
-        foreach ($matchups as $i => $pair) {
-            $matchNumber = $i + 1;
-            $team1 = $seedMap[$pair[0]] ?? null;
-            $team2 = $seedMap[$pair[1]] ?? null;
-
-            $team1Id = $team1['id'] ?? null;
-            $team2Id = $team2['id'] ?? null;
-
-            // Determine status
-            $status = 'pending';
-            $winnerId = null;
-
-            // Handle byes: if one team is null, mark as a bye (auto-win) but don't mark as 'complete'
-            // We store winner_id so we can place the team into the next round, but use 'bye' to prevent
-            // cascading propagation beyond the immediate next round during bracket construction.
-            if ($team1Id && !$team2Id) {
-                $status = 'bye';
-                $winnerId = $team1Id;
-            } elseif (!$team1Id && $team2Id) {
-                $status = 'bye';
-                $winnerId = $team2Id;
-            } elseif ($team1Id && $team2Id) {
-                $status = 'ready';
+        // Second pass: the builder's forward pointers are array indexes, which can only be
+        // resolved to real match ids once every row above exists.
+        $link = $this->db->prepare('UPDATE matches SET next_match_id = ?, next_match_slot = ? WHERE id = ?');
+        foreach ($plan as $index => $match) {
+            if ($match['next_match'] === null) {
+                continue;
             }
-
-            $stmt = $this->db->prepare('
-                INSERT INTO matches (tournament_id, round, match_number, team1_id, team2_id, winner_id, status)
-                VALUES (?, 1, ?, ?, ?, ?, ?)
-            ');
-            $stmt->execute([$tournamentId, $matchNumber, $team1Id, $team2Id, $winnerId, $status]);
-            $round1Matches[$matchNumber] = (int)$this->db->lastInsertId();
+            $link->execute([$matchIds[$match['next_match']], $match['next_match_slot'], $matchIds[$index]]);
         }
-
-        // Insert subsequent rounds
-        $prevRoundMatches = $round1Matches;
-        for ($r = 2; $r <= $numRounds; $r++) {
-            $count = $matchesPerRound[$r];
-            $currentRoundMatches = [];
-            for ($mn = 1; $mn <= $count; $mn++) {
-                $stmt = $this->db->prepare('
-                    INSERT INTO matches (tournament_id, round, match_number, status)
-                    VALUES (?, ?, ?, "pending")
-                ');
-                $stmt->execute([$tournamentId, $r, $mn]);
-                $currentRoundMatches[$mn] = (int)$this->db->lastInsertId();
-            }
-
-            // Link previous round matches to this round
-            foreach ($prevRoundMatches as $mn => $matchId) {
-                $nextMn = (int)ceil($mn / 2);
-                $slot   = ($mn % 2 === 1) ? 1 : 2;
-                $this->db->prepare('UPDATE matches SET next_match_id = ?, next_match_slot = ? WHERE id = ?')
-                    ->execute([$currentRoundMatches[$nextMn], $slot, $matchId]);
-            }
-
-            // Place bye winners into the next round's slots only — no cascading.
-            foreach ($prevRoundMatches as $mn => $matchId) {
-                $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
-                $stmt->execute([$matchId]);
-                $m = $stmt->fetch();
-                if (!$m || !$m['next_match_id'] || !$m['winner_id']) continue;
-
-                $col = (int)$m['next_match_slot'] === 1 ? 'team1_id' : 'team2_id';
-                $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
-                    ->execute([$m['winner_id'], $m['next_match_id']]);
-
-                $this->maybeMarkReady((int)$m['next_match_id']);
-            }
-
-            $prevRoundMatches = $currentRoundMatches;
-        }
-
-        // Safety: ensure final match is not auto-declared a winner due to chained byes.
-        // Clear any 'bye' status and winner_id on final matches so the championship must be played.
-        $this->db->prepare('UPDATE matches SET status = "pending", winner_id = NULL WHERE tournament_id = ? AND next_match_id IS NULL AND status = "bye"')
-            ->execute([$tournamentId]);
-    }
-
-    private function maybeMarkReady(int $matchId): void {
-        $stmt = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
-        $stmt->execute([$matchId]);
-        $m = $stmt->fetch();
-        if ($m && $m['team1_id'] && $m['team2_id']) {
-            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$matchId]);
-        }
-    }
-
-    /**
-     * Propagate the winner from a source match into its next match slot and cascade
-     * through subsequent rounds when the target match has only one team (a bye).
-     */
-    private function propagateWinnerFromMatchToNext(int $sourceMatchId): void {
-        $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
-        $stmt->execute([$sourceMatchId]);
-        $m = $stmt->fetch();
-        if (!$m || !$m['next_match_id'] || !$m['winner_id']) return;
-
-        $nextId = (int)$m['next_match_id'];
-        $slot   = (int)$m['next_match_slot'];
-        $col    = $slot === 1 ? 'team1_id' : 'team2_id';
-
-        $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
-            ->execute([$m['winner_id'], $nextId]);
-
-        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id, status FROM matches WHERE id = ?');
-        $stmt2->execute([$nextId]);
-        $nm = $stmt2->fetch();
-
-        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
-            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
-        } elseif ($nm && ($nm['team1_id'] || $nm['team2_id'])) {
-            // Only one team in the next match — it's itself a bye, keep cascading
-            $byeWinnerId = $nm['team1_id'] ?? $nm['team2_id'];
-            $this->db->prepare('UPDATE matches SET status = "bye", winner_id = ? WHERE id = ?')
-                ->execute([$byeWinnerId, $nextId]);
-            $this->propagateWinnerFromMatchToNext($nextId); // recurse
-        }
-    }
-
-    private function buildSeededMatchups(array $seeds): array {
-        $size = count($seeds);
-        if ($size < 2) return [];
-        $order = $this->seedOrder($size);
-        $matchups = [];
-        for ($i = 0; $i < $size; $i += 2) {
-            $matchups[] = [$seeds[$order[$i] - 1], $seeds[$order[$i + 1] - 1]];
-        }
-        return $matchups;
-    }
-
-    /**
-     * Standard single-elimination seeding order for a bracket of $size (a power of 2),
-     * as a permutation of positions 1..$size. Built recursively so that seed 1 and seed 2
-     * can only meet in the final, {1,2} and {3,4} can only meet in the semifinal, and so on —
-     * i.e. top seeds are placed in opposite bracket halves rather than paired sequentially.
-     */
-    private function seedOrder(int $size): array {
-        if ($size <= 1) return [1];
-        $prev = $this->seedOrder((int)($size / 2));
-        $order = [];
-        foreach ($prev as $s) {
-            $order[] = $s;
-            $order[] = $size + 1 - $s;
-        }
-        return $order;
     }
 }
 

@@ -2,6 +2,8 @@
 // api/controllers/TournamentController.php
 
 class TournamentController {
+    private $db;
+
     public function __construct(PDO $db) {
 		$this->db = $db;
 	}
