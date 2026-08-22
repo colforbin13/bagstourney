@@ -54,36 +54,55 @@ describe('AdminDashboardComponent', () => {
     httpMock.expectNone(`${environment.apiUrl}/tournaments`);
   });
 
-  it('should create a tournament with the chosen visibility, seeding mode, and team entry mode', () => {
+  it('should create a tournament with the chosen visibility, seeding mode, team entry mode, and format', () => {
     bootstrap();
     component.newName = 'New Tournament';
     component.newVisibility = 'private';
     component.newSeedingMode = 'manual';
     component.newTeamEntryMode = 'direct';
+    component.newFormat = 'double';
     component.create();
 
     const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
-      name: 'New Tournament', visibility: 'private', seeding_mode: 'manual', team_entry_mode: 'direct',
+      name: 'New Tournament', visibility: 'private', seeding_mode: 'manual',
+      team_entry_mode: 'direct', format: 'double',
     });
-    req.flush({ ...mockTournament, name: 'New Tournament', visibility: 'private', seeding_mode: 'manual', team_entry_mode: 'direct' });
+    req.flush({ ...mockTournament, name: 'New Tournament', visibility: 'private', seeding_mode: 'manual', team_entry_mode: 'direct', format: 'double' });
 
     expect(component.tournaments()[0].name).toBe('New Tournament');
     expect(component.newName).toBe('');
     expect(component.newVisibility).toBe('public');
     expect(component.newSeedingMode).toBe('automatic');
     expect(component.newTeamEntryMode).toBe('auto_draft');
+    expect(component.newFormat).toBe('single');
     expect(component.creating()).toBe(false);
   });
 
-  it('should surface an error when creation fails', () => {
+  it('should surface the server message when creation is refused', () => {
+    // A stale cached profile can let the UI offer double elimination to an account whose
+    // plan has since lapsed, so the server's explanation has to reach the organizer.
+    bootstrap();
+    component.newName = 'New Tournament';
+    component.newFormat = 'double';
+    component.create();
+
+    httpMock.expectOne(`${environment.apiUrl}/tournaments`)
+      .flush({ error: 'Double elimination is a paid-plan feature. Upgrade to use it.' },
+             { status: 403, statusText: 'Forbidden' });
+
+    expect(component.createError()).toBe('Double elimination is a paid-plan feature. Upgrade to use it.');
+    expect(component.creating()).toBe(false);
+  });
+
+  it('should fall back to a generic message when the server sends no explanation', () => {
     bootstrap();
     component.newName = 'New Tournament';
     component.create();
 
     httpMock.expectOne(`${environment.apiUrl}/tournaments`)
-      .flush({ error: 'boom' }, { status: 500, statusText: 'Server Error' });
+      .flush(null, { status: 500, statusText: 'Server Error' });
 
     expect(component.createError()).toBe('Failed to create tournament.');
     expect(component.creating()).toBe(false);
@@ -140,8 +159,45 @@ describe('AdminDashboardComponent', () => {
     fixture.detectChanges();
 
     const hints: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.field-hint'));
-    expect(hints.length).toBe(3);
+    expect(hints.length).toBe(4);
     expect(fixture.nativeElement.querySelectorAll('select[title]').length).toBe(0);
+  });
+
+  it('should default to single elimination', () => {
+    bootstrap();
+    expect(component.newFormat).toBe('single');
+  });
+
+  it('should offer double elimination but disable it without a paid plan', () => {
+    spyOn(component, 'isPaidPlan').and.returnValue(false);
+    bootstrap();
+    fixture.detectChanges();
+
+    const option: HTMLOptionElement = fixture.nativeElement.querySelector('option[value="double"]');
+    // Shown rather than hidden: the paid tier should be visible to the people it is meant
+    // to convert. Disabling is UX only — the server refuses the format regardless.
+    expect(option).toBeTruthy();
+    expect(option.disabled).toBe(true);
+    expect(option.textContent).toContain('paid plan');
+    expect(component.formatHint()).toContain('available on a paid plan');
+  });
+
+  it('should enable double elimination on a paid plan', () => {
+    spyOn(component, 'isPaidPlan').and.returnValue(true);
+    bootstrap();
+    fixture.detectChanges();
+
+    const option: HTMLOptionElement = fixture.nativeElement.querySelector('option[value="double"]');
+    expect(option.disabled).toBe(false);
+    expect(option.textContent).not.toContain('paid plan');
+    expect(component.formatHint()).not.toContain('available on a paid plan');
+  });
+
+  it('should explain that the format locks once the bracket is generated', () => {
+    bootstrap();
+    component.newFormat = 'double';
+    expect(component.formatHint()).toContain('losers bracket');
+    expect(component.formatHint()).toContain('Locked once the bracket is generated');
   });
 
   it('should point a first-time organizer at the walkthrough', () => {

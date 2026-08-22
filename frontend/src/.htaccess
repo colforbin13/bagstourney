@@ -8,6 +8,13 @@ RewriteBase /
 RewriteCond %{REQUEST_URI} ^/api/
 RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
 
+# Shared bracket links get the SPA shell with per-tournament Open Graph tags injected, so
+# iMessage/Slack/WhatsApp preview the tournament instead of an unlabelled app. Those
+# crawlers don't run JavaScript, so the tags have to be present in the served HTML.
+# Browsers are served the same shell they always were, plus the extra <meta> tags; the
+# script falls back to index.html untouched on any error.
+RewriteRule ^bracket/[^/]+/?$ api/preview.php [QSA,L]
+
 # For all other URLs, serve index.html for Angular routing.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

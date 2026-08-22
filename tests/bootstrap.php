@@ -6,3 +6,4 @@
 // database, no network, and no credentials, so the suite is safe to run anywhere.
 
 require_once __DIR__ . '/../api/lib/BracketBuilder.php';
+require_once __DIR__ . '/../api/lib/LinkPreview.php';

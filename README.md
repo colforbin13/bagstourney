@@ -1,6 +1,6 @@
 # Bracketway
 
-A mobile-first, single-elimination tournament bracket manager for events played by
+A mobile-first tournament bracket manager — single or double elimination — for events played by
 two-person teams — bags (cornhole), KanJam, pickleball doubles, darts, partner card games,
 and anything else with the same shape. Nothing in the app is sport-specific; the frontend
 lists representative games at `/sports` purely as copy.

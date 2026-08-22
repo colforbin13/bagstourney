@@ -1,7 +1,8 @@
-<!-- One definition of a match card, used by both the mirrored layout and the plain
-     single-column one, so the two can never drift apart. `roundPos` is only needed to
-     decide whether a winner here is the champion. -->
-<ng-template #matchCard let-match="match" let-roundPos="roundPos">
+<!-- One definition of a match card, used by the mirrored layout, the plain single-column
+     one, and the stacked per-side layout, so they can never drift apart. Whether a winner
+     here is the champion comes from crownsChampion(), not from the round's position — in
+     double elimination the deciding match is the grand final, or the rematch after it. -->
+<ng-template #matchCard let-match="match">
     <div class="match-card"
             [class.match-complete]="match.status === 'complete'"
             [class.match-pending]="match.status === 'pending'"
@@ -13,7 +14,7 @@
         <div class="team-name-wrap">
         <span class="team-name">
             {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
-            @if (tournament()?.status === 'complete' && roundPos === totalRounds() && match.winner_id === match.team1_id) {
+            @if (crownsChampion(match) && match.winner_id === match.team1_id) {
             <span class="champion-icon" aria-hidden="true">🏆</span>
             }
         </span>
@@ -39,7 +40,7 @@
         <div class="team-name-wrap">
         <span class="team-name">
             {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
-            @if (tournament()?.status === 'complete' && roundPos === totalRounds() && match.winner_id === match.team2_id) {
+            @if (crownsChampion(match) && match.winner_id === match.team2_id) {
             <span class="champion-icon" aria-hidden="true">🏆</span>
             }
         </span>
@@ -95,7 +96,7 @@
         <div class="bracket-matches" [style.--total-rows]="rows" [style.--row-unit.px]="rowUnitPx">
         @for (entry of round.matches; track entry.match.id) {
             <div class="match-wrapper" [style.grid-row]="entry.gridRow">
-            <ng-container *ngTemplateOutlet="matchCard; context: { match: entry.match, roundPos: round.pos }"></ng-container>
+            <ng-container *ngTemplateOutlet="matchCard; context: { match: entry.match }"></ng-container>
             </div>
         }
         </div>
@@ -164,7 +165,58 @@
     <div class="fit-stage">
     <div class="fit-inner" [style.transform]="kiosk() ? 'scale(' + fitScale() + ')' : null">
 
-    @if (useMirrorLayout() && mirrorLayout(); as layout) {
+    @if (isDoubleElimination()) {
+    <!-- Stacked sections: winners bracket, then losers, then the grand final. Deliberately
+         not mirrored — the mirrored geometry assumes a perfect halving tree, which the
+         losers bracket is not. Stacking also keeps the two trees legible as separate
+         things, which is the point of the format. -->
+    <div class="bracket-sides">
+        @for (side of sideLayouts(); track side.side) {
+        <section class="bracket-side">
+            <h2 class="bracket-side-heading">{{ side.heading }}</h2>
+            <div class="bracket">
+                @for (round of side.rounds; track round.pos) {
+                <div class="bracket-round">
+                    <div class="round-label">{{ round.label }}</div>
+                    <div class="bracket-matches" [style.--total-rows]="side.rows" [style.--row-unit.px]="rowUnitPx">
+                    @for (entry of round.matches; track entry.match.id) {
+                        <div class="match-wrapper" [style.grid-row]="entry.gridRow">
+                        <ng-container *ngTemplateOutlet="matchCard; context: { match: entry.match }"></ng-container>
+                        </div>
+                    }
+                    </div>
+                </div>
+                @if (!round.isLast) {
+                <div class="bracket-gutter" [style.width.px]="gutterWidth">
+                    <div class="round-label" aria-hidden="true" style="visibility:hidden">&nbsp;</div>
+                    <svg class="connector-svg"
+                        [attr.width]="gutterWidth"
+                        [attr.height]="side.rows * rowUnitPx"
+                        [attr.viewBox]="'0 0 ' + gutterWidth + ' ' + (side.rows * rowUnitPx)">
+                    @for (c of round.connectors; track $index) {
+                        <path [attr.d]="connectorPath(c)" class="connector-line" />
+                        <circle [attr.cx]="0" [attr.cy]="c.y1" r="3" class="connector-dot" />
+                        <circle [attr.cx]="0" [attr.cy]="c.y2" r="3" class="connector-dot" />
+                        <circle [attr.cx]="gutterWidth / 2" [attr.cy]="c.mid" r="4" class="connector-node" />
+                    }
+                    </svg>
+                </div>
+                }
+                }
+            </div>
+        </section>
+        }
+
+        @if (tournament()?.status === 'complete' && champion()) {
+        <div class="champion">
+            <div class="champion-name">
+            <span class="champion-icon" aria-hidden="true">🏆</span>
+            {{ champion() }}
+            </div>
+        </div>
+        }
+    </div>
+    } @else if (useMirrorLayout() && mirrorLayout(); as layout) {
     <!-- Mirrored: both halves of round 1 start at the outside edges and play inward to
          the final in the middle. Half the height of a single-sided bracket, so the cards
          and text can be much bigger on the same screen. -->
@@ -179,7 +231,7 @@
             <div class="bracket-matches" [style.--total-rows]="layout.rows" [style.--row-unit.px]="rowUnitPx">
             @if (layout.final; as final) {
                 <div class="match-wrapper" [style.grid-row]="'1 / span ' + layout.rows">
-                <ng-container *ngTemplateOutlet="matchCard; context: { match: final, roundPos: totalRounds() }"></ng-container>
+                <ng-container *ngTemplateOutlet="matchCard; context: { match: final }"></ng-container>
                 </div>
             }
             </div>
@@ -214,7 +266,7 @@
             @for (match of round.matches; track match.id) {
                 <div class="match-wrapper"
                     [style.grid-row]="matchGridRow(match.match_number, round.pos)">
-                <ng-container *ngTemplateOutlet="matchCard; context: { match: match, roundPos: round.pos }"></ng-container>
+                <ng-container *ngTemplateOutlet="matchCard; context: { match: match }"></ng-container>
                 </div>
             }
             </div>

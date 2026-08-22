@@ -20,7 +20,10 @@ class AuthController {
             return;
         }
 
-        $stmt = $this->db->prepare('SELECT id, username, email, password_hash, role, status FROM users WHERE username = ? OR email = ? LIMIT 1');
+        // Every column publicUser() emits has to be selected here — it is the only query
+        // that feeds it. `plan` was added to the payload without being added here, so the
+        // session always reported 'free' and the paid-tier UI never unlocked.
+        $stmt = $this->db->prepare('SELECT id, username, email, password_hash, role, status, plan FROM users WHERE username = ? OR email = ? LIMIT 1');
         $stmt->execute([$username, $username]);
         $user = $stmt->fetch();
 
@@ -170,6 +173,12 @@ class AuthController {
             'username' => $user['username'],
             'email' => $user['email'],
             'role' => $user['role'],
+            // Lets the UI reflect paid-tier entitlements (FEATURE_TRACKER item 16's format
+            // selector). Presentation only — every paid feature is gated server-side too,
+            // so a stale cached profile can mislead the UI but never grant anything.
+            // Defaulted for legacy 'admins' rows migrated on first login, which predate the
+            // column.
+            'plan' => isset($user['plan']) ? $user['plan'] : 'free',
         ];
     }
 

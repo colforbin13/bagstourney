@@ -479,6 +479,59 @@ describe('TournamentManageComponent', () => {
       expect(component.seedingModeBusy()).toBe(false);
     });
 
+    it('should PUT the chosen format', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      component.updateFormat('double');
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ format: 'double' });
+      req.flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', format: 'double',
+        created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+
+      expect(component.tournament()!.format).toBe('double');
+      expect(component.formatBusy()).toBe(false);
+      expect(component.formatError()).toBe('');
+    });
+
+    it('should not PUT when the format is unchanged', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      // A tournament with no format field is single elimination.
+      component.updateFormat('single');
+      httpMock.expectNone(`${environment.apiUrl}/tournaments/${tournamentId}`);
+    });
+
+    it('should surface the server message when a format change is refused', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      component.updateFormat('double');
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({ error: 'Double elimination is a paid-plan feature. Upgrade to use it.' },
+               { status: 403, statusText: 'Forbidden' });
+
+      expect(component.formatError()).toBe('Double elimination is a paid-plan feature. Upgrade to use it.');
+      expect(component.formatBusy()).toBe(false);
+    });
+
+    it('should let a super-admin-granted override unlock double elimination without a paid plan', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      expect(component.canUseDoubleElimination()).toBe(false);
+
+      // paid_override is item 13's per-tournament lever, independent of the account plan.
+      component.tournament.set({ ...component.tournament()!, paid_override: true });
+      expect(component.canUseDoubleElimination()).toBe(true);
+    });
+
     it('should show the shared Teams panel (drag-to-reorder) once teams exist while still in setup', () => {
       bootstrapAwaitingSeeds();
       fixture.detectChanges();

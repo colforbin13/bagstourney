@@ -353,3 +353,36 @@ Bracket outer shell: one flex column per round
     width: max-content;
     padding-bottom: 0;
 }
+/* ─────────────────────────────────────────
+Double elimination: the two trees stacked
+───────────────────────────────────────── */
+.bracket-sides {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.bracket-side-heading {
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0 0 8px;
+    text-align: center;
+}
+
+/* Each section owns its horizontal scroll, so a wide winners bracket never drags the
+   narrower losers bracket sideways with it. */
+.bracket-side .bracket {
+    padding-bottom: 8px;
+}
+
+/* Kiosk mode scales the whole stack, so the sections must report their natural width
+   rather than scrolling internally — same reasoning as .kiosk .bracket above. */
+.kiosk .bracket-sides {
+    gap: 20px;
+}
+
+.kiosk .bracket-side-heading {
+    margin-bottom: 4px;
+}

@@ -28,6 +28,31 @@ describe('AuthService', () => {
     localStorage.clear();
   });
 
+  it('should expose the account plan from the login response', () => {
+    service.login('organizer1', 'password12345').subscribe();
+    httpMock.expectOne(`${environment.apiUrl}/auth/login`)
+      .flush({ token: fakeToken, user: { ...user, plan: 'paid' } });
+
+    expect(service.isPaidPlan()).toBe(true);
+  });
+
+  it('should treat a free plan as not paid', () => {
+    service.login('organizer1', 'password12345').subscribe();
+    httpMock.expectOne(`${environment.apiUrl}/auth/login`)
+      .flush({ token: fakeToken, user: { ...user, plan: 'free' } });
+
+    expect(service.isPaidPlan()).toBe(false);
+  });
+
+  it('should treat a profile with no plan as not paid', () => {
+    // A session cached before the field existed. Under-promising is safe here; the server
+    // gates every paid feature regardless of what the UI believes.
+    service.login('organizer1', 'password12345').subscribe();
+    httpMock.expectOne(`${environment.apiUrl}/auth/login`).flush({ token: fakeToken, user });
+
+    expect(service.isPaidPlan()).toBe(false);
+  });
+
   it('should store the session on successful login', () => {
     service.login('organizer1', 'password12345').subscribe();
 

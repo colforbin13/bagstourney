@@ -52,11 +52,31 @@ describe('HowItWorksComponent', () => {
     expect(text).toContain('save as a PDF');
   });
 
-  it('should explain all three creation choices', () => {
+  it('should explain all four creation choices', () => {
     setup();
     const terms: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.choices dt'))
       .map(dt => dt.textContent!.trim());
-    expect(terms).toEqual(['Public or private', 'Auto-draft or direct entry', 'Automatic or manual seeding']);
+    expect(terms).toEqual([
+      'Public or private',
+      'Auto-draft or direct entry',
+      'Automatic or manual seeding',
+      'Single or double elimination',
+    ]);
+  });
+
+  it('should say double elimination is paid and locks at bracket generation', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('Double elimination is a paid-plan feature');
+    expect(text).toContain("locked once the bracket is generated");
+  });
+
+  it('should explain how a double-elimination bracket actually runs', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('winners bracket');
+    expect(text).toContain('losers bracket');
+    expect(text).toContain('grand final');
   });
 
   it('should explain byes, which are otherwise unexplained anywhere in the app', () => {

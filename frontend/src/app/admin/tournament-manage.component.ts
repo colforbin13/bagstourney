@@ -5,6 +5,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TournamentService } from '../shared/services/tournament.service';
+import { AuthService } from '../shared/services/auth.service';
+import { championName } from '../shared/bracket-labels';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
@@ -40,6 +42,9 @@ interface SetupStep {
           <div class="tm-badges">
             <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
             <span class="badge badge-visibility-{{ tournament()!.visibility }}">{{ tournament()!.visibility }}</span>
+            @if (tournament()!.format === 'double') {
+              <span class="badge badge-visibility-private">double elimination</span>
+            }
             @if (tournament()!.seeding_mode === 'manual') {
               <span class="badge badge-visibility-private">manual seeding</span>
             }
@@ -204,6 +209,23 @@ interface SetupStep {
               <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
               <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
             </select>
+          </div>
+        }
+        <!-- Format sits outside the teams().length === 0 guard above on purpose: it only
+             locks once the bracket is generated, not once teams are drawn, so a
+             manual-seeding organizer can still change it while arranging the ladder. -->
+        @if (canManageSetup() && tournament()!.status === 'setup') {
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Format</div>
+            <select class="input" [ngModel]="tournament()!.format || 'single'"
+              (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
+              <option value="single">Single elimination — one loss and a team is out</option>
+              <option value="double" [disabled]="!canUseDoubleElimination()">
+                Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (paid plan)' }}
+              </option>
+            </select>
+            <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
+            @if (formatError()) { <div class="form-error">{{ formatError() }}</div> }
           </div>
         }
 
@@ -866,6 +888,8 @@ export class TournamentManageComponent implements OnInit {
   visibilityBusy = signal(false);
   seedingModeBusy = signal(false);
   teamEntryModeBusy = signal(false);
+  formatBusy = signal(false);
+  formatError = signal('');
 
   loading = signal(true);
   loadError = signal('');
@@ -915,7 +939,7 @@ export class TournamentManageComponent implements OnInit {
   qrKind = signal<'registration' | 'bracket' | null>(null);
   @ViewChild('qrCanvas') qrCanvasRef?: ElementRef<HTMLCanvasElement>;
 
-  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router) {}
+  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router, private auth: AuthService) {}
 
   ngOnInit() {
     this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
@@ -935,9 +959,7 @@ export class TournamentManageComponent implements OnInit {
         this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
         if (t.status === 'complete') {
           this.svc.getBracket(this.tournamentId).subscribe(data => {
-            const rounds = Object.entries(data.rounds).map(([n, m]) => ({ n: +n, m })).sort((a, b) => b.n - a.n);
-            const final = rounds[0]?.m[0] as any;
-            this.champion.set(final?.winner_name ?? null);
+            this.champion.set(championName(data));
           });
         }
 
@@ -1029,6 +1051,28 @@ export class TournamentManageComponent implements OnInit {
       error: () => {
         this.seedingModeBusy.set(false);
         this.showToast('Failed to update seeding mode.');
+      },
+    });
+  }
+
+  // Unlike the account-plan check on the create form, a tournament can also be unlocked by
+  // a super-admin-granted paid_override, so this asks the tournament rather than the user.
+  canUseDoubleElimination(): boolean {
+    return this.auth.isPaidPlan() || !!this.tournament()?.paid_override;
+  }
+
+  updateFormat(format: 'single' | 'double') {
+    if ((this.tournament()?.format || 'single') === format) return;
+    this.formatBusy.set(true);
+    this.formatError.set('');
+    this.svc.updateTournament(this.tournamentId, { format }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.formatBusy.set(false);
+      },
+      error: err => {
+        this.formatBusy.set(false);
+        this.formatError.set(err?.error?.error || 'Failed to update tournament format.');
       },
     });
   }

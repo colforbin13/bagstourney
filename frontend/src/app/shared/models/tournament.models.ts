@@ -58,6 +58,9 @@ export interface Tournament {
   visibility: 'public' | 'private';
   seeding_mode: 'automatic' | 'manual';
   team_entry_mode: 'auto_draft' | 'direct';
+  // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
+  // bracket is generated. Optional so responses predating migration 016 still parse.
+  format?: 'single' | 'double';
   created_at: string;
   // FEATURE_TRACKER item 13 plumbing: a per-tournament plan unlock, settable only by a
   // super admin (see TournamentController::update()) until real billing exists.
@@ -145,6 +148,12 @@ export interface Match {
   winner_id: number | null;
   next_match_id: number | null;
   next_match_slot: 1 | 2 | null;
+  // FEATURE_TRACKER item 16. Optional so responses predating migration 016 still parse;
+  // absent means a single-elimination match, i.e. bracket_side 'winners' with no loser edge.
+  loser_match_id?: number | null;
+  loser_match_slot?: 1 | 2 | null;
+  bracket_side?: 'winners' | 'losers' | 'grand_final';
+  is_reset?: 0 | 1;
   status: 'pending' | 'ready' | 'complete' | 'bye';
   team1_name: string | null;
   team2_name: string | null;
@@ -155,6 +164,23 @@ export interface Match {
   team2_participant2_name: string | null;
 }
 
+export interface BracketRound {
+  /** Structural round number within the side. Can start above 1 in a losers bracket whose
+   *  first round collapsed away, so render by position rather than by this value. */
+  round: number;
+  matches: Match[];
+}
+
+export interface BracketSide {
+  side: 'winners' | 'losers' | 'grand_final';
+  rounds: BracketRound[];
+}
+
 export interface BracketData {
-  rounds: { [round: number]: Match[] };
+  format: 'single' | 'double';
+  /** Ordered winners → losers → grand final. Single elimination has only `winners`. */
+  sides: BracketSide[];
+  /** Legacy grouping, present only for single elimination. Kept so a client cached before
+   *  the two-tree response existed still renders; new code should read `sides`. */
+  rounds?: { [round: number]: Match[] };
 }

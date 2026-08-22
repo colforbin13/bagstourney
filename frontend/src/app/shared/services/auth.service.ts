@@ -10,6 +10,10 @@ export interface AuthenticatedUser {
   username: string | null;
   email: string | null;
   role: 'super_admin' | 'organizer';
+  // Optional because a profile cached before this field existed will not carry it, and
+  // because it is presentation only — paid features are gated server-side, so treating a
+  // missing or stale value as 'free' can under-promise but never over-grant.
+  plan?: 'free' | 'paid';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,6 +26,7 @@ export class AuthService {
   readonly username = computed(() => this._username());
   readonly user = computed(() => this._user());
   readonly isSuperAdmin = computed(() => this._user()?.role === 'super_admin');
+  readonly isPaidPlan = computed(() => this._user()?.plan === 'paid');
   readonly token = computed(() => this._token());
 
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;

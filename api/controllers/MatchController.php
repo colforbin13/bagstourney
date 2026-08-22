@@ -48,13 +48,51 @@ class MatchController {
         $stmt->execute([$tournamentId]);
         $matches = $stmt->fetchAll();
 
-        // Group by round
-        $rounds = [];
+        $formatStmt = $this->db->prepare('SELECT format FROM tournaments WHERE id = ?');
+        $formatStmt->execute([$tournamentId]);
+        $formatRow = $formatStmt->fetch();
+        $format = $formatRow && $formatRow['format'] ? $formatRow['format'] : 'single';
+
+        // Grouped by bracket side first, then round. Round numbers restart per side in
+        // double elimination, so grouping on `round` alone — as this used to — merges
+        // winners round 2 with losers round 2 and renders them as one column.
+        $bySide = [];
         foreach ($matches as $match) {
-            $rounds[$match['round']][] = $match;
+            $side = isset($match['bracket_side']) && $match['bracket_side'] ? $match['bracket_side'] : 'winners';
+            $bySide[$side][(int)$match['round']][] = $match;
         }
 
-        echo json_encode(['rounds' => $rounds]);
+        $sides = [];
+        foreach (['winners', 'losers', 'grand_final'] as $side) {
+            if (empty($bySide[$side])) {
+                continue;
+            }
+            ksort($bySide[$side]);
+            $rounds = [];
+            foreach ($bySide[$side] as $round => $group) {
+                // Rounds are emitted as an ordered list rather than an object keyed by round
+                // number: a losers bracket whose first round collapsed away starts at round
+                // 2, and consumers care about a round's *position* within its side, not the
+                // structural number.
+                $rounds[] = ['round' => $round, 'matches' => $group];
+            }
+            $sides[] = ['side' => $side, 'rounds' => $rounds];
+        }
+
+        $payload = ['format' => $format, 'sides' => $sides];
+
+        if ($format !== 'double') {
+            // Legacy shape, for a client cached before the two-tree response existed. It is
+            // exactly right for single elimination and meaningless for double, so it is
+            // omitted there rather than shipped wrong.
+            $legacy = [];
+            foreach ($matches as $match) {
+                $legacy[$match['round']][] = $match;
+            }
+            $payload['rounds'] = $legacy;
+        }
+
+        echo json_encode($payload);
     }
 
     public function updateScore(int $matchId, array $body, array $actor): void {
@@ -125,28 +163,29 @@ class MatchController {
                 $this->enqueueMatchCompletedNotifications($match, $matchId);
             }
 
-            // Advance winner to next match. cascadePropagate() places the winner, marks the
-            // target ready once both slots are filled, and follows any chained byes — this
-            // used to be duplicated inline here as well, which meant two copies of the
-            // advance rule to keep in step.
-            if ($match['next_match_id']) {
-                $this->cascadePropagate($matchId);
+            // Advance the winner, and in double elimination drop the loser into the losers
+            // bracket. cascadePropagate() places both and re-evaluates whether each target
+            // is now playable.
+            $this->cascadePropagate($matchId);
 
-                if (!$wasComplete) {
-                    $this->enqueueRoundCompletedNotifications($match);
-                }
-            } else {
-                if (!$wasComplete) {
+            // Whether this finished the tournament is no longer something the match's own
+            // shape can answer: in double elimination a grand final may or may not be the
+            // last match, depending on which side won it. Ask for the champion instead.
+            $championId = $this->championOf((int)$match['tournament_id']);
+
+            if (!$wasComplete) {
+                if ($championId !== null) {
                     $this->enqueueTournamentFinalizedNotifications($match, $matchId);
+                } else {
+                    $this->enqueueRoundCompletedNotifications($match);
                 }
             }
 
-            // A tournament is complete exactly when its final has a winner. Deriving the
-            // status here, rather than only setting it in the final's branch above, is what
-            // makes editing an earlier score reopen a finished tournament: that edit clears
-            // the final via cascadeClearDownstream(), which previously left the tournament
-            // marked 'complete' with no champion.
-            $this->syncTournamentStatus((int)$match['tournament_id']);
+            // Deriving the status here, rather than only when the last match is played, is
+            // what makes editing an earlier score reopen a finished tournament: that edit
+            // clears the deciding match via cascadeClearDownstream(), which previously left
+            // the tournament marked 'complete' with no champion.
+            $this->syncTournamentStatus((int)$match['tournament_id'], $championId);
 
             $this->db->commit();
 
@@ -199,82 +238,199 @@ class MatchController {
         }
     }
 
-    // Clears downstream propagation of a match's winner by nulling the appropriate slot
-    // and recursively clearing any matches that were advanced from it. This allows
-    // editing of completed matches without leaving inconsistent downstream results.
-    private function cascadeClearDownstream(int $matchId): void {
-        // Get next match info for this match
-        $stmt = $this->db->prepare('SELECT next_match_id, next_match_slot FROM matches WHERE id = ?');
-        $stmt->execute([$matchId]);
-        $m = $stmt->fetch();
-        if (!$m || !$m['next_match_id']) return;
-
-        $nextId = (int)$m['next_match_id'];
-        $slot = (int)$m['next_match_slot'];
-        $col = $slot === 1 ? 'team1_id' : 'team2_id';
-
-        // Clear the slot in the next match and reset its result/status
-        $this->db->prepare("UPDATE matches SET $col = NULL, winner_id = NULL, team1_score = NULL, team2_score = NULL, status = 'pending' WHERE id = ?")
-            ->execute([$nextId]);
-
-        // Recurse to clear any further propagation from the next match
-        $this->cascadeClearDownstream($nextId);
-    }
-
     /**
-     * After a match completes, propagate its winner forward and cascade through
-     * subsequent rounds when target matches have only one team (byes). Do NOT
-     * auto-declare the final: final matches (next_match_id IS NULL) are left to play.
+     * Undo the downstream effects of a result that is being replaced.
+     *
+     * Follows *both* forward edges — where the winner advanced and where the loser dropped.
+     * In double elimination those two paths re-converge at the grand final, so a match can be
+     * reached twice; $visited keeps that from doing the work twice.
+     *
+     * The walk is driven by the data rather than the structure: a slot is cleared only when a
+     * team is actually sitting in it, and the recursion continues only when the match it just
+     * touched actually had a result to lose.
+     *
+     * Worth being precise about what that buys, because it is tempting to assume more. In a
+     * fully-played bracket it is *equivalent* to blindly walking every downstream edge, since
+     * each slot has exactly one feeder and a match cannot hold a result unless both slots were
+     * filled — so nothing downstream can survive an ancestor being withdrawn. The guards earn
+     * their place by stopping the walk the moment a branch was never populated (fewer queries,
+     * and no writes to matches that had nothing to undo) and by staying correct if a
+     * partially-populated shape ever appears — a losers-bracket walkover, say, which
+     * BracketBuilder currently designs out but nothing in this method depends on.
      */
-    private function cascadePropagate(int $sourceMatchId): void {
-        // Propagate only one round after a match completes: place the winner into the immediate
-        // next match slot. Do NOT auto-declare winners or cascade through multiple rounds here.
-        $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
-        $stmt->execute([$sourceMatchId]);
-        $m = $stmt->fetch();
-        if (!$m || !$m['next_match_id'] || !$m['winner_id']) return;
+    private function cascadeClearDownstream(int $matchId, array &$visited = []): void {
+        if (isset($visited[$matchId])) return;
+        $visited[$matchId] = true;
 
-        $nextId = (int)$m['next_match_id'];
-        $slot = (int)$m['next_match_slot'];
-        $col = $slot === 1 ? 'team1_id' : 'team2_id';
+        $stmt = $this->db->prepare('
+            SELECT next_match_id, next_match_slot, loser_match_id, loser_match_slot
+            FROM matches WHERE id = ?
+        ');
+        $stmt->execute([$matchId]);
+        $source = $stmt->fetch();
+        if (!$source) return;
 
-        // Place winner into next match slot
-        $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")->execute([$m['winner_id'], $nextId]);
+        $edges = [
+            [$source['next_match_id'], $source['next_match_slot']],
+            [$source['loser_match_id'], $source['loser_match_slot']],
+        ];
 
-        // Check target match and mark ready only when both slots are present.
-        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
-        $stmt2->execute([$nextId]);
-        $nm = $stmt2->fetch();
-        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
-            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
+        foreach ($edges as $edge) {
+            list($targetId, $targetSlot) = $edge;
+            if (!$targetId) continue;
+
+            $targetId = (int)$targetId;
+            $column = (int)$targetSlot === 1 ? 'team1_id' : 'team2_id';
+
+            $read = $this->db->prepare('SELECT team1_id, team2_id, winner_id FROM matches WHERE id = ?');
+            $read->execute([$targetId]);
+            $target = $read->fetch();
+
+            // Nothing ever propagated into this slot, so nothing beyond it depends on us.
+            // Each slot is fed by exactly one edge, so anything sitting here came from this
+            // match and is ours to withdraw.
+            if (!$target || $target[$column] === null) continue;
+
+            $hadResult = $target['winner_id'] !== null;
+
+            $this->db->prepare("
+                UPDATE matches
+                SET {$column} = NULL, winner_id = NULL, team1_score = NULL, team2_score = NULL, status = 'pending'
+                WHERE id = ?
+            ")->execute([$targetId]);
+
+            // The opponent may still be in place, which makes the match playable again as
+            // soon as the corrected result advances into it.
+            $this->refreshReadiness($targetId);
+
+            if ($hadResult) {
+                // That result was played with a team that has just been withdrawn, so its own
+                // winner and loser both have to be taken back too.
+                $this->cascadeClearDownstream($targetId, $visited);
+            }
         }
     }
 
     /**
-     * Derive the tournament's status from its final match: 'complete' once the final has a
-     * winner, 'active' while it does not. Deliberately only moves between those two — a
-     * tournament still in 'setup' has no bracket to read and must be left alone.
+     * After a match completes, place its winner into the match it advances to and, in double
+     * elimination, its loser into the losers-bracket match it drops to.
      *
-     * Single elimination has exactly one match with no next_match_id, so that identifies
-     * the final. Double elimination (FEATURE_TRACKER.md item 16) breaks that assumption —
-     * a grand final may be followed by a reset match — which is precisely why the rule
-     * lives in one place instead of being inlined at the call site.
+     * The grand final is the one special case. It feeds the reset match through both edges,
+     * but the reset is played only when the losers-bracket side (slot 2) wins it — at that
+     * point both teams carry a single loss. If the winners-bracket side holds, the tournament
+     * is over and nothing carries across.
      */
-    private function syncTournamentStatus(int $tournamentId): void {
+    private function cascadePropagate(int $sourceMatchId): void {
+        $stmt = $this->db->prepare('
+            SELECT team1_id, team2_id, winner_id, bracket_side, is_reset,
+                   next_match_id, next_match_slot, loser_match_id, loser_match_slot
+            FROM matches WHERE id = ?
+        ');
+        $stmt->execute([$sourceMatchId]);
+        $match = $stmt->fetch();
+        if (!$match || !$match['winner_id']) return;
+        if ($this->grandFinalEndsHere($match)) return;
+
+        $winnerId = (int)$match['winner_id'];
+        $loserId = $winnerId === (int)$match['team1_id'] ? $match['team2_id'] : $match['team1_id'];
+
+        $this->placeTeam($match['next_match_id'], $match['next_match_slot'], $winnerId);
+        $this->placeTeam($match['loser_match_id'], $match['loser_match_slot'], $loserId);
+    }
+
+    /**
+     * True when $match is a grand final that the winners-bracket side has just won, so the
+     * reset it points at must not be played.
+     */
+    private function grandFinalEndsHere(array $match): bool {
+        return ($match['bracket_side'] ?? 'winners') === 'grand_final'
+            && !(int)($match['is_reset'] ?? 0)
+            && (int)$match['winner_id'] === (int)$match['team1_id'];
+    }
+
+    /** Put a team into one slot of a target match, then re-evaluate whether it can be played. */
+    private function placeTeam($targetId, $targetSlot, $teamId): void {
+        if (!$targetId || $teamId === null) return;
+
+        $targetId = (int)$targetId;
+        $column = (int)$targetSlot === 1 ? 'team1_id' : 'team2_id';
+        $this->db->prepare("UPDATE matches SET {$column} = ? WHERE id = ?")
+            ->execute([(int)$teamId, $targetId]);
+
+        $this->refreshReadiness($targetId);
+    }
+
+    /**
+     * A match with both entrants present is playable; with fewer it is still waiting. Never
+     * touches a match that already has a result — reopening one is cascadeClearDownstream()'s
+     * job, and only when a participant was actually withdrawn.
+     */
+    private function refreshReadiness(int $matchId): void {
+        $stmt = $this->db->prepare('SELECT team1_id, team2_id, winner_id FROM matches WHERE id = ?');
+        $stmt->execute([$matchId]);
+        $match = $stmt->fetch();
+        if (!$match || $match['winner_id'] !== null) return;
+
+        $status = ($match['team1_id'] && $match['team2_id']) ? 'ready' : 'pending';
+        $this->db->prepare('UPDATE matches SET status = ? WHERE id = ?')->execute([$status, $matchId]);
+    }
+
+    /**
+     * The tournament's champion, or null while it is still being decided.
+     *
+     * Single elimination: the winner of the one match with no next_match_id.
+     *
+     * Double elimination: "no next match" stops meaning "the end", because the grand final
+     * points at a reset. The champion is the reset's winner when the reset was played, and
+     * otherwise the grand final's winner — but only if the winners-bracket side (slot 1) took
+     * it. A losers-bracket win levels the tournament at one loss each and sends it to the
+     * reset, so at that moment there is no champion yet.
+     */
+    private function championOf(int $tournamentId): ?int {
+        $stmt = $this->db->prepare('
+            SELECT is_reset, team1_id, winner_id
+            FROM matches
+            WHERE tournament_id = ? AND bracket_side = "grand_final"
+            ORDER BY is_reset
+        ');
+        $stmt->execute([$tournamentId]);
+        $grandFinals = $stmt->fetchAll();
+
+        if ($grandFinals) {
+            $grandFinal = $grandFinals[0];
+            $reset = isset($grandFinals[1]) ? $grandFinals[1] : null;
+
+            if ($reset && $reset['winner_id']) {
+                return (int)$reset['winner_id'];
+            }
+            if ($grandFinal['winner_id'] && (int)$grandFinal['winner_id'] === (int)$grandFinal['team1_id']) {
+                return (int)$grandFinal['winner_id'];
+            }
+            return null;
+        }
+
         $stmt = $this->db->prepare('
             SELECT winner_id FROM matches
             WHERE tournament_id = ? AND next_match_id IS NULL
         ');
         $stmt->execute([$tournamentId]);
         $final = $stmt->fetch();
-        if (!$final) return;
 
-        $status = $final['winner_id'] ? 'complete' : 'active';
+        return $final && $final['winner_id'] ? (int)$final['winner_id'] : null;
+    }
+
+    /**
+     * Derive the tournament's status from whether a champion exists. Deliberately only moves
+     * between 'active' and 'complete' — a tournament still in 'setup' has no bracket to read
+     * and must be left alone.
+     */
+    private function syncTournamentStatus(int $tournamentId, ?int $championId): void {
         $this->db->prepare('
             UPDATE tournaments SET status = ?
             WHERE id = ? AND status IN ("active", "complete")
-        ')->execute([$status, $tournamentId]);
+        ')->execute([$championId === null ? 'active' : 'complete', $tournamentId]);
     }
+
 
     // Notifies the 4 participants (2 per team) of this specific match. $match is the
     // pre-update row fetched at the top of updateScore(), so its tournament_id/round/
@@ -304,13 +460,20 @@ class MatchController {
     // reach this method, so a round completed purely via byes will not notify (accepted
     // limitation). Notifies every confirmed, opted-in participant in the whole tournament,
     // not just this match's own participants or those advancing.
+    //
+    // The round must be scoped by bracket_side as well. Round numbers restart per side in
+    // double elimination, so winners round 2 and losers round 2 are different rounds that
+    // finish at different times; matching on round alone would treat them as one and
+    // suppress both notifications until the later of the two completed.
     private function enqueueRoundCompletedNotifications(array $match): void {
         if (!NOTIFY_ROUND_COMPLETED_ENABLED) return;
+        $bracketSide = isset($match['bracket_side']) ? $match['bracket_side'] : 'winners';
         $remaining = $this->db->prepare('
             SELECT COUNT(*) FROM matches
-            WHERE tournament_id = ? AND round = ? AND status NOT IN ("complete", "bye")
+            WHERE tournament_id = ? AND round = ? AND bracket_side = ?
+              AND status NOT IN ("complete", "bye")
         ');
-        $remaining->execute([$match['tournament_id'], $match['round']]);
+        $remaining->execute([$match['tournament_id'], $match['round'], $bracketSide]);
         if ((int)$remaining->fetchColumn() !== 0) return;
 
         $stmt = $this->db->prepare('
@@ -327,9 +490,9 @@ class MatchController {
         }
     }
 
-    // Called only from the "no next_match_id" branch, which is structurally always the
-    // championship match — so this and enqueueRoundCompletedNotifications() never both
-    // fire for the same match. Notifies every confirmed, opted-in participant tournament-wide.
+    // Called only when championOf() has just returned a winner, so this and
+    // enqueueRoundCompletedNotifications() never both fire for the same match. Notifies
+    // every confirmed, opted-in participant tournament-wide.
     private function enqueueTournamentFinalizedNotifications(array $match, int $matchId): void {
         if (!NOTIFY_TOURNAMENT_FINALIZED_ENABLED) return;
         $stmt = $this->db->prepare('

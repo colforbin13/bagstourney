@@ -22,11 +22,24 @@ class TournamentController {
         (SELECT COUNT(*) FROM teams tm WHERE tm.tournament_id = t.id) AS team_count,
         (SELECT COUNT(*) FROM matches m WHERE m.tournament_id = t.id AND m.status <> 'bye') AS match_count,
         (SELECT COUNT(*) FROM matches m WHERE m.tournament_id = t.id AND m.status = 'complete') AS matches_played,
-        (SELECT MAX(m.round) FROM matches m WHERE m.tournament_id = t.id) AS total_rounds,
-        (SELECT MIN(m.round) FROM matches m WHERE m.tournament_id = t.id AND m.status IN ('pending', 'ready')) AS current_round,
+        (SELECT MAX(m.round) FROM matches m WHERE m.tournament_id = t.id AND m.bracket_side = 'winners') AS total_rounds,
+        (SELECT MIN(m.round) FROM matches m
+            WHERE m.tournament_id = t.id AND m.bracket_side = 'winners'
+              AND m.status IN ('pending', 'ready')) AS current_round,
+        -- Champion detection has to understand both formats. In single elimination the one
+        -- match with no next_match_id is the final. In double elimination that match is the
+        -- *reset*, which usually goes unplayed — so a finished tournament would report no
+        -- champion at all. Take the reset's winner when it was played, otherwise the grand
+        -- final's, and fall back to the single-elimination rule when there is no grand final.
         (SELECT w.name FROM matches m JOIN teams w ON w.id = m.winner_id
-            WHERE m.tournament_id = t.id AND m.next_match_id IS NULL AND m.winner_id IS NOT NULL
-            ORDER BY m.round DESC LIMIT 1) AS champion_name
+            WHERE m.tournament_id = t.id AND m.winner_id IS NOT NULL
+              AND (
+                    m.is_reset = 1
+                 OR (m.bracket_side = 'grand_final' AND m.winner_id = m.team1_id)
+                 OR (m.bracket_side <> 'grand_final' AND m.next_match_id IS NULL)
+              )
+            ORDER BY m.is_reset DESC, m.round DESC
+            LIMIT 1) AS champion_name
     ";
 
     public function list(?array $actor = null): void {
@@ -132,10 +145,23 @@ class TournamentController {
         $visibility = in_array($body['visibility'] ?? null, ['public', 'private'], true) ? $body['visibility'] : 'public';
         $seedingMode = in_array($body['seeding_mode'] ?? null, ['automatic', 'manual'], true) ? $body['seeding_mode'] : 'automatic';
         $teamEntryMode = in_array($body['team_entry_mode'] ?? null, ['auto_draft', 'direct'], true) ? $body['team_entry_mode'] : 'auto_draft';
+        $format = in_array($body['format'] ?? null, ['single', 'double'], true) ? $body['format'] : 'single';
+
+        // Paid-tier feature gate. The frontend hides the option, but that is UX only — this
+        // is the authorization boundary. Only the account plan can be consulted here: the
+        // tournament does not exist yet, so it cannot carry a per-tournament override. An
+        // organizer with an override but a free plan can still create as single and switch
+        // via update() once the row exists.
+        if (formatRequiresPaidPlan($format) && !userHasPaidPlan($this->db, (int)$actor['id'])) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Double elimination is a paid-plan feature. Upgrade to use it.']);
+            return;
+        }
+
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, seeding_mode, team_entry_mode, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $seedingMode, $teamEntryMode, $actor['id']]);
+            $stmt = $this->db->prepare('INSERT INTO tournaments (name, uuid, visibility, seeding_mode, team_entry_mode, format, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?)');
+            $stmt->execute([$name, $this->generateUuidV4(), $visibility, $seedingMode, $teamEntryMode, $format, $actor['id']]);
             $id = (int)$this->db->lastInsertId();
             $this->db->prepare('INSERT INTO tournament_members (tournament_id, user_id, role, granted_by_user_id) VALUES (?, ?, "owner", ?)')
                 ->execute([$id, $actor['id'], $actor['id']]);
@@ -224,6 +250,39 @@ class TournamentController {
             }
             $fields[] = 'team_entry_mode = ?';
             $params[] = $body['team_entry_mode'];
+        }
+        if (isset($body['format'])) {
+            if (!in_array($body['format'], ['single', 'double'], true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid tournament format']);
+                return;
+            }
+            // Locked once the bracket exists, which is exactly when status leaves 'setup'.
+            //
+            // Note this is a *weaker* lock than seeding_mode/team_entry_mode above, which
+            // also refuse once teams exist. Those two govern how teams are formed, so they
+            // are already spent by then; format governs the bracket, which does not exist
+            // yet. Locking format on team count too would strand manual-seeding organizers:
+            // teams are drawn while the tournament stays in 'setup', so a double-elimination
+            // tournament whose plan lapsed in that window could neither generate its bracket
+            // nor drop back to single elimination.
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$id]);
+            $t = $stmt->fetch();
+            if (!$t || $t['status'] !== 'setup') {
+                http_response_code(400);
+                echo json_encode(['error' => 'Tournament format can only be changed before the bracket is generated']);
+                return;
+            }
+            // Unlike create(), both levers are available here — the tournament row exists, so
+            // a super-admin-granted paid_override counts as well as the owner's account plan.
+            if (formatRequiresPaidPlan($body['format']) && !tournamentHasPaidFeatures($this->db, $id)) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Double elimination is a paid-plan feature. Upgrade to use it.']);
+                return;
+            }
+            $fields[] = 'format = ?';
+            $params[] = $body['format'];
         }
         if (isset($body['paid_override'])) {
             // FEATURE_TRACKER item 13 plumbing: a one-time per-tournament unlock, set

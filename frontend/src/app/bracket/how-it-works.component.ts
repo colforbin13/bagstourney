@@ -50,6 +50,16 @@ import { AuthService } from '../shared/services/auth.service';
               gives you a drag-and-drop ladder to arrange first. Pick manual if you know who
               the strong teams are and want them apart in the bracket.
             </dd>
+            <dt>Single or double elimination</dt>
+            <dd>
+              Single elimination is one loss and you're out. Double elimination gives every
+              team a second chance: your first loss drops you into a losers bracket, and only
+              a second knocks you out. It's kinder to a team that draws the eventual champion
+              early, at the cost of roughly twice as many games.
+              <strong>Double elimination is a paid-plan feature</strong>, and unlike the other
+              choices here it's locked once the bracket is generated — the bracket's whole
+              shape depends on it.
+            </dd>
           </dl>
         </li>
 
@@ -86,8 +96,15 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 04</span>
           <h2>The bracket gets built</h2>
           <p>
-            Single elimination: lose once and you're out. Your teams get slotted into the
-            nearest bracket that fits them — 8 teams into 8 slots, 9 teams into 16.
+            Your teams get slotted into the nearest bracket that fits them — 8 teams into 8
+            slots, 9 teams into 16. In single elimination, losing once ends your run.
+          </p>
+          <p>
+            In double elimination the same tree becomes the <strong>winners bracket</strong>,
+            and a second <strong>losers bracket</strong> runs alongside it collecting everyone
+            knocked out of the first. The two survivors meet in a grand final. If the team
+            coming up from the losers bracket wins it, both sides have one loss each and a
+            single deciding rematch is played.
           </p>
           <p>
             When the count isn't a clean power of two, the leftover slots become

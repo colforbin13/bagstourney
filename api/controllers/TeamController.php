@@ -100,7 +100,8 @@ class TeamController {
             // 'setup' until the organizer confirms a seed order via generateBracketAction().
             // Automatic seeding (the default) generates the bracket immediately, unchanged.
             if (($tournament['seeding_mode'] ?? 'automatic') === 'automatic') {
-                $this->generateBracket($tournamentId, $teams);
+                $this->requireFormatAllowed($tournamentId, $tournament['format'] ?? 'single');
+                $this->generateBracket($tournamentId, $teams, $tournament['format'] ?? 'single');
                 $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                     ->execute(['active', $tournamentId]);
             }
@@ -276,7 +277,7 @@ class TeamController {
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt = $this->db->prepare('SELECT status, format FROM tournaments WHERE id = ?');
             $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch();
             if (!$tournament || $tournament['status'] !== 'setup') {
@@ -295,7 +296,8 @@ class TeamController {
                 throw new Exception('Need at least 2 teams to generate a bracket');
             }
 
-            $this->generateBracket($tournamentId, $teams);
+            $this->requireFormatAllowed($tournamentId, $tournament['format'] ?? 'single');
+            $this->generateBracket($tournamentId, $teams, $tournament['format'] ?? 'single');
 
             $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                 ->execute(['active', $tournamentId]);
@@ -385,17 +387,41 @@ class TeamController {
     }
 
     /**
-     * Persist a single-elimination bracket for $teams.
+     * The second half of the paid-tier format gate (TournamentController::create()/update()
+     * is the first): re-checked here because the format could have been chosen while the
+     * plan was active and the bracket generated after it lapsed.
      *
-     * The bracket's *shape* — pairings, byes, where winners advance — is computed by
-     * BracketBuilder, which is pure and unit-tested in tests/BracketBuilderTest.php. This
-     * method only writes that shape out. Keep the split: bracket logic that lives here
-     * cannot be tested without a database, which is what made this the riskiest code in
-     * the repo to change (see FEATURE_TRACKER.md item 16).
+     * Deliberately the *last* moment it is ever checked. Once the bracket exists nothing
+     * re-validates it, so a lapsed plan can never break a tournament that is already being
+     * played — the worst available failure mode is a live bracket dying at a venue mid-event.
      *
-     * @param array $teams Rows with at least 'id' and 'seed'.
+     * Throwing leaves the caller's transaction to roll back, so a tournament that fails here
+     * still has no teams and no bracket, and stays in 'setup' where its format can be
+     * switched back to single elimination.
      */
-    private function generateBracket(int $tournamentId, array $teams): void {
+    private function requireFormatAllowed(int $tournamentId, string $format): void {
+        if (formatRequiresPaidPlan($format) && !tournamentHasPaidFeatures($this->db, $tournamentId)) {
+            throw new Exception(
+                'Double elimination is a paid-plan feature. Upgrade, or switch this tournament to single elimination.'
+            );
+        }
+    }
+
+    /**
+     * Persist a bracket for $teams.
+     *
+     * The bracket's *shape* — pairings, byes, where winners advance, where losers drop — is
+     * computed by BracketBuilder, which is pure and unit-tested in
+     * tests/BracketBuilderTest.php and tests/BracketDoubleEliminationTest.php. This method
+     * only writes that shape out. Keep the split: bracket logic that lives here cannot be
+     * tested without a database, which is what made this the riskiest code in the repo to
+     * change (see FEATURE_TRACKER.md item 16).
+     *
+     * @param array  $teams  Rows with at least 'id' and 'seed'.
+     * @param string $format 'single' or 'double'. Anything else is treated as 'single', so a
+     *                       row predating the format column can never be read as double.
+     */
+    private function generateBracket(int $tournamentId, array $teams, string $format = 'single'): void {
         $seedToTeamId = [];
         foreach ($teams as $team) {
             $seedToTeamId[(int)$team['seed']] = (int)$team['id'];
@@ -403,11 +429,14 @@ class TeamController {
 
         // Throws on a field smaller than two teams or on gapped seeds. Both surface through
         // the caller's catch block as a 400 instead of silently producing a wrong draw.
-        $plan = BracketBuilder::singleElimination($seedToTeamId);
+        $plan = $format === 'double'
+            ? BracketBuilder::doubleElimination($seedToTeamId)
+            : BracketBuilder::singleElimination($seedToTeamId);
 
         $insert = $this->db->prepare('
-            INSERT INTO matches (tournament_id, round, match_number, team1_id, team2_id, winner_id, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO matches
+                (tournament_id, round, match_number, bracket_side, is_reset, team1_id, team2_id, winner_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $matchIds = [];
         foreach ($plan as $index => $match) {
@@ -415,6 +444,8 @@ class TeamController {
                 $tournamentId,
                 $match['round'],
                 $match['match_number'],
+                $match['bracket_side'],
+                $match['is_reset'] ? 1 : 0,
                 $match['team1_id'],
                 $match['team2_id'],
                 $match['winner_id'],
@@ -424,13 +455,24 @@ class TeamController {
         }
 
         // Second pass: the builder's forward pointers are array indexes, which can only be
-        // resolved to real match ids once every row above exists.
-        $link = $this->db->prepare('UPDATE matches SET next_match_id = ?, next_match_slot = ? WHERE id = ?');
+        // resolved to real match ids once every row above exists. Both edges are written in
+        // one statement so a match is never left half-linked.
+        $link = $this->db->prepare('
+            UPDATE matches
+            SET next_match_id = ?, next_match_slot = ?, loser_match_id = ?, loser_match_slot = ?
+            WHERE id = ?
+        ');
         foreach ($plan as $index => $match) {
-            if ($match['next_match'] === null) {
+            if ($match['next_match'] === null && $match['loser_match'] === null) {
                 continue;
             }
-            $link->execute([$matchIds[$match['next_match']], $match['next_match_slot'], $matchIds[$index]]);
+            $link->execute([
+                $match['next_match'] === null ? null : $matchIds[$match['next_match']],
+                $match['next_match_slot'],
+                $match['loser_match'] === null ? null : $matchIds[$match['loser_match']],
+                $match['loser_match_slot'],
+                $matchIds[$index],
+            ]);
         }
     }
 }

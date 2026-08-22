@@ -2,7 +2,7 @@
 
 ## Project overview
 
-Bracketway is a mobile-first single-elimination tournament manager.
+Bracketway is a mobile-first tournament manager, supporting single and double elimination.
 
 - `api/` contains the PHP JSON API and front controller.
 - `frontend/` contains the Angular application.
@@ -84,10 +84,17 @@ Pure logic in `api/lib/` **must include unit tests** in `tests/`. Run them with
 Composer and no `vendor/` directory, deliberately: production runs PHP 7.2 on hardware
 that can't be upgraded yet.
 
-- **Nothing in `tests/` may touch a database, network, or credentials.** Extract the logic
-  worth testing into `api/lib/` as a pure function, and keep the controller as a thin layer
-  that persists the result. Where the persistence mapping itself is worth covering, use a
-  recording PDO double (see `tests/BracketPersistenceTest.php`), not a real connection.
+- **Nothing in `tests/` may touch an external database, the network, or credentials.**
+  Extract the logic worth testing into `api/lib/` as a pure function, and keep the
+  controller as a thin layer that persists the result. Where the persistence mapping itself
+  is worth covering, use a recording PDO double (see `tests/BracketPersistenceTest.php`).
+  Where the logic reads back state it just wrote — the match cascade does — an **in-memory
+  SQLite** database is allowed (see `tests/MatchCascadeTest.php`); its schema is a hand-kept
+  mirror of the MySQL one, so update it when a migration changes those tables. Never point a
+  test at the real database.
+- **When you add tests for risky logic, prove they bite.** Deliberately break the code and
+  confirm a test fails before trusting a green run. The cascade suite was written this way,
+  and the exercise corrected a comment that claimed more than the code actually did.
 - Code under `api/` must stay PHP 7.2-compatible — no typed properties, arrow functions,
   `??=`, `match`, constructor promotion, or union types. Declare class properties
   explicitly (`private $db;`); dynamic properties are deprecated in PHP 8.2+.

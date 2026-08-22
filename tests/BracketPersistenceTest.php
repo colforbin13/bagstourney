@@ -13,7 +13,7 @@ require_once __DIR__ . '/../api/controllers/TeamController.php';
  *
  * BracketBuilder returns forward pointers as array indexes, because real match ids do not
  * exist until the rows are inserted. Translating those indexes into ids is the one place
- * the refactor could plausibly go wrong, and it is invisible to BracketBuilderTest. A
+ * the refactor could plausibly go wrong, and it is invisible to the builder's own tests. A
  * recording PDO double lets us assert the exact statement sequence with no database.
  */
 final class BracketPersistenceTest extends TestCase
@@ -23,6 +23,9 @@ final class BracketPersistenceTest extends TestCase
 
     /** Stands in for AUTO_INCREMENT; the first inserted match becomes id 1001. */
     private int $lastInsertId = 1000;
+
+    private const FIRST_ID = 1001;
+    private const TOURNAMENT_ID = 7;
 
     private function recordingPdo(): PDO
     {
@@ -50,19 +53,29 @@ final class BracketPersistenceTest extends TestCase
         return $pdo;
     }
 
-    private function generateBracketFor(int $numTeams): array
+    private function seedRows(int $numTeams): array
     {
         $teams = [];
         for ($seed = 1; $seed <= $numTeams; $seed++) {
             $teams[] = ['id' => 100 + $seed, 'seed' => $seed];
         }
-
-        $controller = new TeamController($this->recordingPdo());
-
-        $method = new ReflectionMethod(TeamController::class, 'generateBracket');
-        $method->invoke($controller, 7, $teams);
-
         return $teams;
+    }
+
+    private function seedMap(int $numTeams): array
+    {
+        $map = [];
+        for ($seed = 1; $seed <= $numTeams; $seed++) {
+            $map[$seed] = 100 + $seed;
+        }
+        return $map;
+    }
+
+    private function generateBracketFor(int $numTeams, string $format = 'single'): void
+    {
+        $controller = new TeamController($this->recordingPdo());
+        $method = new ReflectionMethod(TeamController::class, 'generateBracket');
+        $method->invoke($controller, self::TOURNAMENT_ID, $this->seedRows($numTeams), $format);
     }
 
     private function statementsMatching(string $needle): array
@@ -72,29 +85,61 @@ final class BracketPersistenceTest extends TestCase
         }));
     }
 
+    /** The params generateBracket() should insert for one planned match. */
+    private function expectedInsert(array $match): array
+    {
+        return [
+            self::TOURNAMENT_ID,
+            $match['round'],
+            $match['match_number'],
+            $match['bracket_side'],
+            $match['is_reset'] ? 1 : 0,
+            $match['team1_id'],
+            $match['team2_id'],
+            $match['winner_id'],
+            $match['status'],
+        ];
+    }
+
+    /** The link params for one planned match, or null when it has no outgoing edge. */
+    private function expectedLink(array $match, int $index): ?array
+    {
+        if ($match['next_match'] === null && $match['loser_match'] === null) {
+            return null;
+        }
+        return [
+            $match['next_match'] === null ? null : self::FIRST_ID + $match['next_match'],
+            $match['next_match_slot'],
+            $match['loser_match'] === null ? null : self::FIRST_ID + $match['loser_match'],
+            $match['loser_match_slot'],
+            self::FIRST_ID + $index,
+        ];
+    }
+
+    private function expectedLinks(array $plan): array
+    {
+        $expected = [];
+        foreach ($plan as $index => $match) {
+            $link = $this->expectedLink($match, $index);
+            if ($link !== null) {
+                $expected[] = $link;
+            }
+        }
+        return $expected;
+    }
+
+    // ----------------------------------------------------------------- single elimination
+
     public function testInsertsOneRowPerPlannedMatchInPlanOrder(): void
     {
         $this->generateBracketFor(5);
 
-        $plan = BracketBuilder::singleElimination([1 => 101, 2 => 102, 3 => 103, 4 => 104, 5 => 105]);
+        $plan = BracketBuilder::singleElimination($this->seedMap(5));
         $inserts = $this->statementsMatching('INSERT INTO matches');
 
         $this->assertCount(count($plan), $inserts);
-
         foreach ($plan as $index => $match) {
-            $this->assertSame(
-                [
-                    7, // tournament id
-                    $match['round'],
-                    $match['match_number'],
-                    $match['team1_id'],
-                    $match['team2_id'],
-                    $match['winner_id'],
-                    $match['status'],
-                ],
-                $inserts[$index]['params'],
-                "Insert params for plan index {$index}"
-            );
+            $this->assertSame($this->expectedInsert($match), $inserts[$index]['params'], "insert {$index}");
         }
     }
 
@@ -102,35 +147,31 @@ final class BracketPersistenceTest extends TestCase
     {
         $this->generateBracketFor(5);
 
-        $plan = BracketBuilder::singleElimination([1 => 101, 2 => 102, 3 => 103, 4 => 104, 5 => 105]);
+        $plan = BracketBuilder::singleElimination($this->seedMap(5));
         $links = $this->statementsMatching('UPDATE matches SET next_match_id');
 
-        $expected = [];
-        foreach ($plan as $index => $match) {
-            if ($match['next_match'] === null) {
-                continue;
-            }
-            // Plan index N was inserted Nth, so it holds id 1001 + N.
-            $expected[] = [
-                1001 + $match['next_match'],
-                $match['next_match_slot'],
-                1001 + $index,
-            ];
-        }
+        $this->assertSame($this->expectedLinks($plan), array_column($links, 'params'));
+    }
 
-        $this->assertSame($expected, array_column($links, 'params'));
+    public function testSingleEliminationWritesNoLoserEdges(): void
+    {
+        $this->generateBracketFor(8);
+
+        $links = $this->statementsMatching('UPDATE matches SET next_match_id');
+        $this->assertNotEmpty($links);
+        foreach ($links as $link) {
+            $this->assertNull($link['params'][2], 'loser_match_id must stay null in single elimination');
+            $this->assertNull($link['params'][3], 'loser_match_slot must stay null in single elimination');
+        }
     }
 
     public function testFinalMatchIsNeverGivenAForwardPointer(): void
     {
         $this->generateBracketFor(8);
 
-        $links = $this->statementsMatching('UPDATE matches SET next_match_id');
-        $inserts = $this->statementsMatching('INSERT INTO matches');
-
-        // An 8-team bracket has 7 matches; every one but the final is linked forward.
-        $this->assertCount(7, $inserts);
-        $this->assertCount(6, $links);
+        // An 8-team single-elimination bracket has 7 matches; every one but the final links on.
+        $this->assertCount(7, $this->statementsMatching('INSERT INTO matches'));
+        $this->assertCount(6, $this->statementsMatching('UPDATE matches SET next_match_id'));
     }
 
     public function testEachStatementIsPreparedOnlyOnce(): void
@@ -139,7 +180,7 @@ final class BracketPersistenceTest extends TestCase
 
         $distinctSql = array_unique(array_column($this->log, 'sql'));
 
-        // One INSERT shape and one UPDATE shape, reused across every row — the previous
+        // One INSERT shape and one UPDATE shape, reused across every row — the pre-refactor
         // implementation re-prepared inside the loop and issued an extra SELECT per match.
         $this->assertCount(2, $distinctSql);
         $this->assertSame([], $this->statementsMatching('SELECT'), 'Persisting a bracket should not read back');
@@ -151,16 +192,104 @@ final class BracketPersistenceTest extends TestCase
         $method = new ReflectionMethod(TeamController::class, 'generateBracket');
 
         try {
-            $method->invoke($controller, 7, [
+            $method->invoke($controller, self::TOURNAMENT_ID, [
                 ['id' => 101, 'seed' => 1],
                 ['id' => 102, 'seed' => 2],
                 ['id' => 104, 'seed' => 4],
-            ]);
+            ], 'single');
             $this->fail('Expected gapped seeds to be rejected');
         } catch (InvalidArgumentException $e) {
             $this->assertStringContainsString('contiguous', $e->getMessage());
         }
 
         $this->assertSame([], $this->log, 'No rows may be written for an invalid draw');
+    }
+
+    // ----------------------------------------------------------------- double elimination
+
+    public function testDoubleEliminationInsertsEveryPlannedMatch(): void
+    {
+        $this->generateBracketFor(8, 'double');
+
+        $plan = BracketBuilder::doubleElimination($this->seedMap(8));
+        $inserts = $this->statementsMatching('INSERT INTO matches');
+
+        $this->assertCount(count($plan), $inserts);
+        foreach ($plan as $index => $match) {
+            $this->assertSame($this->expectedInsert($match), $inserts[$index]['params'], "insert {$index}");
+        }
+    }
+
+    public function testDoubleEliminationResolvesBothEdgesToMatchIds(): void
+    {
+        $this->generateBracketFor(8, 'double');
+
+        $plan = BracketBuilder::doubleElimination($this->seedMap(8));
+        $links = $this->statementsMatching('UPDATE matches SET next_match_id');
+
+        $this->assertSame($this->expectedLinks($plan), array_column($links, 'params'));
+
+        // Sanity: the fixture must actually exercise loser edges, or the assertion above
+        // would pass on a bracket that never wrote one.
+        $withLoserEdge = array_filter($links, function (array $link): bool {
+            return $link['params'][2] !== null;
+        });
+        $this->assertNotEmpty($withLoserEdge);
+    }
+
+    public function testDoubleEliminationPersistsBracketSideAndResetFlag(): void
+    {
+        $this->generateBracketFor(8, 'double');
+
+        $sides = [];
+        $resets = 0;
+        foreach ($this->statementsMatching('INSERT INTO matches') as $insert) {
+            $side = $insert['params'][3];
+            $sides[$side] = ($sides[$side] ?? 0) + 1;
+            $resets += $insert['params'][4];
+        }
+
+        $this->assertSame(7, $sides[BracketBuilder::SIDE_WINNERS]);
+        $this->assertSame(6, $sides[BracketBuilder::SIDE_LOSERS]);
+        $this->assertSame(2, $sides[BracketBuilder::SIDE_GRAND_FINAL]);
+        $this->assertSame(1, $resets, 'exactly one reset match, flagged');
+    }
+
+    public function testTheGrandFinalCarriesBothParticipantsIntoTheReset(): void
+    {
+        $plan = BracketBuilder::doubleElimination($this->seedMap(8));
+
+        $grandFinal = null;
+        $resetIndex = null;
+        foreach ($plan as $index => $match) {
+            if ($match['bracket_side'] !== BracketBuilder::SIDE_GRAND_FINAL) {
+                continue;
+            }
+            if ($match['is_reset']) {
+                $resetIndex = $index;
+            } else {
+                $grandFinal = $match;
+            }
+        }
+
+        // Winner into slot 1, loser into slot 2 — the ordinary two-edge pair, which is why
+        // the reset needs no special-case source plumbing.
+        $this->assertSame($resetIndex, $grandFinal['next_match']);
+        $this->assertSame(1, $grandFinal['next_match_slot']);
+        $this->assertSame($resetIndex, $grandFinal['loser_match']);
+        $this->assertSame(2, $grandFinal['loser_match_slot']);
+    }
+
+    public function testUnknownFormatFallsBackToSingleElimination(): void
+    {
+        // A row written before the format column existed, or any value the enum later grows,
+        // must never be read as double elimination.
+        $this->generateBracketFor(8, 'something-else');
+
+        $inserts = $this->statementsMatching('INSERT INTO matches');
+        $this->assertCount(7, $inserts);
+        foreach ($inserts as $insert) {
+            $this->assertSame(BracketBuilder::SIDE_WINNERS, $insert['params'][3]);
+        }
     }
 }

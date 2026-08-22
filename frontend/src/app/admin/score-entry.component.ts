@@ -240,16 +240,20 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
 
   canScore = computed(() => this.tournament()?.capabilities?.can_score ?? false);
 
+  // Flattened in play order: the whole winners bracket, then the losers bracket, then the
+  // grand final. Labels are qualified per side, so "Round 2" alone can never be ambiguous
+  // between the two trees.
   private flatMatches = computed<ScoreRow[]>(() => {
     const data = this.bracketData();
     if (!data) return [];
-    const roundNums = Object.keys(data.rounds).map(Number).sort((a, b) => a - b);
-    const total = roundNums.length;
     const out: ScoreRow[] = [];
-    roundNums.forEach((num, i) => {
-      const label = roundLabel(i + 1, total);
-      for (const match of data.rounds[num]) out.push({ match, label });
-    });
+    for (const side of data.sides ?? []) {
+      const total = side.rounds.length;
+      side.rounds.forEach((round, i) => {
+        const label = roundLabel(i + 1, total, side.side, data.format);
+        for (const match of round.matches) out.push({ match, label });
+      });
+    }
     return out;
   });
 
@@ -294,7 +298,8 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
 
   private applyBracket(data: BracketData) {
     this.bracketData.set(data);
-    for (const match of Object.values(data.rounds).flat() as Match[]) {
+    const allMatches: Match[] = (data.sides ?? []).flatMap(side => side.rounds.flatMap(r => r.matches));
+    for (const match of allMatches) {
       // Only seed a row that has no entry yet, so a background refresh never wipes a
       // score somebody is halfway through typing.
       if (!this.scores[match.id]) {

@@ -6,6 +6,7 @@ import { ScoreEntryComponent } from './score-entry.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { BracketData, Match, Tournament, TournamentCapabilities } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
+import { singleEliminationBracket, emptyBracket } from '../shared/testing/bracket-fixtures';
 
 describe('ScoreEntryComponent', () => {
   let component: ScoreEntryComponent;
@@ -46,15 +47,13 @@ describe('ScoreEntryComponent', () => {
   }
 
   // A two-round bracket: two ready semifinals, one pending final.
-  const bracket: BracketData = {
-    rounds: {
+  const bracket: BracketData = singleEliminationBracket({
       1: [
         match({ id: 101, match_number: 1, status: 'ready' }),
         match({ id: 102, match_number: 2, status: 'ready', team1_name: 'Charlie', team2_name: 'Delta' }),
       ],
-      2: [match({ id: 201, round: 2, match_number: 1, status: 'pending', team1_name: null, team2_name: null })],
-    },
-  } as unknown as BracketData;
+    2: [match({ id: 201, round: 2, match_number: 1, status: 'pending', team1_name: null, team2_name: null })],
+  });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -96,9 +95,9 @@ describe('ScoreEntryComponent', () => {
   });
 
   it('should leave out byes, which have no score to enter', () => {
-    bootstrap(tournamentWith(scorer), {
-      rounds: { 1: [match({ id: 301, status: 'bye' }), match({ id: 302, status: 'ready' })] },
-    } as unknown as BracketData);
+    bootstrap(tournamentWith(scorer), singleEliminationBracket({
+      1: [match({ id: 301, status: 'bye' }), match({ id: 302, status: 'ready' })],
+    }));
 
     expect(component.readyMatches().map(r => r.match.id)).toEqual([302]);
   });
@@ -179,15 +178,13 @@ describe('ScoreEntryComponent', () => {
   });
 
   it('should offer completed matches for correction, newest first', () => {
-    bootstrap(tournamentWith(scorer), {
-      rounds: {
+    bootstrap(tournamentWith(scorer), singleEliminationBracket({
         1: [
           match({ id: 101, match_number: 1, status: 'complete', team1_score: 21, team2_score: 9, winner_id: 10 }),
           match({ id: 102, match_number: 2, status: 'complete', team1_score: 21, team2_score: 15, winner_id: 10 }),
         ],
-        2: [match({ id: 201, round: 2, match_number: 1, status: 'ready' })],
-      },
-    } as unknown as BracketData);
+      2: [match({ id: 201, round: 2, match_number: 1, status: 'ready' })],
+    }));
 
     expect(component.completedMatches().map(r => r.match.id)).toEqual([102, 101]);
     expect(component.readyMatches().map(r => r.match.id)).toEqual([201]);
@@ -195,7 +192,7 @@ describe('ScoreEntryComponent', () => {
 
   it('should seed the inputs with the existing result when correcting a score', () => {
     const done = match({ id: 101, status: 'complete', team1_score: 21, team2_score: 9 });
-    bootstrap(tournamentWith(scorer), { rounds: { 1: [done] } } as unknown as BracketData);
+    bootstrap(tournamentWith(scorer), singleEliminationBracket({ 1: [done] }));
 
     component.startEdit(done);
 
@@ -212,15 +209,15 @@ describe('ScoreEntryComponent', () => {
   });
 
   it('should explain an empty list differently once the tournament is finished', () => {
-    bootstrap(tournamentWith(scorer, 'complete'), {
-      rounds: { 1: [match({ id: 101, status: 'complete', team1_score: 21, team2_score: 9 })] },
-    } as unknown as BracketData);
+    bootstrap(tournamentWith(scorer, 'complete'), singleEliminationBracket({
+      1: [match({ id: 101, status: 'complete', team1_score: 21, team2_score: 9 })],
+    }));
 
     expect(fixture.nativeElement.querySelector('.empty').textContent).toContain('finished');
   });
 
   it('should explain an empty list differently before the bracket exists', () => {
-    bootstrap(tournamentWith(scorer, 'setup'), { rounds: {} } as BracketData);
+    bootstrap(tournamentWith(scorer, 'setup'), emptyBracket());
     expect(fixture.nativeElement.querySelector('.empty').textContent).toContain("hasn't been generated");
   });
 

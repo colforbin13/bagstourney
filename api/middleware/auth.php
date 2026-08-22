@@ -147,6 +147,15 @@ const FREEMIUM_FREE_TIER_MAX_PARTICIPANTS = 32;
 const FREEMIUM_PAID_TIER_MAX_PARTICIPANTS = 256;
 
 function effectiveParticipantCap(PDO $db, int $tournamentId): int {
+    return tournamentHasPaidFeatures($db, $tournamentId)
+        ? FREEMIUM_PAID_TIER_MAX_PARTICIPANTS
+        : FREEMIUM_FREE_TIER_MAX_PARTICIPANTS;
+}
+
+// Either lever unlocks paid features for a tournament: the owner's account plan (item 12)
+// or the per-tournament override (item 13). They are deliberately independent — a
+// free-plan organizer can unlock a single big event without subscribing.
+function tournamentHasPaidFeatures(PDO $db, int $tournamentId): bool {
     $stmt = $db->prepare('
         SELECT t.paid_override, u.plan
         FROM tournaments t
@@ -155,8 +164,28 @@ function effectiveParticipantCap(PDO $db, int $tournamentId): int {
     ');
     $stmt->execute([$tournamentId]);
     $row = $stmt->fetch();
-    $isPaid = $row && ((int)$row['paid_override'] === 1 || $row['plan'] === 'paid');
-    return $isPaid ? FREEMIUM_PAID_TIER_MAX_PARTICIPANTS : FREEMIUM_FREE_TIER_MAX_PARTICIPANTS;
+    return $row && ((int)$row['paid_override'] === 1 || $row['plan'] === 'paid');
+}
+
+// The account-plan half on its own, for decisions made before a tournament row exists —
+// i.e. choosing a format at creation time, when there is nothing yet to carry an override.
+function userHasPaidPlan(PDO $db, int $userId): bool {
+    $stmt = $db->prepare('SELECT plan FROM users WHERE id = ?');
+    $stmt->execute([$userId]);
+    $row = $stmt->fetch();
+    return $row && $row['plan'] === 'paid';
+}
+
+// Double elimination is the paid tier's first real *feature* gate, as opposed to items
+// 12/13's numeric cap (FEATURE_TRACKER.md item 16). Deliberately checked at two moments
+// only — choosing the format, and generating the bracket from it — and never while a
+// tournament is being played. A lapsed subscription must not break a live bracket at a
+// venue mid-event; by then the tournament is already built and the money question is
+// settled. See the downgrade-semantics note in the tracker.
+const PAID_ONLY_TOURNAMENT_FORMATS = ['double'];
+
+function formatRequiresPaidPlan(string $format): bool {
+    return in_array($format, PAID_ONLY_TOURNAMENT_FORMATS, true);
 }
 
 // Like requireTournamentRole() but for anonymous-allowed GET endpoints: public

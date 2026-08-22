@@ -28,11 +28,13 @@ export class TournamentService {
     visibility?: 'public' | 'private',
     seedingMode?: 'automatic' | 'manual',
     teamEntryMode?: 'auto_draft' | 'direct',
+    format?: 'single' | 'double',
   ) {
     const body: Record<string, string> = { name };
     if (visibility) body['visibility'] = visibility;
     if (seedingMode) body['seeding_mode'] = seedingMode;
     if (teamEntryMode) body['team_entry_mode'] = teamEntryMode;
+    if (format) body['format'] = format;
     return this.http.post<Tournament>(`${this.api}/tournaments`, body);
   }
 
