@@ -86,6 +86,59 @@ On the frontend, `shared/bracket-labels.ts` owns the derived presentation all th
 
 `tests/MatchCascadeTest.php` covers all of this against an in-memory SQLite database, because the cascade reads back state it just writes. It was validated by mutation — breaking the loser edge, the loser drop, the reset guard, or the champion rule each fails at least one test.
 
+### Billing
+
+Stripe pays for the paid tier (`FEATURE_TRACKER.md` items 12/13): a recurring subscription
+on an organizer account sets `users.plan`, and a one-time purchase sets a single
+tournament's `paid_override`. Single merchant, hosted Checkout — no card data reaches the
+server, and no Stripe key reaches the browser. Hand-rolled against Stripe's REST API; there
+is no SDK and no Composer.
+
+Stripe is the **merchant of record** via Managed Payments, so tax, fraud, disputes and buyer
+support are Stripe's, not ours — nothing here calculates tax. `applyManagedPayments()` in
+`BillingController` adds `managed_payments[enabled]` and removes `invoice_creation`, which
+Stripe forbids because it issues receipts itself. If you ever add `automatic_tax`,
+`payment_method_types`, `shipping_*`, `adaptive_pricing` or a Connect parameter to a session,
+that function is what has to learn to strip it — Managed Payments rejects those outright
+rather than ignoring them.
+
+Nothing about the *gates* changed. `effectiveParticipantCap()`, `tournamentHasPaidFeatures()`
+and `formatRequiresPaidPlan()` read the same two flags they always did — billing only
+automates what a super admin used to set by hand, and the manual levers still work.
+
+- `api/lib/StripeSignature.php` — verifies the `Stripe-Signature` header. The webhook
+  endpoint is necessarily public and unauthenticated, so this HMAC is its entire access
+  control; that is why it is a pure function in `api/lib/` with a mutation-tested battery in
+  `tests/StripeSignatureTest.php`. It needs the **raw** request body, which is why
+  `api/index.php` keeps `$rawBody` alongside the decoded `$body`.
+- `api/lib/BillingIntent.php` — pure translation of an event into an action
+  (`tests/BillingIntentTest.php`). It returns Stripe's identifiers and never decides whose
+  plan to change; `BillingController` resolves that from `billing_checkouts` and
+  `users.stripe_customer_id`, rows we wrote ourselves, so request metadata is corroboration
+  rather than authority.
+- `api/services/StripeClient.php` — curl wrapper, same shape as the mail clients.
+- `api/controllers/BillingController.php` — `/billing/status`, `/plans`, `/confirm`,
+  `/checkout/subscription`, `/checkout/tournament`, `/portal`, `/webhook`.
+
+Four invariants worth knowing before changing any of it:
+
+- **`plan_source` / `paid_override_source` (migration `017`) record who granted a plan.**
+  Stripe may only revoke what Stripe granted, so a cancellation or refund can never strip a
+  super-admin comped account or tournament.
+- **Fulfilment runs from both the webhook and the return page, idempotently.** The redirect
+  and the webhook race and either can win; whichever is second is a no-op. Don't "simplify"
+  one away — dropping the return page means a paying organizer stares at an unchanged screen.
+- **`billing_events` claims Stripe's event id before processing**, so at-least-once delivery
+  cannot double-grant. A row left in `error` is deliberately re-claimable, so a transient
+  failure heals on one of Stripe's three days of retries.
+- **A lapsed plan never touches a running tournament** — same rule as the format gate. A
+  `past_due` subscription keeps its plan, because Stripe is still retrying the card and
+  cutting an organizer off mid-dunning at a venue is the worst failure available.
+
+With no keys configured billing is simply off: the endpoints 503, the UI hides its upgrade
+buttons, and the app behaves exactly as it did before. `docs/stripe-setup.md` is the
+dashboard walkthrough and the go-live checklist.
+
 ### Link previews
 
 `/bracket/...` is rewritten to `api/preview.php` (see the rewrite in `frontend/src/.htaccess`), which serves the built `index.html` with per-tournament Open Graph and Twitter Card tags injected, and replaces the generic `<title>`. Messaging apps don't run JavaScript, so a single-page app's tags have to be in the HTML as served — otherwise every shared bracket previews identically as "Bracketway".

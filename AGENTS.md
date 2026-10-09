@@ -51,6 +51,13 @@ and RxJS 7.8.
 - Preserve the existing `/bags/api` deployment prefix handling in `api/index.php`.
 - Configuration and secrets belong in environment variables or local untracked config;
   never commit production database credentials or JWT secrets.
+- Every integration must degrade to *off* when unconfigured, never to broken. Empty mail
+  credentials skip sending; empty Stripe keys hide the upgrade buttons and 503 the billing
+  endpoints. A missing secret should cost a feature, not the app.
+- Payment code additionally: never trust a webhook's own metadata to decide *who* gets an
+  entitlement — resolve that from rows we wrote when the checkout started. Make every
+  fulfilment path idempotent, because delivery is at-least-once and the post-payment
+  redirect races the webhook.
 
 ## Database and migrations
 

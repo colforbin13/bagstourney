@@ -184,3 +184,52 @@ export interface BracketData {
    *  the two-tree response existed still renders; new code should read `sides`. */
   rounds?: { [round: number]: Match[] };
 }
+
+// --- Stripe billing (FEATURE_TRACKER items 12/13) -------------------------------------
+
+/** GET /billing/status. Cheap — no call out to Stripe — so any screen can load it. */
+export interface BillingStatus {
+  /** False when this installation has no Stripe keys or the kill switch is off. The UI
+   *  hides its upgrade buttons on this rather than offering a checkout that would 503. */
+  billing_enabled: boolean;
+  test_mode: boolean;
+  plan: 'free' | 'paid';
+  /** 'manual' means a super admin granted the plan; there is no subscription to manage. */
+  plan_source: 'manual' | 'stripe';
+  plan_expires_at: string | null;
+  has_subscription: boolean;
+  can_manage_billing: boolean;
+  /** Which offers are configured. An unconfigured price is simply not sold. */
+  offers: {
+    tournament_unlock: boolean;
+    subscription_monthly: boolean;
+    subscription_annual: boolean;
+  };
+  free_participant_cap: number;
+  paid_participant_cap: number;
+}
+
+/** GET /billing/plans — prices read live from Stripe, never duplicated in our config. */
+export interface BillingPlanOption {
+  key: 'tournament_unlock' | 'subscription_monthly' | 'subscription_annual';
+  /** Minor units (cents), as Stripe reports them. Formatting is the frontend's job. */
+  unit_amount: number | null;
+  currency: string | null;
+  /** Absent for the one-time unlock, which does not recur. */
+  interval: 'day' | 'week' | 'month' | 'year' | null;
+  interval_count: number | null;
+}
+
+export interface BillingCheckoutSession {
+  /** Stripe-hosted Checkout URL to send the browser to. */
+  url: string;
+  session_id: string;
+}
+
+/** GET /billing/confirm — reconciles the session the organizer just came back from. */
+export interface BillingConfirmation {
+  status: 'paid' | 'pending';
+  kind: 'tournament_unlock' | 'subscription';
+  /** True when the webhook had already granted it before the redirect landed. */
+  already_fulfilled: boolean;
+}

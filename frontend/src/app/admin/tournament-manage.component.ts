@@ -6,8 +6,9 @@ import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
+import { BillingService } from '../shared/services/billing.service';
 import { championName } from '../shared/bracket-labels';
-import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
+import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
@@ -50,13 +51,26 @@ interface SetupStep {
             }
             @if (participantCap() !== null) {
               <span class="badge" [class.badge-cap-warning]="participantCount()! >= participantCap()!"
-                title="Freemium plan limit — plumbing ahead of real billing">
+                title="Participant limit for this tournament's plan">
                 {{ participantCount() }}/{{ participantCap() }} participants
               </span>
             }
+            @if (canBuyUnlock()) {
+              <!-- FEATURE_TRACKER item 13: a one-time purchase that upgrades this one
+                   tournament, with no subscription. Owners only — this spends money — and
+                   hidden entirely when the installation has no Stripe keys. -->
+              <button class="btn btn-sm btn-primary" [disabled]="unlockBusy()" (click)="buyTournamentUnlock()"
+                title="Upgrade just this tournament with a one-time payment">
+                @if (unlockBusy()) {
+                  <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
+                } @else {
+                  Upgrade this tournament
+                }
+              </button>
+            }
             @if (isSuperAdmin()) {
               <button class="btn btn-sm" [disabled]="paidOverrideBusy()" (click)="togglePaidOverride()"
-                title="Manual plan override for this tournament — no billing exists yet">
+                title="Grant this tournament the paid tier by hand, without a payment">
                 @if (paidOverrideBusy()) {
                   <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
                 } @else {
@@ -822,6 +836,19 @@ export class TournamentManageComponent implements OnInit {
   participantCap = computed(() => this.tournament()?.capabilities?.participant_cap ?? null);
   participantCount = computed(() => this.tournament()?.capabilities?.participant_count ?? null);
   paidOverrideBusy = signal(false);
+  // Stripe billing (FEATURE_TRACKER item 13). Null until /billing/status answers, and left
+  // null on error — every check below treats that as "nothing to sell", so a billing
+  // outage costs the organizer an upgrade button rather than the whole manage screen.
+  billingStatus = signal<BillingStatus | null>(null);
+  unlockBusy = signal(false);
+  // Owner (or super admin) only, since this spends money; hidden once the tournament is
+  // already upgraded, however that happened, and whenever the install cannot sell.
+  canBuyUnlock = computed(() =>
+    !!this.billingStatus()?.billing_enabled &&
+    !!this.billingStatus()?.offers.tournament_unlock &&
+    (this.tournament()?.capabilities?.can_manage_staff ?? false) &&
+    !this.tournament()?.paid_override
+  );
   deletingTournament = signal(false);
   actionsMenuOpen = signal(false);
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
@@ -939,11 +966,71 @@ export class TournamentManageComponent implements OnInit {
   qrKind = signal<'registration' | 'bracket' | null>(null);
   @ViewChild('qrCanvas') qrCanvasRef?: ElementRef<HTMLCanvasElement>;
 
-  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router, private auth: AuthService) {}
+  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router, private auth: AuthService, private billing: BillingService) {}
 
   ngOnInit() {
     this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
     this.load();
+    this.loadBillingStatus();
+
+    // Returning from Stripe Checkout. The redirect and Stripe's webhook race each other, so
+    // reconcile explicitly rather than assuming the webhook already landed — otherwise an
+    // organizer who has just paid comes back to an unchanged page.
+    const sessionId = this.route.snapshot.queryParamMap.get('session_id');
+    if (sessionId) {
+      this.confirmCheckoutReturn(sessionId);
+    } else if (this.route.snapshot.queryParamMap.get('checkout') === 'cancelled') {
+      this.showToast('Checkout cancelled — nothing was charged.');
+      this.clearCheckoutQueryParams();
+    }
+  }
+
+  private loadBillingStatus() {
+    this.billing.getStatus().subscribe({
+      // Left null on failure, which reads as "nothing to sell" everywhere it is checked.
+      next: s => this.billingStatus.set(s),
+      error: () => this.billingStatus.set(null),
+    });
+  }
+
+  private confirmCheckoutReturn(sessionId: string) {
+    this.billing.confirm(sessionId).subscribe({
+      next: result => {
+        this.showToast(
+          result.status === 'paid'
+            ? 'Payment received — this tournament is upgraded.'
+            : "Payment is still processing. The upgrade will apply as soon as it clears.",
+        );
+        this.clearCheckoutQueryParams();
+        // Reload so the participant cap badge reflects the new ceiling immediately.
+        this.load();
+      },
+      error: () => {
+        // The webhook remains the source of truth, so a failed reconcile is not a failed
+        // payment; say the honest thing rather than implying the money went nowhere.
+        this.showToast('Payment is still processing. Refresh in a moment.');
+        this.clearCheckoutQueryParams();
+        this.load();
+      },
+    });
+  }
+
+  /** Drops ?session_id= so a refresh doesn't re-reconcile an already-spent session. */
+  private clearCheckoutQueryParams() {
+    this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+  }
+
+  // FEATURE_TRACKER item 13: the one-time per-tournament unlock. Sends the browser to
+  // Stripe's hosted checkout; no card details ever touch this app.
+  buyTournamentUnlock() {
+    this.unlockBusy.set(true);
+    this.billing.startTournamentUnlockCheckout(this.tournamentId).subscribe({
+      next: session => this.billing.redirectTo(session.url),
+      error: err => {
+        this.unlockBusy.set(false);
+        this.showToast(err?.error?.error ?? 'Could not start checkout. Please try again.');
+      },
+    });
   }
 
   load() {
@@ -997,8 +1084,9 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  // FEATURE_TRACKER item 13 plumbing: no billing exists yet, so this is a manual
-  // stand-in for what a one-time Stripe purchase will flip automatically once it ships.
+  // The super admin's manual lever, kept alongside Stripe rather than replaced by it: it
+  // comps an account, and covers an install with no payment keys at all. A grant made here
+  // is recorded as 'manual', so a later Stripe refund can never revoke it.
   togglePaidOverride() {
     const t = this.tournament();
     if (!t) return;

@@ -63,6 +63,25 @@ export class AuthService {
     this.router.navigate([redirect]);
   }
 
+  /**
+   * Updates the cached profile's plan without a re-login.
+   *
+   * A JWT lasts 8 hours, and the profile behind it is only refreshed at sign-in — so
+   * without this, an organizer who has just paid keeps seeing free-tier UI (the double
+   * elimination option greyed out, in particular) until their session happens to end.
+   * Called from the billing screen once the server has confirmed the new plan.
+   *
+   * Presentation only, exactly like the field it writes: every paid feature is gated
+   * server-side as well, so a wrong value here can mislead the UI but never grant anything.
+   */
+  setPlan(plan: 'free' | 'paid'): void {
+    const current = this._user();
+    if (!current || current.plan === plan) return;
+    const updated = { ...current, plan };
+    this._user.set(updated);
+    localStorage.setItem('bb_user_profile', JSON.stringify(updated));
+  }
+
   private readUser(): AuthenticatedUser | null {
     try {
       const raw = localStorage.getItem('bb_user_profile');

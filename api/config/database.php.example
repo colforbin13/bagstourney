@@ -23,6 +23,14 @@ export BB_BREVO_FROM="notifications@yourdomain.example"
 export BB_BREVO_FROM_NAME="Your App Name"
 export BB_BREVO_WEBHOOK_USER="brevo"
 export BB_BREVO_WEBHOOK_PASS="a_long_random_string_here"
+export BB_STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+export BB_STRIPE_WEBHOOK_SECRET="whsec_your_webhook_signing_secret"
+export BB_STRIPE_MANAGED_PAYMENTS="true"
+export BB_STRIPE_API_VERSION=""
+export BB_STRIPE_PRICE_TOURNAMENT_UNLOCK="price_your_one_time_unlock_price_id"
+export BB_STRIPE_PRICE_SUBSCRIPTION_MONTHLY="price_your_monthly_price_id"
+export BB_STRIPE_PRICE_SUBSCRIPTION_ANNUAL="price_your_annual_price_id"
+export BB_STRIPE_BILLING_ENABLED="true"
 export BB_NOTIFY_MATCH_COMPLETED_ENABLED="true"
 export BB_NOTIFY_ROUND_COMPLETED_ENABLED="true"
 export BB_NOTIFY_TOURNAMENT_FINALIZED_ENABLED="true"
@@ -64,6 +72,35 @@ $BREVO_FROM_NAME = 'Your App Name';
 // webhook credentials so either provider can be rotated independently.
 $BREVO_WEBHOOK_USER = 'brevo';
 $BREVO_WEBHOOK_PASS = 'replace_with_a_secure_random_value';
+// Stripe billing — the organizer pays the platform (FEATURE_TRACKER.md items 12/13). This
+// is a single-merchant hosted Checkout integration; participant registration fees (items
+// 10/11) are a separate Stripe Connect build and are not this.
+//
+// Leave every value blank to disable billing entirely: the paid flags stay super-admin-only
+// exactly as they are today and the frontend hides the upgrade buttons, so an unconfigured
+// install behaves as if this feature does not exist rather than offering a broken checkout.
+// See docs/stripe-setup.md for the dashboard walkthrough.
+$STRIPE_SECRET_KEY = 'sk_test_your_stripe_secret_key';
+// Developers > Webhooks > your endpoint > Signing secret. Register the endpoint at
+// https://yourdomain.example/api/billing/webhook — note /api, not /bags/api.
+$STRIPE_WEBHOOK_SECRET = 'whsec_your_webhook_signing_secret';
+// Managed Payments — Stripe acts as merchant of record, handling sales tax/VAT/GST,
+// fraud, disputes and buyer support for 3.5% above standard processing. Requires the
+// Managed Payments terms accepted in the dashboard, the feature enabled, and an
+// eligible product tax code on every product. See docs/stripe-setup.md.
+$STRIPE_MANAGED_PAYMENTS = true;
+// Blank uses the Stripe account's default API version, which is what you want —
+// except that Managed Payments needs 2025-03-31.basil or later.
+$STRIPE_API_VERSION = '';
+// Price IDs from the Stripe product catalogue, not amounts — the price of record lives in
+// Stripe so changing what you charge is a dashboard edit rather than a deploy.
+$STRIPE_PRICE_TOURNAMENT_UNLOCK = 'price_your_one_time_unlock_price_id';
+$STRIPE_PRICE_SUBSCRIPTION_MONTHLY = 'price_your_monthly_price_id';
+$STRIPE_PRICE_SUBSCRIPTION_ANNUAL = 'price_your_annual_price_id';
+// Kill switch independent of the keys: false stops new checkouts without removing
+// credentials. Plans already paid for keep working.
+$STRIPE_BILLING_ENABLED = true;
+
 // Per-category kill switches — e.g. to stay under a Postmark plan's monthly send limit.
 // Checked at both enqueue time (MatchController) and send time (send_notifications.php).
 $NOTIFY_MATCH_COMPLETED_ENABLED = true;
@@ -91,6 +128,14 @@ define('BREVO_FROM_EMAIL', $BREVO_FROM_EMAIL);
 define('BREVO_FROM_NAME', $BREVO_FROM_NAME);
 define('BREVO_WEBHOOK_USER', $BREVO_WEBHOOK_USER);
 define('BREVO_WEBHOOK_PASS', $BREVO_WEBHOOK_PASS);
+define('STRIPE_SECRET_KEY', $STRIPE_SECRET_KEY);
+define('STRIPE_WEBHOOK_SECRET', $STRIPE_WEBHOOK_SECRET);
+define('STRIPE_MANAGED_PAYMENTS', $STRIPE_MANAGED_PAYMENTS);
+define('STRIPE_API_VERSION', $STRIPE_API_VERSION);
+define('STRIPE_PRICE_TOURNAMENT_UNLOCK', $STRIPE_PRICE_TOURNAMENT_UNLOCK);
+define('STRIPE_PRICE_SUBSCRIPTION_MONTHLY', $STRIPE_PRICE_SUBSCRIPTION_MONTHLY);
+define('STRIPE_PRICE_SUBSCRIPTION_ANNUAL', $STRIPE_PRICE_SUBSCRIPTION_ANNUAL);
+define('STRIPE_BILLING_ENABLED', $STRIPE_BILLING_ENABLED);
 define('NOTIFY_MATCH_COMPLETED_ENABLED', $NOTIFY_MATCH_COMPLETED_ENABLED);
 define('NOTIFY_ROUND_COMPLETED_ENABLED', $NOTIFY_ROUND_COMPLETED_ENABLED);
 define('NOTIFY_TOURNAMENT_FINALIZED_ENABLED', $NOTIFY_TOURNAMENT_FINALIZED_ENABLED);

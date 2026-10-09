@@ -54,6 +54,9 @@ import { AuthService } from '../services/auth.service';
             }
             <div class="nav-dropdown-menu">
               <a routerLink="/admin/profile" routerLinkActive="active" (click)="closeProfileMenu()">Profile</a>
+              <!-- Under the account menu rather than the super-admin one: an organizer's
+                   own plan is theirs to manage. -->
+              <a routerLink="/admin/billing" routerLinkActive="active" (click)="closeProfileMenu()">Billing</a>
               <button type="button" class="nav-dropdown-item" (click)="auth.logout(); closeProfileMenu()">Sign out</button>
             </div>
           </div>

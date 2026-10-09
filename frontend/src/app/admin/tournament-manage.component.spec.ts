@@ -4,8 +4,9 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { TournamentManageComponent } from './tournament-manage.component';
 import { TournamentService } from '../shared/services/tournament.service';
+import { BillingService } from '../shared/services/billing.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team } from '../shared/models/tournament.models';
+import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team, BillingStatus } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 
 describe('TournamentManageComponent', () => {
@@ -42,7 +43,14 @@ describe('TournamentManageComponent', () => {
         TournamentService,
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ id: String(tournamentId) }) } },
+          useValue: {
+            snapshot: {
+              paramMap: convertToParamMap({ id: String(tournamentId) }),
+              // Present in every real navigation. The component reads it to spot a
+              // ?session_id= return from Stripe Checkout.
+              queryParamMap: convertToParamMap({}),
+            },
+          },
         },
       ],
     }).compileComponents();
@@ -52,7 +60,35 @@ describe('TournamentManageComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
+  // ngOnInit also asks /billing/status (FEATURE_TRACKER item 13's per-tournament upgrade
+  // button). It is unrelated to everything the rest of this suite asserts, so it is swept
+  // up here — as billing-disabled, which is the shape that leaves the toolbar unchanged —
+  // rather than flushed by hand in every test. Tests that care about the button flush it
+  // themselves, and then find nothing left to sweep.
+  function sweepBillingStatus() {
+    for (const req of httpMock.match(`${environment.apiUrl}/billing/status`)) {
+      req.flush(billingStatus({ billing_enabled: false }));
+    }
+  }
+
+  function billingStatus(over: Partial<BillingStatus> = {}): BillingStatus {
+    return {
+      billing_enabled: true,
+      test_mode: true,
+      plan: 'free',
+      plan_source: 'manual',
+      plan_expires_at: null,
+      has_subscription: false,
+      can_manage_billing: false,
+      offers: { tournament_unlock: true, subscription_monthly: true, subscription_annual: true },
+      free_participant_cap: 32,
+      paid_participant_cap: 256,
+      ...over,
+    };
+  }
+
   afterEach(() => {
+    sweepBillingStatus();
     httpMock.verify();
   });
 
@@ -940,6 +976,100 @@ describe('TournamentManageComponent', () => {
       const href = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.tm-actions-row a'))
         .map(a => a.getAttribute('href'));
       expect(href).not.toContain(`/admin/tournament/${tournamentId}/score`);
+    });
+  });
+  // --- Stripe per-tournament upgrade (FEATURE_TRACKER item 13) ------------------------
+  describe('per-tournament upgrade', () => {
+    // Flushes the billing status this component asks for on init, so afterEach's sweep
+    // finds nothing left and these tests own the value under test.
+    function withBilling(over: Partial<BillingStatus> = {}) {
+      httpMock.expectOne(`${environment.apiUrl}/billing/status`).flush(billingStatus(over));
+      fixture.detectChanges();
+    }
+
+    it('offers the upgrade to an owner when billing is available', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+
+      expect(component.canBuyUnlock()).toBeTrue();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Upgrade this tournament');
+    });
+
+    it('hides it from a manager, who cannot spend money on behalf of the owner', () => {
+      bootstrapCore(managerCapabilities);
+      withBilling();
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('hides it when the installation has no Stripe keys', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling({ billing_enabled: false });
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('hides it when no per-tournament price is configured', () => {
+      // Selling a subscription but not the one-off unlock is a supported configuration.
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling({ offers: { tournament_unlock: false, subscription_monthly: true, subscription_annual: false } });
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('hides it once the tournament is already upgraded, however that happened', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+      component.tournament.update(t => ({ ...t!, paid_override: true }));
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('treats a failed billing lookup as nothing to sell', () => {
+      // A billing outage should cost an upgrade button, not the whole manage screen.
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      httpMock.expectOne(`${environment.apiUrl}/billing/status`)
+        .flush({ error: 'down' }, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(component.canBuyUnlock()).toBeFalse();
+      expect(component.tournament()).not.toBeNull();
+    });
+
+    it('redirects to Stripe when the upgrade is bought', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+
+      const billing = TestBed.inject(BillingService);
+      const redirect = spyOn(billing, 'redirectTo');
+
+      component.buyTournamentUnlock();
+      const req = httpMock.expectOne(`${environment.apiUrl}/billing/checkout/tournament`);
+      // Charging against the wrong tournament would upgrade the wrong event for real money.
+      expect(req.request.body).toEqual({ tournament_id: tournamentId });
+      req.flush({ url: 'https://checkout.stripe.com/c/pay/cs_test_x', session_id: 'cs_test_x' });
+
+      expect(redirect).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_test_x');
+    });
+
+    it('clears the busy state and reports the error when checkout fails', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+
+      component.buyTournamentUnlock();
+      httpMock.expectOne(`${environment.apiUrl}/billing/checkout/tournament`)
+        .flush({ error: 'This tournament is already upgraded' }, { status: 409, statusText: 'Conflict' });
+
+      // A stuck spinner would leave the organizer unable to retry.
+      expect(component.unlockBusy()).toBeFalse();
+      expect(component.toast()).toContain('already upgraded');
     });
   });
 });

@@ -85,6 +85,13 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./admin/profile.component').then(m => m.ProfileComponent),
   },
+  // Any signed-in organizer, not super-admin-only: this is where they buy their own plan.
+  // It doubles as the return page for a subscription checkout (?session_id=...).
+  {
+    path: 'admin/billing',
+    canActivate: [authGuard],
+    loadComponent: () => import('./admin/billing.component').then(m => m.BillingComponent),
+  },
   {
     path: 'admin/users',
     canActivate: [authGuard, superAdminGuard],

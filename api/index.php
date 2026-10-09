@@ -23,6 +23,7 @@ require_once __DIR__ . '/controllers/TournamentAccessController.php';
 require_once __DIR__ . '/controllers/UserController.php';
 require_once __DIR__ . '/controllers/NotificationController.php';
 require_once __DIR__ . '/controllers/AuditLogController.php';
+require_once __DIR__ . '/controllers/BillingController.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -41,7 +42,12 @@ $idInvalid = $idSegment !== null && !ctype_digit($idSegment);
 $id        = ($idSegment !== null && ctype_digit($idSegment)) ? (int)$idSegment : null;
 $action    = ($id !== null && $id > 0) ? ($segments[2] ?? null) : ($segments[1] ?? null);
 
-$body = json_decode(file_get_contents('php://input'), true) ?? [];
+// Kept as the raw string as well as the decoded array: Stripe's webhook signature is an
+// HMAC over the exact bytes that were sent, so re-encoding $body would change whitespace
+// and key order and could never verify. Read once — php://input is a stream, and reading
+// it twice is not reliable across every SAPI.
+$rawBody = file_get_contents('php://input');
+$body = json_decode($rawBody, true) ?? [];
 
 try {
     switch ($resource) {
@@ -268,6 +274,38 @@ try {
                 $ctrl->update($id, $body);
             } elseif ($method === 'POST' && $id && $action === 'password-reset') {
                 $ctrl->resetPassword($id);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Stripe billing (FEATURE_TRACKER items 12/13) ---
+        // Parsed from $segments directly rather than the shared $id/$action pair, the way
+        // 'notifications' does: none of these paths carry a numeric id, so the generic
+        // parsing would read 'checkout' as an invalid id.
+        case 'billing':
+            $ctrl = new BillingController(getDB());
+            $billingAction = $segments[1] ?? null;
+            $billingSubAction = $segments[2] ?? null;
+
+            if ($method === 'POST' && $billingAction === 'webhook') {
+                // Deliberately no auth helper: Stripe cannot present a token, and the
+                // signature over $rawBody is the access control. Must come before any
+                // requireCurrentUser() in this block.
+                $ctrl->webhook($rawBody, $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '');
+            } elseif ($method === 'GET' && $billingAction === 'status') {
+                $ctrl->status(requireCurrentUser(getDB()));
+            } elseif ($method === 'GET' && $billingAction === 'plans') {
+                $ctrl->plans(requireCurrentUser(getDB()));
+            } elseif ($method === 'GET' && $billingAction === 'confirm') {
+                $ctrl->confirm($_GET, requireCurrentUser(getDB()));
+            } elseif ($method === 'POST' && $billingAction === 'checkout' && $billingSubAction === 'subscription') {
+                $ctrl->startSubscriptionCheckout($body, requireCurrentUser(getDB()));
+            } elseif ($method === 'POST' && $billingAction === 'checkout' && $billingSubAction === 'tournament') {
+                $ctrl->startTournamentUnlockCheckout($body, requireCurrentUser(getDB()));
+            } elseif ($method === 'POST' && $billingAction === 'portal') {
+                $ctrl->openPortal(requireCurrentUser(getDB()));
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
