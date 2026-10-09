@@ -168,3 +168,21 @@ before touching an area again. `USER_MANAGEMENT_PLAN.md` is the detailed design 
 the (now-complete) role-based access and user-management work, kept as historical
 reference. Check `FEATURE_TRACKER.md` before starting new work to avoid duplicating or
 conflicting with what's planned.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/<feature-slug>/` in this repo, not in GitHub
+Issues. See `docs/agents/issue-tracker.md` — including how this relates to
+`FEATURE_TRACKER.md`.
+
+### Triage labels
+
+The five canonical triage roles, used verbatim as a `Status:` line in each issue file. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root, both created lazily. See
+`docs/agents/domain.md`.

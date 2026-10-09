@@ -19,6 +19,9 @@ deploy.ps1
 *.conf
 !*.conf.example
 
+# Launch-video render output and composition sources (/brag skill)
+brag-output/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -33,8 +33,12 @@ if (-not (Test-Path $PharPath)) {
 # date.timezone silences a startup warning from an invalid ini value. Both are loaded
 # per-invocation rather than editing the (admin-protected) global ini — the same approach
 # the API's local dev server uses for pdo_mysql.
+# pdo_sqlite backs tests/MatchCascadeTest.php, which drives the real match-state machine
+# against an in-memory database — the cascade reads back state it just wrote, so a statement
+# recorder cannot cover it. Still nothing external: no server, no network, no credentials.
 $phpArgs = @(
     "-d", "extension=mbstring",
+    "-d", "extension=pdo_sqlite",
     "-d", "date.timezone=UTC",
     $PharPath
 ) + $args

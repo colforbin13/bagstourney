@@ -110,4 +110,26 @@ describe('HowItWorksComponent', () => {
       .map(a => a.getAttribute('href'));
     expect(hrefs).toEqual(['/admin', '/tournaments']);
   });
+
+  it('should offer the tour above the walkthrough without downloading it unasked', () => {
+    setup();
+    const video: HTMLVideoElement = fixture.nativeElement.querySelector('.tour video');
+    expect(video.getAttribute('src')).toBe('assets/bracketway-tour.mp4');
+    expect(video.getAttribute('poster')).toBe('assets/bracketway-tour.jpg');
+    // The video carries its own audio, so it is played on purpose, never autoplayed —
+    // and preload="none" keeps an unplayed visit down to the poster.
+    expect(video.getAttribute('preload')).toBe('none');
+    expect(video.hasAttribute('controls')).toBeTrue();
+    expect(video.hasAttribute('autoplay')).toBeFalse();
+  });
+
+  it('should keep the walkthrough readable with the video blocked', () => {
+    setup();
+    const tour: HTMLElement = fixture.nativeElement.querySelector('.tour');
+    const walkthrough: HTMLElement = fixture.nativeElement.querySelector('.walkthrough');
+    // The tour is a summary of the chapters, not a replacement for them: it sits above the
+    // walkthrough, and nothing below it depends on anyone pressing play.
+    expect(tour.compareDocumentPosition(walkthrough) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tour.querySelector('figcaption')!.textContent!.trim().length).toBeGreaterThan(0);
+  });
 });

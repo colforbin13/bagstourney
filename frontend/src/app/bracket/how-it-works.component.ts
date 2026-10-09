@@ -21,6 +21,18 @@ import { AuthService } from '../shared/services/auth.service';
         </p>
       </header>
 
+      <!-- The same walkthrough, watched instead of read. Deliberately click-to-play with
+           preload="none": it carries a music and sound track, so it isn't wallpaper, and an
+           unplayed visit should cost the poster and nothing else. Everything the video says
+           is written out below it, so the page is complete with video blocked or sound off. -->
+      <figure class="tour">
+        <video src="assets/bracketway-tour.mp4" poster="assets/bracketway-tour.jpg"
+          controls playsinline preload="none" width="1280" height="720"></video>
+        <figcaption>
+          Sign-ups, the draw, live scoring and the bracket on the wall — the whole run in 23 seconds.
+        </figcaption>
+      </figure>
+
       <ol class="walkthrough">
         <li class="chapter">
           <span class="chapter-num">Step 01</span>
@@ -196,6 +208,30 @@ import { AuthService } from '../shared/services/auth.service';
     }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
+
+    /* The tour is a 16:9 frame authored at 1920px, and its bracket scenes stop being
+       readable somewhere below 900px wide. Let it break out of the page's 680px column
+       wherever the viewport can hold it, and fall back to the column width below that. */
+    .tour { width: 960px; margin: 0 0 40px calc(50% - 480px); }
+    .tour video {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .tour figcaption {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    @media (max-width: 1060px) {
+      .tour { width: 100%; margin-left: 0; }
+    }
 
     .walkthrough { display: flex; flex-direction: column; gap: 36px; list-style: none; }
     .chapter { border-top: 2px solid var(--border); padding-top: 16px; }
