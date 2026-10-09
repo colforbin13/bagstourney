@@ -2,11 +2,7 @@
 // api/controllers/MatchController.php
 
 class MatchController {
-    private $db;
-
-    public function __construct(PDO $db) {
-		$this->db = $db;
-	}
+    public function __construct(private readonly PDO $db) {}
 
     // Resolves a uuid to its tournament before delegating to bracket() — no visibility
     // check here, matching TournamentController::getByUuid(): knowing the uuid is itself
@@ -225,7 +221,11 @@ class MatchController {
             $stmt->execute([$matchId]);
             echo json_encode($stmt->fetch());
 
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
+            // Throwable, not Exception, so that an Error (TypeError and friends, which PHP 8
+            // raises where PHP 7 warned) still reaches the rollback below instead of unwinding
+            // past it with the transaction left open.
+            //
             // writeAuditLog() and the final SELECT above run after commit() succeeds but are
             // still inside this try block; if either of them throws, there is no longer an
             // active transaction, and calling rollBack() would itself throw and mask the
@@ -233,8 +233,11 @@ class MatchController {
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
+            error_log('MatchController::updateScore: ' . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
+            // Generic for the same reason as the router's handler: this path is reached only
+            // by unexpected failures, whose messages can carry SQL.
+            echo json_encode(['error' => 'Internal server error']);
         }
     }
 

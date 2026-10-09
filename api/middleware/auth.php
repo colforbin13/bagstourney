@@ -87,7 +87,7 @@ function requireTournamentRole(PDO $db, int $tournamentId, array $allowedRoles):
 function currentUserOrNull(PDO $db): ?array {
     $headers = getallheaders();
     $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-    if (strpos($auth, 'Bearer ') !== 0) return null;
+    if (!str_starts_with($auth, 'Bearer ')) return null;
     $claims = verifyJWT(substr($auth, 7));
     if (!$claims) return null;
     return currentUser($db, $claims);
@@ -256,7 +256,7 @@ function verifyJWT(string $token): ?array {
 function requireAuth(): array {
     $headers = getallheaders();
     $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-    if (strpos($auth, 'Bearer ') !== 0) {
+    if (!str_starts_with($auth, 'Bearer ')) {
         http_response_code(401);
         echo json_encode(['error' => 'Unauthorized']);
         exit;

@@ -4,11 +4,7 @@
 require_once __DIR__ . '/../services/PostmarkClient.php';
 
 class AuthController {
-    private $db;
-
-    public function __construct(PDO $db) {
-		$this->db = $db;
-	}
+    public function __construct(private readonly PDO $db) {}
 
     public function login(array $body): void {
         $username = trim($body['username'] ?? '');

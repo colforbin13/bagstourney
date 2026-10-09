@@ -5,12 +5,14 @@
 #   .\run-php-tests.ps1 --filter BracketBuilder     # any extra args pass through to PHPUnit
 #
 # PHPUnit ships as a single .phar and is downloaded on first run into tools/ (gitignored).
-# There is deliberately no Composer dependency: production runs PHP 7.2 on hardware that
-# can't be upgraded yet, and the repo has never had a vendor/ directory. The tests are
-# dev-only and are never deployed — deploy.ps1 copies api/ and dist/browser/, not tests/.
+# There is deliberately no Composer dependency and the repo has never had a vendor/
+# directory — originally forced by a PHP 7.2 production server, now kept by preference
+# (see AGENTS.md). The tests are dev-only and are never deployed — deploy.ps1 copies
+# api/ and dist/browser/, not tests/.
 #
-# Note this runs the suite on your LOCAL PHP (8.x). The code under test is written to
-# PHP 7.2 rules so it also runs in production; the suite does not verify that on its own.
+# This runs the suite on your LOCAL PHP. Since production moved to 8.5.4 that is finally
+# the same language level as the code under test, so a green run here is real evidence
+# about production rather than the near-coincidence it was under the PHP 7.2 rule.
 
 $ErrorActionPreference = "Stop"
 

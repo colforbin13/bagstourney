@@ -15,7 +15,7 @@
  * that every match appears after the matches that feed it — including losers-bracket
  * feeds — so a single forward pass is enough to simulate or persist a whole bracket.
  *
- * PHP 7.2-compatible: production still runs 7.2 (see AGENTS.md).
+ * Targets PHP 8.1+, as does the rest of `api/` (see AGENTS.md).
  */
 final class BracketBuilder
 {

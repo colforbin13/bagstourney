@@ -8,11 +8,7 @@
 // session (see api/middleware/auth.php::notificationManageToken()).
 
 class NotificationController {
-    private $db;
-
-    public function __construct(PDO $db) {
-        $this->db = $db;
-    }
+    public function __construct(private readonly PDO $db) {}
 
     public function confirm(array $body): void {
         $participantId = (int)($body['participant_id'] ?? 0);
@@ -262,9 +258,9 @@ class NotificationController {
         if ($user === null) {
             $headers = getallheaders();
             $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-            if (strpos($auth, 'Basic ') === 0) {
+            if (str_starts_with($auth, 'Basic ')) {
                 $decoded = base64_decode(substr($auth, 6));
-                if ($decoded !== false && strpos($decoded, ':') !== false) {
+                if ($decoded !== false && str_contains($decoded, ':')) {
                     [$user, $pass] = explode(':', $decoded, 2);
                 }
             }

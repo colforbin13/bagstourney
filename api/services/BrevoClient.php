@@ -17,15 +17,11 @@ class BrevoClient {
     // limit that may not reset until midnight, short enough to recover the same day.
     const DEFAULT_RETRY_AFTER = 3600;
 
-    private $apiKey;
-    private $fromEmail;
-    private $fromName;
-
-    public function __construct(string $apiKey, string $fromEmail, string $fromName) {
-        $this->apiKey = $apiKey;
-        $this->fromEmail = $fromEmail;
-        $this->fromName = $fromName;
-    }
+    public function __construct(
+        private readonly string $apiKey,
+        private readonly string $fromEmail,
+        private readonly string $fromName,
+    ) {}
 
     public function isConfigured(): bool {
         return $this->apiKey !== '' && $this->fromEmail !== '';

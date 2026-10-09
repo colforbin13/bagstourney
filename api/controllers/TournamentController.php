@@ -2,11 +2,7 @@
 // api/controllers/TournamentController.php
 
 class TournamentController {
-    private $db;
-
-    public function __construct(PDO $db) {
-		$this->db = $db;
-	}
+    public function __construct(private readonly PDO $db) {}
 
     // Per-row summary stats for the tournament list, so a row can say "Round 3 of 4 ·
      // 11 of 15 matches" or name a champion without the client fetching each bracket.

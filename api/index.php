@@ -287,9 +287,17 @@ try {
             http_response_code(404);
             echo json_encode(['error' => 'Not found']);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    // Throwable, not Exception: PHP 8 raises TypeError/ValueError/ArgumentCountError as
+    // Error, which is not an Exception. Caught narrowly, those escape this handler and PHP
+    // appends its own fatal-error output to the half-written JSON body, so the client gets
+    // a response it cannot parse instead of a clean 500.
+    error_log('api/index.php: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    // Deliberately generic: an unexpected throwable here is often a PDOException, whose
+    // message carries the failing SQL. Controllers still emit their own validation
+    // messages; this handler only sees failures the caller can do nothing about.
+    echo json_encode(['error' => 'Internal server error']);
 }
 
 ?>

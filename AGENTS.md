@@ -13,18 +13,22 @@ Bracketway is a mobile-first tournament manager, supporting single and double el
 
 ## Runtime compatibility
 
-The production server runs PHP 7.x. Keep backend code compatible with PHP 7 syntax.
-In particular, do not use PHP 8-only features such as constructor property promotion,
-union/intersection types, attributes, named arguments, or `match` expressions. Use a
-normal property declaration and constructor assignment instead:
+The production server runs **PHP 8.5.4** (verified on 192.168.1.19, 2026-09-02). Target
+PHP 8.1 as the language floor for `api/` — that is comfortably below what production and
+local development both run, and it leaves room for the box to be rebuilt without a rush
+to match. Constructor property promotion, typed and `readonly` properties, enums, `match`,
+named arguments, `??=`, and the `str_*` predicates are all fair game.
 
-```php
-private $db;
+This replaces a long-standing PHP 7.2 constraint. If you find code or a comment still
+asserting it, the comment is stale — the server was replaced on 2026-08-28.
 
-public function __construct(PDO $db) {
-    $this->db = $db;
-}
-```
+One rule survives the change, because PHP 8 makes it matter more: **catch `Throwable`, not
+`Exception`, wherever the catch exists to protect a response or unwind a transaction.**
+PHP 8 raises `TypeError`/`ValueError`/`ArgumentCountError` as `Error`, which is not an
+`Exception`, in many places where PHP 7 only emitted a warning. A narrow catch lets those
+escape, and PHP then appends its own fatal-error output to a half-written JSON body. Catch
+`Exception` narrowly only where the catch is deliberately reading a *validation* failure
+the controller itself threw; pair it with a `Throwable` catch that rolls back and rethrows.
 
 The API requires the `pdo_mysql` extension. The database is MySQL 5.7+ with `utf8mb4`.
 Angular development/build tooling requires Node 20+ and uses Angular 21, TypeScript 5.9,
@@ -81,8 +85,15 @@ and RxJS 7.8.
 
 Pure logic in `api/lib/` **must include unit tests** in `tests/`. Run them with
 `.\run-php-tests.ps1`, which fetches `tools/phpunit.phar` on first use — there is no
-Composer and no `vendor/` directory, deliberately: production runs PHP 7.2 on hardware
-that can't be upgraded yet.
+Composer and no `vendor/` directory.
+
+That started as a hard constraint (production ran PHP 7.2 on hardware that couldn't be
+upgraded) and is now a *preference*: the platform no longer forbids Composer, so keeping
+the repo dependency-free is a taste call about deployment simplicity, not a limitation.
+Keep it for anything you would otherwise write in a few dozen lines. Reach for a real
+library where getting it wrong is a security problem rather than a bug — payment
+processing and token/crypto handling being the obvious cases. Adding Composer is a
+deliberate decision to make once, not per-library; raise it before doing it.
 
 - **Nothing in `tests/` may touch an external database, the network, or credentials.**
   Extract the logic worth testing into `api/lib/` as a pure function, and keep the
@@ -95,11 +106,13 @@ that can't be upgraded yet.
 - **When you add tests for risky logic, prove they bite.** Deliberately break the code and
   confirm a test fails before trusting a green run. The cascade suite was written this way,
   and the exercise corrected a comment that claimed more than the code actually did.
-- Code under `api/` must stay PHP 7.2-compatible — no typed properties, arrow functions,
-  `??=`, `match`, constructor promotion, or union types. Declare class properties
-  explicitly (`private $db;`); dynamic properties are deprecated in PHP 8.2+.
-- Tests themselves run on your local PHP 8.x and are never deployed (`deploy.ps1` copies
-  `api/` and `dist/browser/`, not `tests/`), so they may use modern syntax.
+- Code under `api/` targets PHP 8.1+ (see Runtime compatibility). Declare class properties
+  explicitly or promote them in the constructor — never rely on dynamic properties, which
+  PHP 8.2 deprecated and 9 will remove.
+- Tests run on your local PHP (8.5.4 here) and are never deployed (`deploy.ps1` copies
+  `api/` and `dist/browser/`, not `tests/`). They and `api/` now share a language level, so
+  the suite exercising fine locally is finally evidence about production rather than a
+  coincidence — which was not true under the old PHP 7.2 rule.
 - Controllers' request/response handling remains outside this suite — `php -l` plus manual
   API/browser smoke tests still cover it.
 

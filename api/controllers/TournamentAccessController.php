@@ -2,11 +2,7 @@
 // Tournament-scoped member and ownership management.
 
 class TournamentAccessController {
-    private $db;
-
-    public function __construct(PDO $db) {
-        $this->db = $db;
-    }
+    public function __construct(private readonly PDO $db) {}
 
     public function listMembers(int $tournamentId): void {
         requireTournamentRole($this->db, $tournamentId, ['owner']);

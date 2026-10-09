@@ -13,7 +13,7 @@
  * WhatsApp and the rest do not execute JavaScript — they read the HTML as served. Without
  * server-side tags, every shared bracket previews the same way, or not at all.
  *
- * PHP 7.2-compatible: production still runs 7.2 (see AGENTS.md).
+ * Targets PHP 8.1+, as does the rest of `api/` (see AGENTS.md).
  */
 final class LinkPreview
 {
@@ -108,7 +108,7 @@ final class LinkPreview
     {
         $out = '';
         foreach ($tags as $key => $value) {
-            $attribute = strpos($key, 'og:') === 0 ? 'property' : 'name';
+            $attribute = str_starts_with($key, 'og:') ? 'property' : 'name';
             $out .= sprintf(
                 '<meta %s="%s" content="%s" />' . "\n",
                 $attribute,

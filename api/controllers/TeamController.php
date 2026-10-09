@@ -2,11 +2,7 @@
 // api/controllers/TeamController.php
 
 class TeamController {
-    private $db;
-
-    public function __construct(PDO $db) {
-		$this->db = $db;
-	}
+    public function __construct(private readonly PDO $db) {}
 
     public function listByTournament(int $tournamentId): void {
         $stmt = $this->db->prepare('
@@ -124,6 +120,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -197,6 +201,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -258,6 +270,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -319,6 +339,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -383,6 +411,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 

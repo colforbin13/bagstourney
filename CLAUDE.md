@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Repo-wide conventions — PHP 7 compatibility, backend/frontend patterns, migration rules, unit test requirements, and verification/deployment hygiene — live in `AGENTS.md`. Read that file too; this one focuses on commands and architecture.
+Repo-wide conventions — the PHP language floor, backend/frontend patterns, migration rules, unit test requirements, and verification/deployment hygiene — live in `AGENTS.md`. Read that file too; this one focuses on commands and architecture.
 
 ## Commands
 
@@ -28,7 +28,7 @@ Repo-wide conventions — PHP 7 compatibility, backend/frontend patterns, migrat
 
 ### Deployment
 
-- `deploy.ps1` (Windows) builds the frontend via `npm run build:prod`, then robocopies `dist/browser/` and `api/` to `$DEPLOY_PATH`/`$DEPLOY_API_PATH` (default `\\192.168.1.18\www\bags` and `...\bags\api`). It never overwrites the already-deployed `api/config/database.php`.
+- `deploy.ps1` (Windows) builds the frontend via `npm run build:prod`, then robocopies `dist/browser/` and `api/` to `$DEPLOY_PATH`/`$DEPLOY_API_PATH` (default `\\192.168.1.19\www\bags` and `...\bags\api`). It never overwrites the already-deployed `api/config/database.php`.
 - When a change includes a migration, the required order is: deploy API files → run `php db/migrate.php` on the target → deploy/refresh the frontend.
 
 ## Architecture
