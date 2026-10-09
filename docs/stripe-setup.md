@@ -158,8 +158,13 @@ able to reach you. Use the Stripe CLI:
 
 ```
 stripe login
-stripe listen --forward-to localhost:8080/billing/webhook
+stripe listen --forward-to localhost:8080/billing/webhook --events checkout.session.completed,checkout.session.expired,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,charge.refunded,charge.dispute.created,invoice.payment_failed
 ```
+
+Recent CLI versions refuse to listen without an explicit `--events` list. The local API also
+needs the `curl`, `openssl` and `mbstring` extensions, a CA bundle, and `BB_APP_PUBLIC_URL`
+set to the local frontend so Checkout returns there rather than to production — the
+`run-bag-bracket` skill has the full start command.
 
 `stripe listen` prints its own `whsec_...` — use **that** as `BB_STRIPE_WEBHOOK_SECRET` while
 testing locally. It is different from the dashboard endpoint's secret.

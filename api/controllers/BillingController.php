@@ -27,6 +27,10 @@ require_once __DIR__ . '/../lib/BillingIntent.php';
 require_once __DIR__ . '/../services/StripeClient.php';
 
 class BillingController {
+    // How long a webhook event may sit claimed-but-unfinished before a retry is allowed to
+    // take it over. See claimEvent().
+    const STALE_CLAIM_SECONDS = 300;
+
     private StripeClient $stripe;
 
     public function __construct(private PDO $db) {
@@ -725,10 +729,15 @@ class BillingController {
         // unlocked this tournament by hand, so a later refund of this payment does not
         // revoke their grant. Paying for something already comped is a wasted purchase, not
         // a bug — the checkout endpoint refuses it up front; this only covers the race.
+        //
+        // The source must be assigned before the flag. MySQL evaluates SET left to right and
+        // later assignments see earlier results, so with the flag first the CASE always saw
+        // paid_override = 1 and left every Stripe purchase recorded as 'manual' — which made
+        // it impossible for a refund to reverse.
         $stmt = $this->db->prepare("
             UPDATE tournaments
-            SET paid_override = 1,
-                paid_override_source = CASE WHEN paid_override = 1 THEN paid_override_source ELSE 'stripe' END
+            SET paid_override_source = CASE WHEN paid_override = 1 THEN paid_override_source ELSE 'stripe' END,
+                paid_override = 1
             WHERE id = ?
         ");
         $stmt->execute([$tournamentId]);
@@ -744,14 +753,31 @@ class BillingController {
      * A row left in 'error' is deliberately reclaimable: Stripe retries a 500 for up to
      * three days, and a handler that failed on a transient fault should succeed on one of
      * those retries rather than being locked out by its own failed attempt.
+     *
+     * So is a row still in 'received' after STALE_CLAIM_SECONDS. That state means a handler
+     * claimed the event and then died before recording any outcome — a fatal error, a
+     * killed worker — so nothing ever marked it 'error'. Without this, every retry would be
+     * dismissed as a duplicate and the event lost for good. The window only has to outlast
+     * a handler that is genuinely still running; reprocessing is safe either way, because
+     * every fulfilment path is idempotent. Re-stamping received_at is what makes the
+     * reclaim count as a change, and stops a second concurrent delivery reclaiming it too.
+     *
+     * Assignment order matters: MySQL evaluates these left to right and later ones see
+     * earlier results, so status must be rewritten last.
      */
     private function claimEvent(string $eventId, string $type): bool {
         $stmt = $this->db->prepare("
             INSERT INTO billing_events (stripe_event_id, type, status)
             VALUES (?, ?, 'received')
             ON DUPLICATE KEY UPDATE
-                status = IF(status = 'error', 'received', status),
-                detail = IF(status = 'error', NULL, detail)
+                detail = IF(status = 'error', NULL, detail),
+                received_at = IF(
+                    status = 'error'
+                        OR (status = 'received' AND received_at < NOW() - INTERVAL " . self::STALE_CLAIM_SECONDS . " SECOND),
+                    NOW(),
+                    received_at
+                ),
+                status = IF(status = 'error', 'received', status)
         ");
         $stmt->execute([$eventId, $type]);
 
