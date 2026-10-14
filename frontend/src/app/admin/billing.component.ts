@@ -157,17 +157,6 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
     .offer-interval { font-size: 0.85rem; font-weight: 400; color: var(--text-dim); }
     .offer-detail { font-size: 0.85rem; color: var(--text-dim); flex: 1; }
     .footnote { font-size: 0.85rem; color: var(--text-dim); margin-top: 24px; }
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 24px;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      background: var(--marker);
-      color: var(--marker-ink);
-    }
-    .toast-error { background: var(--danger, #b3261e); color: #fff; }
   `]
 })
 export class BillingComponent implements OnInit {
