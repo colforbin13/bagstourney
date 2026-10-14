@@ -63,16 +63,6 @@ import { confirmService } from '../shared/services/confirm.service';
     .list-item-name { font-weight: 500; }
     .deleted-at { font-size: 0.8rem; color: var(--text-dim); }
     .empty { text-align: center; padding: 48px 24px; color: var(--text-dim); }
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 24px;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      background: var(--marker);
-      color: var(--marker-ink);
-    }
   `]
 })
 export class DeletedTournamentsComponent implements OnInit {
