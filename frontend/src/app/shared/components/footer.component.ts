@@ -18,14 +18,36 @@ import { RouterLink } from '@angular/router';
         </svg>
         <span>Powered by Bracketway</span>
       </a>
+      <nav class="app-footer-links" aria-label="Site information">
+        <a routerLink="/pricing">Pricing</a>
+        <a routerLink="/terms">Terms</a>
+        <a routerLink="/refunds">Refunds</a>
+        <a routerLink="/privacy">Privacy</a>
+      </nav>
     </footer>
   `,
   styles: [`
     .app-footer {
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
       padding: 32px 16px 24px;
     }
+    .app-footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px 16px;
+      a {
+        color: var(--muted);
+        font-size: 0.72rem;
+        text-decoration: none;
+        &:hover { color: var(--text-dim); text-decoration: underline; }
+      }
+    }
+    /* Posters and the printed bracket shouldn't carry site links. */
+    @media print { .app-footer-links { display: none; } }
     .app-footer-brand {
       display: flex;
       align-items: center;

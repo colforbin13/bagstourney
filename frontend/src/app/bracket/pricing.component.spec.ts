@@ -133,6 +133,15 @@ describe('PricingComponent', () => {
     expect(text()).toContain('never interrupts an event in progress');
   });
 
+  it('should tell buyers the statement descriptor and the refund windows', () => {
+    setup();
+    httpMock.expectOne(plansUrl).flush(livePlans);
+    fixture.detectChanges();
+    expect(text()).toContain('your card statement shows LINK.COM');
+    expect(text()).toContain('refundable for 14 days');
+    expect(text()).toContain('7 days (monthly) or 30 days (annual)');
+  });
+
   it('should close with sign-up actions for an anonymous visitor', () => {
     setup();
     httpMock.expectOne(plansUrl).flush(livePlans);

@@ -29,6 +29,22 @@ export const routes: Routes = [
     path: 'pricing',
     loadComponent: () => import('./bracket/pricing.component').then(m => m.PricingComponent),
   },
+  // Terms, Refund and Privacy policies: one component, the route's data picks the page.
+  {
+    path: 'terms',
+    loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
+    data: { doc: 'terms' },
+  },
+  {
+    path: 'refunds',
+    loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
+    data: { doc: 'refunds' },
+  },
+  {
+    path: 'privacy',
+    loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
+    data: { doc: 'privacy' },
+  },
   {
     path: 'sports',
     loadComponent: () => import('./bracket/sports.component').then(m => m.SportsComponent),

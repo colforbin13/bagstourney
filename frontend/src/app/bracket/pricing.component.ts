@@ -14,6 +14,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../shared/services/auth.service';
 import { BillingService } from '../shared/services/billing.service';
 import { BillingPlanOption } from '../shared/models/tournament.models';
+import { LEGAL } from '../shared/legal';
 
 // Mirrors FREEMIUM_*_MAX_PARTICIPANTS in api/middleware/auth.php. Used only until the API
 // answers (or if it can't), so the page never renders a blank where a number belongs.
@@ -238,8 +239,12 @@ export class PricingComponent implements OnInit {
       a: () => "Pro applies to the tournaments you create. If you're a manager or scorekeeper on someone else's tournament, that tournament uses its creator's plan.",
     },
     {
-      q: 'Why is the charge from Stripe, and why is there sales tax?',
-      a: () => 'Payments are handled by Stripe, which sells the plan on our behalf. Stripe works out any sales tax for where you live, adds it at checkout, and emails your receipt.',
+      q: 'Who handles the payment, and why is there sales tax?',
+      a: () => 'Payments are processed by Stripe through Link, which sells the plan on our behalf, so your card statement shows LINK.COM. Stripe works out any sales tax for where you live, adds it at checkout, and emails your receipt.',
+    },
+    {
+      q: 'Can I get a refund?',
+      a: () => `Yes, within limits. A one-time upgrade is refundable for ${LEGAL.refundDays.tournamentUpgrade} days if that tournament's bracket hasn't been generated yet. A Pro charge is refundable if you ask within ${LEGAL.refundDays.monthly} days (monthly) or ${LEGAL.refundDays.annual} days (annual). The full details are in our Refund policy, linked at the bottom of every page.`,
     },
     {
       q: 'How do I cancel or change my card?',
