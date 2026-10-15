@@ -36,6 +36,20 @@ final class LinkPreviewTest extends TestCase
         $this->assertSame('16 teams · Round 3 of 4', LinkPreview::describe($this->tournament()));
     }
 
+    public function testDescribesATournamentInPoolPlay(): void
+    {
+        $t = $this->tournament(['total_rounds' => 0, 'current_round' => null, 'pool_rounds' => 3, 'pool_current_round' => 2]);
+        $this->assertSame('16 teams · Pool round 2 of 3', LinkPreview::describe($t));
+        $t['pool_current_round'] = null;
+        $this->assertSame('16 teams · Pool play finished', LinkPreview::describe($t));
+    }
+
+    public function testBracketProgressWinsOverPoolOnceTheBracketExists(): void
+    {
+        $t = $this->tournament(['pool_rounds' => 3, 'pool_current_round' => null]);
+        $this->assertSame('16 teams · Round 3 of 4', LinkPreview::describe($t));
+    }
+
     public function testDescribesAFinishedTournamentByItsWinner(): void
     {
         $this->assertSame(

@@ -152,6 +152,16 @@ describe('TournamentListComponent', () => {
     expect(line).toContain('Started today');
   });
 
+  it('should show pool progress for a live tournament still in its pool', () => {
+    setup([makeTournament({ stats: makeStats({ total_rounds: 0, current_round: null, match_count: 0, matches_played: 0, pool_rounds: 3, pool_current_round: 2 }) })]);
+    expect(component.meta(component.tournaments()[0])).toContain('Pool round 2 of 3');
+  });
+
+  it('should say the pool is finished while waiting on the bracket', () => {
+    setup([makeTournament({ stats: makeStats({ total_rounds: 0, current_round: null, match_count: 0, matches_played: 0, pool_rounds: 3, pool_current_round: null }) })]);
+    expect(component.meta(component.tournaments()[0])).toContain('Pool play finished');
+  });
+
   it('should leave round and match progress out of a completed tournament meta line', () => {
     setup([makeTournament({ status: 'complete', stats: makeStats({ matches_played: 7, current_round: null }) })]);
     const line = component.meta(component.tournaments()[0]);

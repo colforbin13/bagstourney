@@ -157,6 +157,8 @@
 
     @if (loading()) {
     <div class="empty"><span class="spinner"></span></div>
+    } @else if (!rounds().length && pool()?.started) {
+    <ng-container *ngTemplateOutlet="poolView" />
     } @else if (!rounds().length) {
     <div class="empty">Bracket not generated yet.</div>
     } @else {
@@ -303,6 +305,13 @@
     </div>
     </div>
 
+    <!-- Once the bracket exists, the pool that seeded it stays on the page as a record. -->
+    @if (!loading() && rounds().length && pool()?.started && !kiosk()) {
+    <div class="pool-after">
+        <app-pool-standings [pool]="pool()" />
+    </div>
+    }
+
     @if (error()) {
         <div class="toast toast-error">{{ error() }}</div>
     }
@@ -311,3 +320,32 @@
     }
     }
 </div>
+
+<!-- Pool play (FEATURE_TRACKER item 18): what spectators see before the bracket exists.
+     The standings are the live seed order; the games underneath show who plays whom. -->
+<ng-template #poolView>
+    <div class="pool-view" [class.pool-view-kiosk]="kiosk()">
+        <div class="pool-panel">
+            <app-pool-standings [pool]="pool()" [large]="kiosk()" />
+        </div>
+        <div class="pool-panel">
+            @for (round of poolRoundsToShow(); track round.round) {
+            <div class="pool-round">
+                <div class="pool-round-label">Pool round {{ round.round }}</div>
+                @for (g of round.matches; track g.id) {
+                <div class="pool-game" [class.done]="g.status === 'complete'">
+                    <span class="pool-team" [class.won]="g.winner_id === g.team1_id">{{ g.team1_name }}</span>
+                    <span class="pool-score">
+                        @if (g.status === 'complete') { {{ g.team1_score }}–{{ g.team2_score }} } @else { vs }
+                    </span>
+                    <span class="pool-team right" [class.won]="g.winner_id === g.team2_id">{{ g.team2_name }}</span>
+                </div>
+                }
+            </div>
+            }
+            @if (pool()?.complete) {
+            <div class="pool-wait">Pool play is finished. The bracket is coming up next.</div>
+            }
+        </div>
+    </div>
+</ng-template>

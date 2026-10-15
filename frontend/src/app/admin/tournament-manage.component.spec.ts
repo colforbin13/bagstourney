@@ -6,7 +6,7 @@ import { TournamentManageComponent } from './tournament-manage.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { BillingService } from '../shared/services/billing.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team, BillingStatus } from '../shared/models/tournament.models';
+import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team, BillingStatus, PoolData } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 
 describe('TournamentManageComponent', () => {
@@ -733,6 +733,111 @@ describe('TournamentManageComponent', () => {
 
       httpMock.expectNone(`${environment.apiUrl}/participants/1`);
       expect(component.participants()).toEqual([participant]);
+    });
+  });
+
+  describe('pool play', () => {
+    const team = (id: number, seed: number): Team => ({
+      id, tournament_id: tournamentId, name: `Team ${id}`, participant1_id: id * 10, participant2_id: id * 10 + 1,
+      participant1_name: `P${id}a`, participant2_name: `P${id}b`, seed,
+    } as Team);
+
+    function pool(over: Partial<PoolData> = {}): PoolData {
+      return {
+        games_per_team: 3, started: true, games_played: 2, games_total: 3, complete: false, locked: false,
+        rounds: [], standings: [], ...over,
+      };
+    }
+
+    function bootstrapPool(status: 'setup' | 'active', poolData: PoolData | null, opts: { direct?: boolean; teams?: Team[] } = {}) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Pool Night', status,
+        visibility: 'public', seeding_mode: 'pool_play', pool_games: 3,
+        team_entry_mode: opts.direct ? 'direct' : 'auto_draft',
+        created_at: '2026-01-01', paid_override: true, capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(opts.teams ?? []);
+      if (status === 'active') {
+        httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({ format: 'single', sides: [], pool: poolData });
+      }
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      fixture.detectChanges();
+    }
+
+    it('PUTs pool games per team', () => {
+      bootstrapPool('setup', null);
+      component.updatePoolGames(5);
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.body).toEqual({ pool_games: 5 });
+      req.flush({ ...component.tournament()!, pool_games: 5 });
+      expect(component.tournament()!.pool_games).toBe(5);
+    });
+
+    it('shows the server plan-gate message when pool play is refused', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      component.updateSeedingMode('pool_play');
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({ error: 'Pool play is a Pro feature. Upgrade, or choose another seeding mode.' }, { status: 403, statusText: 'Forbidden' });
+      expect(component.seedingError()).toContain('Pro feature');
+      expect(component.seedingModeBusy()).toBe(false);
+    });
+
+    it('labels the draw as starting the pool and lays out the pool steps', () => {
+      bootstrapPool('setup', null);
+      expect(component.setupSteps().map(s => s.label)).toEqual([
+        'Add your players', 'Draw the teams', 'Play the pool, then generate the bracket',
+      ]);
+    });
+
+    it('offers Start Pool Play instead of Generate Bracket for direct entry', async () => {
+      bootstrapPool('setup', null, { direct: true, teams: [team(1, 1), team(2, 2)] });
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('Start Pool Play');
+      expect(text).not.toContain('Generate Bracket');
+
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+      await component.confirmStartPool();
+      const req = httpMock.expectOne(`${environment.apiUrl}/pool/start`);
+      expect(req.request.body).toEqual({ tournament_id: tournamentId });
+      req.flush(pool());
+      // Reload puts the screen into the pool stage.
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'u', name: 'Pool Night', status: 'active', visibility: 'public',
+        seeding_mode: 'pool_play', team_entry_mode: 'direct', created_at: '2026-01-01', paid_override: true, capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([team(1, 1), team(2, 2)]);
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({ format: 'single', sides: [], pool: pool() });
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      expect(component.pool()?.started).toBe(true);
+    });
+
+    it('shows standings and a scores link while the pool runs, but no bracket button', () => {
+      bootstrapPool('active', pool(), { teams: [team(1, 1), team(2, 2)] });
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('app-pool-standings')).not.toBeNull();
+      expect(el.textContent).toContain('Enter pool scores');
+      expect(el.textContent).not.toContain('Generate Bracket');
+    });
+
+    it('offers seed tweaks, format and Generate Bracket once the pool is complete', () => {
+      bootstrapPool('active', pool({ complete: true, games_played: 3 }), { teams: [team(1, 1), team(2, 2)] });
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.textContent).toContain('Pool play finished');
+      expect(el.querySelectorAll('.pool-ready .team-seed-item').length).toBe(2);
+      expect(el.textContent).toContain('Format');
+      expect(el.textContent).toContain('Generate Bracket');
+      expect(el.textContent).not.toContain('Enter pool scores');
+    });
+
+    it('shows final standings and no seeding step once the bracket exists', () => {
+      bootstrapPool('active', pool({ complete: true, locked: true, games_played: 3 }), { teams: [team(1, 1), team(2, 2)] });
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('app-pool-standings')).not.toBeNull();
+      expect(el.querySelector('.pool-ready')).toBeNull();
     });
   });
 

@@ -6,7 +6,7 @@ import { BehaviorSubject } from 'rxjs';
 import { BracketViewComponent } from './bracket-view.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
-import { Tournament, TournamentCapabilities, BracketData, Match } from '../shared/models/tournament.models';
+import { Tournament, TournamentCapabilities, BracketData, Match, PoolData } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 import { singleEliminationBracket, doubleEliminationBracket, emptyBracket as makeEmptyBracket } from '../shared/testing/bracket-fixtures';
 
@@ -656,6 +656,57 @@ describe('BracketViewComponent', () => {
     it('points the trophy at the grand final, not the last winners round', () => {
       bootstrapDouble();
       expect(component.decidingMatchId()).toBe(20);
+    });
+  });
+
+  describe('pool play', () => {
+    const poolData: PoolData = {
+      games_per_team: 2, started: true, games_played: 1, games_total: 2, complete: false, locked: false,
+      rounds: [
+        { round: 1, matches: [{ id: 1, round: 1, match_number: 1, team1_id: 1, team2_id: 2, team1_name: 'Reds', team2_name: 'Blues', team1_score: 21, team2_score: 9, winner_id: 1, status: 'complete' }] },
+        { round: 2, matches: [{ id: 2, round: 2, match_number: 1, team1_id: 1, team2_id: 3, team1_name: 'Reds', team2_name: 'Greens', team1_score: null, team2_score: null, winner_id: null, status: 'ready' }] },
+      ],
+      standings: [
+        { team_id: 1, team_name: 'Reds', participant1_name: null, participant2_name: null, rank: 1, played: 1, wins: 1, losses: 0, points_for: 21, points_against: 9, point_diff: 12, win_pct: 1 },
+        { team_id: 3, team_name: 'Greens', participant1_name: null, participant2_name: null, rank: 2, played: 0, wins: 0, losses: 0, points_for: 0, points_against: 0, point_diff: 0, win_pct: 0 },
+        { team_id: 2, team_name: 'Blues', participant1_name: null, participant2_name: null, rank: 3, played: 1, wins: 0, losses: 1, points_for: 9, points_against: 21, point_diff: -12, win_pct: 0 },
+      ],
+    };
+
+    function bootWithPool(data: BracketData) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({ ...tournamentWith(), seeding_mode: 'pool_play' });
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(data);
+      fixture.detectChanges();
+    }
+
+    it('shows standings and pool games, newest round first, before the bracket exists', () => {
+      bootWithPool({ ...emptyBracket, pool: poolData });
+      const el: HTMLElement = fixture.nativeElement;
+
+      expect(el.textContent).not.toContain('Bracket not generated yet');
+      expect(el.querySelector('app-pool-standings')).not.toBeNull();
+      const labels = Array.from(el.querySelectorAll('.pool-round-label')).map(l => l.textContent!.trim());
+      expect(labels).toEqual(['Pool round 2', 'Pool round 1']);
+      expect(el.querySelector('.pool-game.done .pool-score')!.textContent).toContain('21–9');
+    });
+
+    it('shows only the round in play on the TV view', () => {
+      bootWithPool({ ...emptyBracket, pool: poolData });
+      component.kiosk.set(true);
+      expect(component.poolRoundsToShow().map(r => r.round)).toEqual([2]);
+    });
+
+    it('keeps the final standings under the bracket once it exists', () => {
+      bootWithPool({ ...singleEliminationBracket({ 1: [
+        { id: 9, tournament_id: 1, round: 1, match_number: 1, team1_id: 1, team2_id: 2, team1_score: null, team2_score: null,
+          winner_id: null, next_match_id: null, next_match_slot: null, status: 'ready',
+          team1_name: 'Reds', team2_name: 'Blues', winner_name: null,
+          team1_participant1_name: null, team1_participant2_name: null, team2_participant1_name: null, team2_participant2_name: null } as any,
+      ] }), pool: { ...poolData, complete: true, locked: true } });
+
+      expect(fixture.nativeElement.querySelector('.pool-after app-pool-standings')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.pool-view')).toBeNull();
     });
   });
 });

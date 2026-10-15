@@ -4,6 +4,65 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Pool play to set bracket seeds
+
+FEATURE_TRACKER item 18, added and built 2026-10-15 per Matt: give every team more games
+for the night and make bracket seeding earned rather than drawn.
+
+**Decisions (Matt, 2026-10-15).** Pro feature (and the one-time upgrade), gated through
+`tournamentHasPaidFeatures()` like double elimination. 2 to 5 pool games per team, default
+3. Everyone advances; standings only set seeds. The tournament goes `active` (Live) when
+the pool starts. Tiebreakers: win % first, then point differential per game, points scored
+per game, head-to-head when exactly two teams are tied, then a stable random draw. Matt
+dropped win % *as a tiebreaker* from the first proposal, since teams tied on it are by
+definition equal there; it is the primary ranking instead (needed because an odd field
+gives teams different numbers of games).
+
+**Schedule and standings** are pure, in `api/lib/PoolPlay.php`, with 17 PHPUnit tests in
+`tests/PoolPlayTest.php` (including an exhaustive no-rematch check for 2 to 40 teams),
+proven to fail when the code is broken. `schedule()` is the circle method stopped after N
+rounds; rounds are `min(games, n-1)` for an even field and `min(games, n)` for an odd one.
+`standings()` breaks the final draw with `crc32(tournamentId:teamId)`, so it never shuffles
+between page loads.
+
+**Data model: a separate `pool_matches` table, not a stage column on `matches`.** The scope
+proposed `matches.stage`, but every reader of `matches` (champion detection, the score
+cascade, list stats, link previews, round-completed notifications) assumes it holds the
+bracket, and a missed filter would give a silent wrong answer. A separate table needs no
+change to any of them. There is no stored "stage" either: a pool-play tournament that is
+`active` with no bracket rows is in the pool (`PoolController::inPoolStage()`).
+Migration `018_pool_play.sql` adds `pool_play` to `seeding_mode`, `tournaments.pool_games`
+and the `pool_matches` table. Additive; no existing tournament changes.
+
+**Flow.** Blind draw: "Draw Teams & Start Pool" forms teams and schedules the pool in one
+transaction (`TeamController::draw()` calls `PoolController::start()`). Direct entry: a
+"Start Pool Play" button (`POST /pool/start`). Scores go through `PUT /pool/{id}` (owner,
+manager or scorekeeper; ties and negatives refused) and every result rewrites `teams.seed`
+from the standings. Reorder and Generate Bracket are refused until every pool game is
+played; after that the organizer can drag a tweak and generate as with manual seeding. Any
+later pool correction re-syncs seeds and so discards a drag tweak, on purpose. Once the
+bracket exists pool results are locked. `pool_games` can only change during setup; the
+bracket format can still change during the pool. Pool games send no email notifications.
+The pool rides along on `GET /matches` as `pool` (null for other modes), so no screen
+makes an extra request.
+
+**Frontend.** Create form and manage screen get the Pool play option (disabled with a
+"(paid plan)" note on free) and a games picker. Shared `PoolStandingsComponent` (W-L, +/-,
+PF, progress line, tiebreak note) on the manage screen, the public bracket page (pool view
+before the bracket, final standings under it afterwards) and the TV view (current round
+only, larger type). Score entry lists pool games first and hides them once locked. The
+tournament list and link previews say "Pool round X of Y" or "Pool play finished".
+`/how-it-works` and `/pricing` copy updated.
+
+**Verified** 2026-10-15: PHP 155/155, frontend 444/444, production build clean. API end to
+end against local MariaDB (Pro gate on create and update, bad `pool_games` refused,
+generate refused before start and before completion, tied score refused, seeds sync,
+reorder and generate after completion, pool locked after the bracket, direct-entry start,
+double start refused, team add after start refused, scoring after a plan lapse, anonymous
+401). Browser at phone width and 1920x1080 TV: 12 players pasted, drawn, pool scored,
+public and TV views, bracket generated with seeds 1 and 2 on byes, final standings under
+the bracket.
+
 ### Fast blind-draw setup
 
 Getting from "new tournament" to a drawn bracket meant typing every player into a single

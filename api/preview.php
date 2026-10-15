@@ -59,6 +59,9 @@ try {
     $stmt = $db->prepare('
         SELECT t.id, t.uuid, t.name, t.status,
                (SELECT COUNT(*) FROM teams tm WHERE tm.tournament_id = t.id) AS team_count,
+               (SELECT MAX(pm.round) FROM pool_matches pm WHERE pm.tournament_id = t.id) AS pool_rounds,
+               (SELECT MIN(pm.round) FROM pool_matches pm
+                  WHERE pm.tournament_id = t.id AND pm.status = "ready") AS pool_current_round,
                (SELECT MAX(m.round) FROM matches m
                   WHERE m.tournament_id = t.id AND m.bracket_side = "winners") AS total_rounds,
                (SELECT MIN(m.round) FROM matches m

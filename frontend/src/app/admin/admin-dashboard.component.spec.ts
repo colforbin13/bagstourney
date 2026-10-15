@@ -54,6 +54,37 @@ describe('AdminDashboardComponent', () => {
     httpMock.expectNone(`${environment.apiUrl}/tournaments`);
   });
 
+  it('should send pool play with its games per team', () => {
+    bootstrap();
+    component.newName = 'Pool Night';
+    component.newSeedingMode = 'pool_play';
+    component.newPoolGames = 4;
+    component.create();
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+    expect(req.request.body).toEqual(jasmine.objectContaining({ seeding_mode: 'pool_play', pool_games: 4 }));
+    req.flush({ ...mockTournament, name: 'Pool Night', seeding_mode: 'pool_play', pool_games: 4 });
+    expect(component.newSeedingMode).toBe('automatic');
+    expect(component.newPoolGames).toBe(3);
+  });
+
+  it('should not send pool games for other seeding modes', () => {
+    bootstrap();
+    component.newName = 'Plain';
+    component.newPoolGames = 5;
+    component.create();
+
+    const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+    expect(req.request.body.pool_games).toBeUndefined();
+    req.flush({ ...mockTournament, name: 'Plain' });
+  });
+
+  it('should explain pool play in the seeding hint', () => {
+    bootstrap();
+    component.newSeedingMode = 'pool_play';
+    expect(component.seedingHint()).toContain('standings set the bracket seeds');
+  });
+
   it('should create a tournament with the chosen visibility, seeding mode, team entry mode, and format', () => {
     bootstrap();
     component.newName = 'New Tournament';

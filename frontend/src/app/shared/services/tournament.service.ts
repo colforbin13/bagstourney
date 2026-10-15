@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, BulkAddResult, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
+import { Tournament, Participant, BulkAddResult, PoolData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -26,15 +26,17 @@ export class TournamentService {
   createTournament(
     name: string,
     visibility?: 'public' | 'private',
-    seedingMode?: 'automatic' | 'manual',
+    seedingMode?: 'automatic' | 'manual' | 'pool_play',
     teamEntryMode?: 'auto_draft' | 'direct',
     format?: 'single' | 'double',
+    poolGames?: number,
   ) {
-    const body: Record<string, string> = { name };
+    const body: Record<string, string | number> = { name };
     if (visibility) body['visibility'] = visibility;
     if (seedingMode) body['seeding_mode'] = seedingMode;
     if (teamEntryMode) body['team_entry_mode'] = teamEntryMode;
     if (format) body['format'] = format;
+    if (seedingMode === 'pool_play' && poolGames) body['pool_games'] = poolGames;
     return this.http.post<Tournament>(`${this.api}/tournaments`, body);
   }
 
@@ -222,6 +224,16 @@ export class TournamentService {
 
   generateBracket(tournamentId: number) {
     return this.http.post<Team[]>(`${this.api}/teams/generate-bracket`, { tournament_id: tournamentId });
+  }
+
+  // Pool play (FEATURE_TRACKER item 18). Reading the pool needs no call of its own: it
+  // rides along on getBracket()/getBracketByUuid().
+  startPool(tournamentId: number) {
+    return this.http.post<PoolData>(`${this.api}/pool/start`, { tournament_id: tournamentId });
+  }
+
+  updatePoolScore(poolMatchId: number, team1Score: number, team2Score: number) {
+    return this.http.put<PoolData>(`${this.api}/pool/${poolMatchId}`, { team1_score: team1Score, team2_score: team2Score });
   }
 
   // Bracket / Matches

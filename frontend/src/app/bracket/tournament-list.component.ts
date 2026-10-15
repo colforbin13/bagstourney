@@ -420,6 +420,10 @@ export class TournamentListComponent implements OnInit {
     }
     if (t.status === 'active' && s) {
       if (s.current_round && s.total_rounds) parts.push(`Round ${s.current_round} of ${s.total_rounds}`);
+      // Pool play: live with pool rounds but no bracket yet.
+      else if (!s.total_rounds && s.pool_rounds) {
+        parts.push(s.pool_current_round ? `Pool round ${s.pool_current_round} of ${s.pool_rounds}` : 'Pool play finished');
+      }
       if (s.match_count > 0) parts.push(`${s.matches_played} of ${s.match_count} matches`);
     }
     const started = this.startedLabel(t.created_at);

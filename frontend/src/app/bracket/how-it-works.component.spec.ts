@@ -59,9 +59,16 @@ describe('HowItWorksComponent', () => {
     expect(terms).toEqual([
       'Public or private',
       'Blind draw or direct entry',
-      'Automatic or manual seeding',
+      'Automatic, manual or pool play seeding',
       'Single or double elimination',
     ]);
+  });
+
+  it('should explain pool play and that it is paid', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('seeds the bracket from the standings');
+    expect(text).toContain('Pool play is a paid-plan feature');
   });
 
   it('should say double elimination is paid and locks at bracket generation', () => {

@@ -4,7 +4,7 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { ScoreEntryComponent } from './score-entry.component';
 import { TournamentService } from '../shared/services/tournament.service';
-import { BracketData, Match, Tournament, TournamentCapabilities } from '../shared/models/tournament.models';
+import { BracketData, Match, PoolData, Tournament, TournamentCapabilities } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 import { singleEliminationBracket, emptyBracket } from '../shared/testing/bracket-fixtures';
 
@@ -109,39 +109,39 @@ describe('ScoreEntryComponent', () => {
 
   it('should refuse a tied score without calling the API', () => {
     bootstrap();
-    component.scores[101] = { team1: '21', team2: '21' };
+    component.scores['b101'] = { team1: '21', team2: '21' };
 
-    component.save(component.readyMatches()[0].match);
+    component.save(component.readyMatches()[0]);
 
-    expect(component.rowError()[101]).toContain('tied');
+    expect(component.rowError()['b101']).toContain('tied');
     httpMock.expectNone(`${environment.apiUrl}/matches/101`);
   });
 
   it('should refuse a half-filled score', () => {
     bootstrap();
-    component.scores[101] = { team1: '21', team2: '' };
+    component.scores['b101'] = { team1: '21', team2: '' };
 
-    component.save(component.readyMatches()[0].match);
+    component.save(component.readyMatches()[0]);
 
-    expect(component.rowError()[101]).toContain('both scores');
+    expect(component.rowError()['b101']).toContain('both scores');
     httpMock.expectNone(`${environment.apiUrl}/matches/101`);
   });
 
   it('should refuse a negative score', () => {
     bootstrap();
-    component.scores[101] = { team1: '-3', team2: '21' };
+    component.scores['b101'] = { team1: '-3', team2: '21' };
 
-    component.save(component.readyMatches()[0].match);
+    component.save(component.readyMatches()[0]);
 
-    expect(component.rowError()[101]).toContain('negative');
+    expect(component.rowError()['b101']).toContain('negative');
     httpMock.expectNone(`${environment.apiUrl}/matches/101`);
   });
 
   it('should submit a valid score and reload, since the next match may now be ready', () => {
     bootstrap();
-    component.scores[101] = { team1: '21', team2: '13' };
+    component.scores['b101'] = { team1: '21', team2: '13' };
 
-    component.save(component.readyMatches()[0].match);
+    component.save(component.readyMatches()[0]);
 
     const req = httpMock.expectOne(`${environment.apiUrl}/matches/101`);
     expect(req.request.method).toBe('PUT');
@@ -156,25 +156,25 @@ describe('ScoreEntryComponent', () => {
 
   it('should surface a server rejection against the match it belongs to', () => {
     bootstrap();
-    component.scores[101] = { team1: '21', team2: '13' };
+    component.scores['b101'] = { team1: '21', team2: '13' };
 
-    component.save(component.readyMatches()[0].match);
+    component.save(component.readyMatches()[0]);
     httpMock.expectOne(`${environment.apiUrl}/matches/101`)
       .flush({ error: 'Match is not ready to play' }, { status: 400, statusText: 'Bad Request' });
 
-    expect(component.rowError()[101]).toBe('Match is not ready to play');
+    expect(component.rowError()['b101']).toBe('Match is not ready to play');
     expect(component.submitting()).toBeNull();
   });
 
   it('should not wipe a half-typed score when a background refresh lands', () => {
     bootstrap();
-    component.scores[101] = { team1: '15', team2: '' };
+    component.scores['b101'] = { team1: '15', team2: '' };
 
     component.load(true);
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith(scorer));
     httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(bracket);
 
-    expect(component.scores[101]).toEqual({ team1: '15', team2: '' });
+    expect(component.scores['b101']).toEqual({ team1: '15', team2: '' });
   });
 
   it('should offer completed matches for correction, newest first', () => {
@@ -194,10 +194,10 @@ describe('ScoreEntryComponent', () => {
     const done = match({ id: 101, status: 'complete', team1_score: 21, team2_score: 9 });
     bootstrap(tournamentWith(scorer), singleEliminationBracket({ 1: [done] }));
 
-    component.startEdit(done);
+    component.startEdit(component.completedMatches()[0]);
 
-    expect(component.editing()).toBe(101);
-    expect(component.scores[101]).toEqual({ team1: '21', team2: '9' });
+    expect(component.editing()).toBe('b101');
+    expect(component.scores['b101']).toEqual({ team1: '21', team2: '9' });
   });
 
   it('should tell a viewer without score access that they cannot enter scores', () => {
@@ -239,5 +239,60 @@ describe('ScoreEntryComponent', () => {
 
     expect(component.loadError()).toBe('Tournament not found.');
     httpMock.expectNone(r => r.url.includes('/tournaments/'));
+  });
+
+  describe('pool play', () => {
+    function pool(over: Partial<PoolData> = {}): PoolData {
+      return {
+        games_per_team: 3, started: true, games_played: 1, games_total: 2,
+        complete: false, locked: false,
+        rounds: [{ round: 1, matches: [
+          { id: 101, round: 1, match_number: 1, team1_id: 10, team2_id: 11, team1_name: 'Alpha', team2_name: 'Bravo',
+            team1_score: null, team2_score: null, winner_id: null, status: 'ready' },
+          { id: 7, round: 1, match_number: 2, team1_id: 12, team2_id: 13, team1_name: 'Charlie', team2_name: 'Delta',
+            team1_score: 21, team2_score: 4, winner_id: 12, status: 'complete' },
+        ] }],
+        standings: [],
+        ...over,
+      };
+    }
+
+    it('lists ready pool games, labelled by pool round, apart from bracket matches sharing an id', () => {
+      bootstrap(tournamentWith(scorer), { ...emptyBracket(), pool: pool() });
+
+      expect(component.readyMatches().map(r => [r.key, r.label])).toEqual([['p101', 'Pool round 1']]);
+      expect(component.completedMatches().map(r => r.key)).toEqual(['p7']);
+      expect(component.scores['p7']).toEqual({ team1: '21', team2: '4' });
+    });
+
+    it('saves a pool game to the pool endpoint', () => {
+      bootstrap(tournamentWith(scorer), { ...emptyBracket(), pool: pool() });
+      component.scores['p101'] = { team1: '21', team2: '17' };
+
+      component.save(component.readyMatches()[0]);
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/pool/101`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ team1_score: 21, team2_score: 17 });
+      httpMock.expectNone(`${environment.apiUrl}/matches/101`);
+      req.flush(pool());
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith(scorer));
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({ ...emptyBracket(), pool: pool() });
+    });
+
+    it('drops pool games once the bracket has locked them', () => {
+      bootstrap(tournamentWith(scorer), { ...bracket, pool: pool({ locked: true, complete: true }) });
+
+      expect(component.readyMatches().every(r => r.kind === 'bracket')).toBe(true);
+      expect(component.completedMatches().length).toBe(0);
+    });
+
+    it('points to the manage screen when the pool is done but the bracket is not built', () => {
+      bootstrap(tournamentWith(scorer), { ...emptyBracket(), pool: pool({
+        complete: true, rounds: [{ round: 1, matches: [pool().rounds[0].matches[1]] }],
+      }) });
+
+      expect(fixture.nativeElement.querySelector('.empty').textContent).toContain('Pool play is finished');
+    });
   });
 });

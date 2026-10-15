@@ -56,11 +56,15 @@ import { AuthService } from '../shared/services/auth.service';
               decided. <strong>The player sign-up link only works with blind draw</strong> —
               there's no pool of unpaired players for a walk-up to join otherwise.
             </dd>
-            <dt>Automatic or manual seeding</dt>
+            <dt>Automatic, manual or pool play seeding</dt>
             <dd>
               Automatic seeds teams for you at the draw and starts play immediately. Manual
               gives you a drag-and-drop ladder to arrange first. Pick manual if you know who
               the strong teams are and want them apart in the bracket.
+              Pool play has every team play 2 to 5 games first, with no rematches, and seeds
+              the bracket from the standings: win percentage, then point differential. Every
+              team gets more games, and the seeds are earned.
+              <strong>Pool play is a <a routerLink="/pricing">paid-plan feature</a>.</strong>
             </dd>
             <dt>Single or double elimination</dt>
             <dd>

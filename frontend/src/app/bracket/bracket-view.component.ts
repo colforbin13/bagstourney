@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
 import { Tournament, Match, BracketData } from '../shared/models/tournament.models';
+import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import {
   roundLabel as labelForRound,
   teamParticipants as participantsFor,
@@ -55,7 +56,7 @@ interface MirrorLayout {
 @Component({
   selector: 'app-bracket-view',
   standalone: true,
-  imports: [RouterLink, FormsModule, NgTemplateOutlet],
+  imports: [RouterLink, FormsModule, NgTemplateOutlet, PoolStandingsComponent],
   templateUrl: './bracket-view.component.html',
   styleUrl: './bracket-view.component.css'
 })
@@ -122,6 +123,21 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly gutterWidth = 32;
 
   champion = computed(() => championName(this.bracketData()));
+
+  // Pool play (FEATURE_TRACKER item 18). Null unless the tournament uses it.
+  pool = computed(() => this.bracketData()?.pool ?? null);
+
+  // On a TV only the round being played fits alongside the standings; anywhere else, every
+  // round, newest first, so the latest results are at the top of a phone screen.
+  poolRoundsToShow = computed(() => {
+    const p = this.pool();
+    if (!p) return [];
+    if (this.kiosk()) {
+      const current = p.rounds.find(r => r.matches.some(m => m.status !== 'complete'));
+      return current ? [current] : p.rounds.slice(-1);
+    }
+    return [...p.rounds].reverse();
+  });
 
   /**
    * The match that actually crowns the champion, so the trophy marker can be placed without

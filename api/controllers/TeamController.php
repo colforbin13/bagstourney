@@ -72,6 +72,7 @@ class TeamController {
 
             // Clear any existing teams/matches for this tournament
             $this->db->prepare('DELETE FROM matches WHERE tournament_id = ?')->execute([$tournamentId]);
+            $this->db->prepare('DELETE FROM pool_matches WHERE tournament_id = ?')->execute([$tournamentId]);
             $this->db->prepare('DELETE FROM teams WHERE tournament_id = ?')->execute([$tournamentId]);
 
             // Pair participants into teams
@@ -100,6 +101,10 @@ class TeamController {
                 $this->generateBracket($tournamentId, $teams, $tournament['format'] ?? 'single');
                 $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                     ->execute(['active', $tournamentId]);
+            } elseif ($tournament['seeding_mode'] === 'pool_play') {
+                // Like automatic seeding, one step: the draw forms teams and starts the
+                // pool, and the tournament goes live. The bracket comes after the pool.
+                (new PoolController($this->db))->start($tournamentId);
             }
 
             $this->db->commit();
@@ -228,12 +233,10 @@ class TeamController {
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt = $this->db->prepare('SELECT status, seeding_mode FROM tournaments WHERE id = ?');
             $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch();
-            if (!$tournament || $tournament['status'] !== 'setup') {
-                throw new Exception('Teams can only be reordered before the bracket is generated');
-            }
+            $this->requireSeedsOpen($tournamentId, $tournament, 'Teams can only be reordered before the bracket is generated');
 
             $stmt = $this->db->prepare('SELECT id FROM teams WHERE tournament_id = ?');
             $stmt->execute([$tournamentId]);
@@ -297,12 +300,10 @@ class TeamController {
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('SELECT status, format FROM tournaments WHERE id = ?');
+            $stmt = $this->db->prepare('SELECT status, format, seeding_mode FROM tournaments WHERE id = ?');
             $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch();
-            if (!$tournament || $tournament['status'] !== 'setup') {
-                throw new Exception('Tournament is not awaiting bracket generation');
-            }
+            $this->requireSeedsOpen($tournamentId, $tournament, 'Tournament is not awaiting bracket generation');
 
             $stmt = $this->db->prepare('SELECT id, seed FROM teams WHERE tournament_id = ? ORDER BY seed');
             $stmt->execute([$tournamentId]);
@@ -435,6 +436,32 @@ class TeamController {
      * still has no teams and no bracket, and stays in 'setup' where its format can be
      * switched back to single elimination.
      */
+    /**
+     * Seeds can be set, and the bracket generated from them, in two windows: a manual or
+     * direct-entry tournament still in setup, and a pool-play tournament whose pool is
+     * finished (it is 'active' by then, so spectators could follow the pool). A pool-play
+     * tournament in setup has not played its pool yet, so it is refused, as is one whose
+     * pool still has games left: its seeds are still moving.
+     */
+    private function requireSeedsOpen(int $tournamentId, $tournament, string $closedMessage): void {
+        if (!$tournament) throw new Exception($closedMessage);
+        if (($tournament['seeding_mode'] ?? '') === 'pool_play') {
+            if ($tournament['status'] === 'setup') {
+                throw new Exception('Start pool play first. The pool standings set the seeds.');
+            }
+            if (!PoolController::inPoolStage($this->db, $tournamentId)) {
+                throw new Exception($closedMessage);
+            }
+            if (!PoolController::poolComplete($this->db, $tournamentId)) {
+                throw new Exception('Finish every pool game first. The standings set the seeds.');
+            }
+            return;
+        }
+        if ($tournament['status'] !== 'setup') {
+            throw new Exception($closedMessage);
+        }
+    }
+
     private function requireFormatAllowed(int $tournamentId, string $format): void {
         if (formatRequiresPaidPlan($format) && !tournamentHasPaidFeatures($this->db, $tournamentId)) {
             throw new Exception(

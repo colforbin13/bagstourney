@@ -48,6 +48,9 @@ export interface TournamentStats {
   // before a bracket exists).
   current_round: number | null;
   champion_name: string | null;
+  // Pool play: pool rounds scheduled (0 if none) and the first with a game still to play.
+  pool_rounds?: number;
+  pool_current_round?: number | null;
 }
 
 export interface Tournament {
@@ -56,7 +59,9 @@ export interface Tournament {
   name: string;
   status: 'setup' | 'active' | 'complete';
   visibility: 'public' | 'private';
-  seeding_mode: 'automatic' | 'manual';
+  seeding_mode: 'automatic' | 'manual' | 'pool_play';
+  // Pool games per team (FEATURE_TRACKER item 18). Only meaningful in pool_play mode.
+  pool_games?: number;
   team_entry_mode: 'auto_draft' | 'direct';
   // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
   // bracket is generated. Optional so responses predating migration 016 still parse.
@@ -190,6 +195,53 @@ export interface BracketData {
   /** Legacy grouping, present only for single elimination. Kept so a client cached before
    *  the two-tree response existed still renders; new code should read `sides`. */
   rounds?: { [round: number]: Match[] };
+  /** Pool play (FEATURE_TRACKER item 18). Null, or absent from an older API, unless the
+   *  tournament uses pool play. */
+  pool?: PoolData | null;
+}
+
+export interface PoolMatch {
+  id: number;
+  round: number;
+  match_number: number;
+  team1_id: number;
+  team2_id: number;
+  team1_name: string;
+  team2_name: string;
+  team1_score: number | null;
+  team2_score: number | null;
+  winner_id: number | null;
+  status: 'ready' | 'complete';
+}
+
+export interface PoolStanding {
+  team_id: number;
+  team_name: string;
+  participant1_name: string | null;
+  participant2_name: string | null;
+  rank: number;
+  played: number;
+  wins: number;
+  losses: number;
+  points_for: number;
+  points_against: number;
+  point_diff: number;
+  win_pct: number;
+}
+
+export interface PoolData {
+  games_per_team: number;
+  /** False until the pool is scheduled (at the draw, or "Start pool play"). */
+  started: boolean;
+  games_played: number;
+  games_total: number;
+  /** Every pool game has a result: the bracket can be generated. */
+  complete: boolean;
+  /** The bracket exists, so pool results can no longer change. */
+  locked: boolean;
+  rounds: { round: number; matches: PoolMatch[] }[];
+  /** Rank order, which is also the seed order. */
+  standings: PoolStanding[];
 }
 
 // --- Stripe billing (FEATURE_TRACKER items 12/13) -------------------------------------

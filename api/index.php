@@ -15,11 +15,13 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/lib/BracketBuilder.php';
 require_once __DIR__ . '/lib/NameList.php';
+require_once __DIR__ . '/lib/PoolPlay.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/TournamentController.php';
 require_once __DIR__ . '/controllers/ParticipantController.php';
 require_once __DIR__ . '/controllers/TeamController.php';
 require_once __DIR__ . '/controllers/MatchController.php';
+require_once __DIR__ . '/controllers/PoolController.php';
 require_once __DIR__ . '/controllers/TournamentAccessController.php';
 require_once __DIR__ . '/controllers/UserController.php';
 require_once __DIR__ . '/controllers/NotificationController.php';
@@ -201,6 +203,26 @@ try {
                 $ctrl->bracket($id); // GET /matches/{tournamentId}
             } elseif ($method === 'PUT' && $id) {
                 $stmt = $db->prepare('SELECT tournament_id FROM matches WHERE id = ?');
+                $stmt->execute([$id]);
+                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager', 'scorekeeper']);
+                $ctrl->updateScore($id, $body, $actor);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Pool play (FEATURE_TRACKER item 18) ---
+        // Reading the pool needs no route of its own: GET /matches carries it.
+        case 'pool':
+            $db = getDB();
+            $ctrl = new PoolController($db);
+            if ($method === 'POST' && !$id && $action === 'start') {
+                // Direct entry's "Start pool play". A blind draw starts its pool from POST /teams.
+                $actor = requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->startAction($body, $actor);
+            } elseif ($method === 'PUT' && $id) {
+                $stmt = $db->prepare('SELECT tournament_id FROM pool_matches WHERE id = ?');
                 $stmt->execute([$id]);
                 $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager', 'scorekeeper']);
                 $ctrl->updateScore($id, $body, $actor);

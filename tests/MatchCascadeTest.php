@@ -5,6 +5,7 @@ use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../api/controllers/TeamController.php';
 require_once __DIR__ . '/../api/controllers/MatchController.php';
+require_once __DIR__ . '/../api/controllers/PoolController.php';
 
 /**
  * Exercises the match-state machine — cascadePropagate(), cascadeClearDownstream() and
@@ -44,7 +45,9 @@ final class MatchCascadeTest extends TestCase
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT "setup",
-                format TEXT NOT NULL DEFAULT "single"
+                format TEXT NOT NULL DEFAULT "single",
+                seeding_mode TEXT NOT NULL DEFAULT "automatic",
+                pool_games INTEGER NOT NULL DEFAULT 3
             )
         ');
         $this->db->exec('

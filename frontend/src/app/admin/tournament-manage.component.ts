@@ -1,5 +1,6 @@
 // src/app/admin/tournament-manage.component.ts
 import { Component, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,7 +10,8 @@ import { AuthService } from '../shared/services/auth.service';
 import { BillingService } from '../shared/services/billing.service';
 import { championName } from '../shared/bracket-labels';
 import { parseNameList } from '../shared/name-list';
-import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus } from '../shared/models/tournament.models';
+import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus, PoolData } from '../shared/models/tournament.models';
+import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
@@ -22,7 +24,7 @@ interface SetupStep {
 @Component({
   selector: 'app-tournament-manage',
   standalone: true,
-  imports: [RouterLink, FormsModule, DragDropModule],
+  imports: [RouterLink, FormsModule, DragDropModule, NgTemplateOutlet, PoolStandingsComponent],
   template: `
     <div class="page">
     @if (loadError()) {
@@ -185,6 +187,21 @@ interface SetupStep {
         </div>
       }
 
+      <ng-template #formatCard>
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Format</div>
+            <select class="input" [ngModel]="tournament()!.format || 'single'"
+              (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
+              <option value="single">Single elimination — one loss and a team is out</option>
+              <option value="double" [disabled]="!canUseDoubleElimination()">
+                Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (paid plan)' }}
+              </option>
+            </select>
+            <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
+            @if (formatError()) { <div class="form-error">{{ formatError() }}</div> }
+          </div>
+      </ng-template>
+
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
         <!-- Where-am-I checklist. The individual controls below already explain themselves
@@ -223,25 +240,29 @@ interface SetupStep {
               (ngModelChange)="updateSeedingMode($event)" [disabled]="seedingModeBusy()">
               <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
               <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
+              <option value="pool_play" [disabled]="!canUsePaidFeatures()">
+                Pool play — teams play pool games first, and the standings set the seeds{{ canUsePaidFeatures() ? '' : ' (paid plan)' }}
+              </option>
             </select>
+            @if (isPoolPlay()) {
+              <div class="row" style="align-items:center;margin-top:10px">
+                <select class="input" style="max-width:240px" [ngModel]="tournament()!.pool_games ?? 3"
+                  (ngModelChange)="updatePoolGames($event)" [disabled]="seedingModeBusy()" aria-label="Pool games per team">
+                  @for (n of poolGameChoices; track n) {
+                    <option [ngValue]="n">{{ n }} pool games per team</option>
+                  }
+                </select>
+              </div>
+              <div class="field-hint" style="margin-top:6px">Every team plays this many games before the bracket, with no rematches.</div>
+            }
+            @if (seedingError()) { <div class="form-error">{{ seedingError() }}</div> }
           </div>
         }
         <!-- Format sits outside the teams().length === 0 guard above on purpose: it only
              locks once the bracket is generated, not once teams are drawn, so a
              manual-seeding organizer can still change it while arranging the ladder. -->
         @if (canManageSetup() && tournament()!.status === 'setup') {
-          <div class="card" style="margin-bottom:24px">
-            <div class="section-label">Format</div>
-            <select class="input" [ngModel]="tournament()!.format || 'single'"
-              (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
-              <option value="single">Single elimination — one loss and a team is out</option>
-              <option value="double" [disabled]="!canUseDoubleElimination()">
-                Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (paid plan)' }}
-              </option>
-            </select>
-            <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
-            @if (formatError()) { <div class="form-error">{{ formatError() }}</div> }
-          </div>
+          <ng-container *ngTemplateOutlet="formatCard" />
         }
 
         @if (isDirectEntry()) {
@@ -398,6 +419,8 @@ interface SetupStep {
                   {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
                   @if (isManualSeeding()) {
                     This will randomly pair players into teams. You'll set the final seed order before generating the bracket.
+                  } @else if (isPoolPlay()) {
+                    This will randomly pair players into teams and start pool play. The standings set the bracket seeds.
                   } @else {
                     This will randomly pair players, seed teams, and generate the bracket.
                   }
@@ -408,7 +431,7 @@ interface SetupStep {
                   <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
                   Drawing…
                 } @else {
-                  {{ isManualSeeding() ? 'Draw Teams' : 'Draw Teams & Start' }}
+                  {{ isManualSeeding() ? 'Draw Teams' : isPoolPlay() ? 'Draw Teams & Start Pool' : 'Draw Teams & Start' }}
                 }
               </button>
             </div>
@@ -460,14 +483,25 @@ interface SetupStep {
                 }
               </button>
             }
-            <button class="btn btn-primary" [disabled]="generatingBracket() || teams().length < 2" (click)="confirmGenerateBracket()">
-              @if (generatingBracket()) {
-                <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
-                Generating…
-              } @else {
-                Generate Bracket
-              }
-            </button>
+            @if (isPoolPlay()) {
+              <button class="btn btn-primary" [disabled]="startingPool() || teams().length < 2" (click)="confirmStartPool()">
+                @if (startingPool()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Starting…
+                } @else {
+                  Start Pool Play
+                }
+              </button>
+            } @else {
+              <button class="btn btn-primary" [disabled]="generatingBracket() || teams().length < 2" (click)="confirmGenerateBracket()">
+                @if (generatingBracket()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Generating…
+                } @else {
+                  Generate Bracket
+                }
+              </button>
+            }
           </div>
           @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
           @if (generateBracketError()) { <div class="form-error" style="margin-top:12px">{{ generateBracketError() }}</div> }
@@ -476,6 +510,55 @@ interface SetupStep {
 
       <!-- ── ACTIVE / COMPLETE PHASE ── -->
       @if (tournament()?.status !== 'setup') {
+        <!-- Pool play (FEATURE_TRACKER item 18): standings while the pool runs, then the
+             seed-and-generate step once every pool game is in. -->
+        @if (pool(); as p) {
+          @if (p.started) {
+            <div class="card" style="margin-bottom:24px">
+              <app-pool-standings [pool]="p" />
+              @if (!p.locked && !p.complete && canScore()) {
+                <div style="margin-top:12px">
+                  <a class="btn btn-sm btn-primary" [routerLink]="['/admin/tournament', tournamentId, 'score']">Enter pool scores</a>
+                </div>
+              }
+            </div>
+          }
+          @if (p.complete && !p.locked && canManageSetup()) {
+            <div class="card pool-ready" style="margin-bottom:24px">
+              <div class="section-label">Pool play finished</div>
+              <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px">
+                Seeds follow the standings. Drag to adjust if you need to, then generate the bracket.
+                Correcting a pool score afterwards resets the order to the standings.
+              </div>
+              <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
+                @for (team of teams(); track team.id) {
+                  <div class="team-seed-item" cdkDrag>
+                    <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
+                    <span class="seed">#{{ team.seed }}</span>
+                    <div class="team-info">
+                      <div class="team-name">{{ team.name }}</div>
+                      <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+            <ng-container *ngTemplateOutlet="formatCard" />
+            <div class="draw-section" style="margin-bottom:24px">
+              <div style="font-size:.85rem;color:var(--text-dim)">{{ teams().length }} teams, seeded from the pool.</div>
+              <button class="btn btn-primary" [disabled]="generatingBracket()" (click)="confirmGenerateBracket()">
+                @if (generatingBracket()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Generating…
+                } @else {
+                  Generate Bracket
+                }
+              </button>
+            </div>
+            @if (generateBracketError()) { <div class="form-error" style="margin:-12px 0 24px">{{ generateBracketError() }}</div> }
+          }
+        }
+
         <div class="section-label" style="margin-bottom:10px">Participants</div>
         @if (participants().length === 0) {
           <div class="empty">No participants.</div>
@@ -896,6 +979,13 @@ export class TournamentManageComponent implements OnInit {
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
   isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
+  isPoolPlay = computed(() => this.tournament()?.seeding_mode === 'pool_play');
+  // Pool play (FEATURE_TRACKER item 18). Loaded with the bracket once the tournament is live;
+  // null for every other seeding mode.
+  pool = signal<PoolData | null>(null);
+  startingPool = signal(false);
+  seedingError = signal('');
+  readonly poolGameChoices = [2, 3, 4, 5];
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
 
   // The setup sequence is a different length depending on the two modes: auto-draft with
@@ -908,6 +998,7 @@ export class TournamentManageComponent implements OnInit {
 
     const direct = this.isDirectEntry();
     const manual = this.isManualSeeding();
+    const poolPlay = this.isPoolPlay();
     const teamsDrawn = this.teams().length > 0;
     const pending = this.pendingParticipants().length;
 
@@ -931,12 +1022,27 @@ export class TournamentManageComponent implements OnInit {
         label: 'Draw the teams',
         detail: manual
           ? 'Randomly pairs your players into teams. You set the seed order afterwards.'
-          : 'Randomly pairs and seeds your players, builds the bracket, and starts play — all at once.',
+          : poolPlay
+            ? 'Randomly pairs your players into teams and starts pool play.'
+            : 'Randomly pairs and seeds your players, builds the bracket, and starts play — all at once.',
         done: teamsDrawn,
       });
     }
 
-    if (direct || manual) {
+    if (poolPlay) {
+      if (direct) {
+        steps.push({
+          label: 'Start pool play',
+          detail: `Schedules ${this.tournament()?.pool_games ?? 3} pool games per team and puts the tournament live.`,
+          done: false,
+        });
+      }
+      steps.push({
+        label: 'Play the pool, then generate the bracket',
+        detail: 'Enter pool scores as games finish. The standings set the seeds.',
+        done: false,
+      });
+    } else if (direct || manual) {
       steps.push({
         label: manual ? 'Set the seed order, then generate' : 'Generate the bracket',
         detail: manual
@@ -1100,10 +1206,13 @@ export class TournamentManageComponent implements OnInit {
         // teams already formed while awaiting bracket generation, so this can no longer
         // be gated on status !== 'setup'.
         this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
-        if (t.status === 'complete') {
+        if (t.status === 'complete' || (t.status === 'active' && t.seeding_mode === 'pool_play')) {
           this.svc.getBracket(this.tournamentId).subscribe(data => {
-            this.champion.set(championName(data));
+            this.pool.set(data.pool ?? null);
+            if (t.status === 'complete') this.champion.set(championName(data));
           });
+        } else {
+          this.pool.set(null);
         }
 
         // Only ask for the member list when the tournament response says we're allowed
@@ -1184,23 +1293,61 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  updateSeedingMode(mode: 'automatic' | 'manual') {
+  updateSeedingMode(mode: 'automatic' | 'manual' | 'pool_play') {
     if (this.tournament()?.seeding_mode === mode) return;
+    this.saveSeeding({ seeding_mode: mode });
+  }
+
+  updatePoolGames(games: number) {
+    if ((this.tournament()?.pool_games ?? 3) === games) return;
+    this.saveSeeding({ pool_games: games });
+  }
+
+  private saveSeeding(change: Partial<Tournament>) {
     this.seedingModeBusy.set(true);
-    this.svc.updateTournament(this.tournamentId, { seeding_mode: mode }).subscribe({
+    this.seedingError.set('');
+    this.svc.updateTournament(this.tournamentId, change).subscribe({
       next: updated => {
         this.tournament.set(updated);
         this.seedingModeBusy.set(false);
       },
-      error: () => {
+      error: err => {
         this.seedingModeBusy.set(false);
-        this.showToast('Failed to update seeding mode.');
+        // A plan gate explains itself better than a generic failure. Re-set the tournament
+        // so the select snaps back to what the server actually holds.
+        this.seedingError.set(err?.error?.error ?? 'Failed to update seeding.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  async confirmStartPool() {
+    const games = this.tournament()?.pool_games ?? 3;
+    const ok = await confirmService.confirm(`Start pool play? Every team plays ${games} pool games, and teams are locked in.`);
+    if (!ok) return;
+    this.startingPool.set(true);
+    this.generateBracketError.set('');
+    this.svc.startPool(this.tournamentId).subscribe({
+      next: () => {
+        this.startingPool.set(false);
+        this.showToast('Pool play started!');
+        this.load();
+      },
+      error: err => {
+        this.startingPool.set(false);
+        this.generateBracketError.set(err?.error?.error ?? 'Failed to start pool play.');
       },
     });
   }
 
   // Unlike the account-plan check on the create form, a tournament can also be unlocked by
   // a super-admin-granted paid_override, so this asks the tournament rather than the user.
+  // Pool play and double elimination share one gate: either paid lever (item 12 or 13).
+  canUsePaidFeatures(): boolean {
+    return this.canUseDoubleElimination();
+  }
+
   canUseDoubleElimination(): boolean {
     return this.auth.isPaidPlan() || !!this.tournament()?.paid_override;
   }
@@ -1632,7 +1779,9 @@ export class TournamentManageComponent implements OnInit {
       ? 'Redraw teams? This will re-shuffle pairings and reset any seed order you\'ve set.'
       : this.isManualSeeding()
         ? 'Draw teams? You\'ll be able to set the final seed order before generating the bracket.'
-        : 'Draw teams and start the tournament? This cannot be undone.';
+        : this.isPoolPlay()
+          ? `Draw teams and start pool play? Every team plays ${this.tournament()?.pool_games ?? 3} pool games. This cannot be undone.`
+          : 'Draw teams and start the tournament? This cannot be undone.';
     const ok = await confirmService.confirm(prompt);
     if (!ok) return;
     this.drawing.set(true);
@@ -1640,7 +1789,8 @@ export class TournamentManageComponent implements OnInit {
     this.svc.drawTeams(this.tournamentId).subscribe({
       next: () => {
         this.drawing.set(false);
-        this.showToast(this.isManualSeeding() ? 'Teams drawn — set your seed order below.' : 'Teams drawn! Bracket generated.');
+        this.showToast(this.isManualSeeding() ? 'Teams drawn — set your seed order below.'
+          : this.isPoolPlay() ? 'Teams drawn! Pool play has started.' : 'Teams drawn! Bracket generated.');
         this.load();
       },
       error: err => {

@@ -77,6 +77,10 @@ class MatchController {
 
         $payload = ['format' => $format, 'sides' => $sides];
 
+        // Pool play (item 18) rides along with the bracket so every screen that shows one
+        // gets the other from the same request. Null unless the tournament uses pool play.
+        $payload['pool'] = (new PoolController($this->db))->payload($tournamentId);
+
         if ($format !== 'double') {
             // Legacy shape, for a client cached before the two-tree response existed. It is
             // exactly right for single elimination and meaningless for double, so it is

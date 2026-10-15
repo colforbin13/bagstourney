@@ -33,7 +33,8 @@ final class LinkPreview
      * yet has no rounds, and a finished one has no current round.
      *
      * @param array $tournament Row with name/status, optionally team_count, current_round,
-     *                          total_rounds and champion_name.
+     *                          total_rounds, champion_name, pool_rounds and
+     *                          pool_current_round.
      */
     public static function describe(array $tournament): string
     {
@@ -56,8 +57,13 @@ final class LinkPreview
         } else {
             $current = isset($tournament['current_round']) ? (int)$tournament['current_round'] : 0;
             $total = isset($tournament['total_rounds']) ? (int)$tournament['total_rounds'] : 0;
+            $poolRounds = isset($tournament['pool_rounds']) ? (int)$tournament['pool_rounds'] : 0;
+            $poolCurrent = isset($tournament['pool_current_round']) ? (int)$tournament['pool_current_round'] : 0;
             if ($current > 0 && $total > 0) {
                 $parts[] = 'Round ' . $current . ' of ' . $total;
+            } elseif ($total === 0 && $poolRounds > 0) {
+                // Pool play (item 18): live, but the bracket comes after the pool.
+                $parts[] = $poolCurrent > 0 ? 'Pool round ' . $poolCurrent . ' of ' . $poolRounds : 'Pool play finished';
             } else {
                 $parts[] = 'In progress';
             }

@@ -188,6 +188,15 @@ function formatRequiresPaidPlan(string $format): bool {
     return in_array($format, PAID_ONLY_TOURNAMENT_FORMATS, true);
 }
 
+// Pool play (FEATURE_TRACKER.md item 18) is the second paid feature, gated the same way and
+// at the same two kinds of moment: choosing it, and starting it. Never while it is running.
+const PAID_ONLY_SEEDING_MODES = ['pool_play'];
+const POOL_PLAY_PAID_MESSAGE = 'Pool play is a Pro feature. Upgrade, or choose another seeding mode.';
+
+function seedingModeRequiresPaidPlan(string $mode): bool {
+    return in_array($mode, PAID_ONLY_SEEDING_MODES, true);
+}
+
 // Like requireTournamentRole() but for anonymous-allowed GET endpoints: public
 // tournaments are visible to everyone, private ones require a role on the tournament
 // (or super_admin) — the same gate that forces private tournaments to be reached via
