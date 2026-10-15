@@ -80,7 +80,7 @@ interface TournamentGroup {
             <span class="step-num">Step 02</span>
             <h2 class="step-title">Draw the teams</h2>
             <p class="step-body">
-              Auto-draft random pairs or enter teams directly, then let the seeding fall where it
+              Blind draw random pairs or enter teams directly, then let the seeding fall where it
               may — or drag the ladder into the order you want.
             </p>
           </li>

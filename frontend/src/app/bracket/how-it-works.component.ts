@@ -49,11 +49,11 @@ import { AuthService } from '../shared/services/auth.service';
               are unlisted and reachable only by their link — though anyone holding that link
               can watch. Changeable at any time.
             </dd>
-            <dt>Auto-draft or direct entry</dt>
+            <dt>Blind draw or direct entry</dt>
             <dd>
-              Auto-draft means players sign up as individuals and get randomly paired into
+              Blind draw means players sign up as individuals and get randomly paired into
               teams. Direct entry means you type in each team yourself, partners already
-              decided. <strong>The player sign-up link only works with auto-draft</strong> —
+              decided. <strong>The player sign-up link only works with blind draw</strong> —
               there's no pool of unpaired players for a walk-up to join otherwise.
             </dd>
             <dt>Automatic or manual seeding</dt>

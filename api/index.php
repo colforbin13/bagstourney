@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/lib/BracketBuilder.php';
+require_once __DIR__ . '/lib/NameList.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/TournamentController.php';
 require_once __DIR__ . '/controllers/ParticipantController.php';
@@ -117,6 +118,9 @@ try {
                 // No requireTournamentRole() here by design: this is exactly the endpoint
                 // anonymous attendees are meant to hit.
                 $ctrl->selfRegister($body);
+            } elseif ($method === 'POST' && $action === 'bulk') {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->bulkCreate($body); // fast blind-draw setup: add a pasted list of names
             } elseif ($method === 'POST') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->create($body);

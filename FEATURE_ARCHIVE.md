@@ -4,6 +4,61 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Fast blind-draw setup
+
+Getting from "new tournament" to a drawn bracket meant typing every player into a single
+name box and pressing Add, once per player. For a 24-player bar night that is the slowest
+part of setup by far, and the marketing handoff (`Bracketway Marketing → Code Handoff.md`,
+item 2) set a target of under two minutes from start to bracket. Added 2026-10-15 per
+Matt, ahead of pool play (item 18).
+
+**What changed.** The manage screen's add-players card has a paste box. It is the default
+while the roster is empty; once players exist the single-name box comes back, with a
+"Paste a list of names" link either way. The preview line counts new players, says how
+many are already listed and will be skipped, and shows the resulting team count or an
+odd-number warning. Adding reloads the tournament so the `n/32 participants` badge recounts.
+
+**Parsing rules** (`api/lib/NameList.php`, mirrored in `frontend/src/app/shared/name-list.ts`):
+
+- One name per line, or tab-separated (a spreadsheet row). A single line splits on commas
+  and semicolons. Once there are several lines each line is one name, so "Smith, John"
+  pasted one-per-line stays one person.
+- Leading list markers (`1.`, `2)`, `-`, `*`, `•`) are stripped; a digit only counts as a
+  marker when punctuation follows, so "3 Putt Pete" keeps his name. Runs of whitespace,
+  including non-breaking spaces from web pages, collapse to one space.
+- Repeats are skipped case-insensitively, against the existing roster and within the
+  paste. Pasting the same sign-up sheet twice is a likelier mistake than two players
+  sharing a name; a genuine second "Mike" can still be added one at a time.
+- Names over 255 characters (the column width) are reported, not truncated.
+
+The server parse is authoritative; the TypeScript copy only drives the preview, so drift
+between them costs a count, never a wrong roster. Both test files carry the same cases.
+
+**Endpoint.** `POST /participants/bulk` `{tournament_id, text}`, owner/manager only, same
+roster-open rules as the single add (setup phase, no teams yet, blind draw mode only; the
+shared checks moved into `ParticipantController::rosterClosedReason()`). It runs in a
+transaction holding the tournament row `FOR UPDATE`, so a concurrent add or
+self-registration cannot slip past the cap check. **All or nothing against the plan cap:**
+a list that would overflow it adds no one and says how many would fit, rather than
+silently dropping whoever came last. Input over 64 KB is refused. No audit-log entry,
+matching the single add.
+
+**Blind draw label.** The UI called the random-pairing mode "Auto-draft". It now says
+"Blind draw" on the create form, the manage screen, `/how-it-works`, the home page and the
+one API error that named it, per the marketing handoff. The stored value is still
+`auto_draft`; only display text changed.
+
+**Verification.** PHPUnit 136/136 (15 new, and breaking the single-line comma rule and the
+case-folding fails 12 of them). Frontend 419/419 headless (22 new across the parser and
+the manage screen), production build clean. API smoke-tested against a local MariaDB with
+every migration applied: markers stripped and a repeat skipped; a re-paste refused as
+"already in this tournament"; a 40-name paste on a 5-player free tournament refused with
+"room for 27 more" and nothing inserted; exactly filling to 32 accepted and the 33rd
+refused; a direct-entry tournament and a drawn tournament both refused; unauthenticated
+call 401. Browser-checked at phone width: paste nine names with one repeat, preview reads
+"8 new players · 1 already listed · 4 teams", Add, then Draw Teams & Start produces four
+teams and an active tournament.
+
 ### Sport-neutral copy and the /sports page
 
 The public copy still described Bracketway as a bag-toss tool — "Bag toss tournament

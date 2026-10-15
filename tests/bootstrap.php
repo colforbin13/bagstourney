@@ -9,3 +9,4 @@ require_once __DIR__ . '/../api/lib/BracketBuilder.php';
 require_once __DIR__ . '/../api/lib/LinkPreview.php';
 require_once __DIR__ . '/../api/lib/StripeSignature.php';
 require_once __DIR__ . '/../api/lib/BillingIntent.php';
+require_once __DIR__ . '/../api/lib/NameList.php';

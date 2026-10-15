@@ -115,6 +115,13 @@ export interface Participant {
   notify_tournament_finalized?: boolean;
 }
 
+// POST /participants/bulk
+export interface BulkAddResult {
+  added: Participant[];
+  skipped_duplicates: string[];
+  skipped_too_long: number;
+}
+
 export interface NotificationPreferences {
   email: string;
   tournament_name: string;

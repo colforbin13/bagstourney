@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
+import { Tournament, Participant, BulkAddResult, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -133,6 +133,11 @@ export class TournamentService {
 
   addParticipant(tournamentId: number, name: string) {
     return this.http.post<Participant>(`${this.api}/participants`, { tournament_id: tournamentId, name });
+  }
+
+  // Fast blind-draw setup: the server splits and cleans the pasted text (api/lib/NameList.php).
+  addParticipantsBulk(tournamentId: number, text: string) {
+    return this.http.post<BulkAddResult>(`${this.api}/participants/bulk`, { tournament_id: tournamentId, text });
   }
 
   deleteParticipant(id: number) {

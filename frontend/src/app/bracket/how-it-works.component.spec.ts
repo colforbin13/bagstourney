@@ -58,7 +58,7 @@ describe('HowItWorksComponent', () => {
       .map(dt => dt.textContent!.trim());
     expect(terms).toEqual([
       'Public or private',
-      'Auto-draft or direct entry',
+      'Blind draw or direct entry',
       'Automatic or manual seeding',
       'Single or double elimination',
     ]);
@@ -86,9 +86,9 @@ describe('HowItWorksComponent', () => {
     expect(text).toContain('advance automatically');
   });
 
-  it('should call out that the sign-up link needs auto-draft', () => {
+  it('should call out that the sign-up link needs blind draw', () => {
     setup();
-    expect(fixture.nativeElement.textContent).toContain('sign-up link only works with auto-draft');
+    expect(fixture.nativeElement.textContent).toContain('sign-up link only works with blind draw');
   });
 
   it('should send a reader wondering about their own game to the sports list', () => {

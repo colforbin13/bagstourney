@@ -40,7 +40,7 @@ import { confirmService } from '../shared/services/confirm.service';
           </label>
           <label class="field">
             <select class="input" [(ngModel)]="newTeamEntryMode">
-              <option value="auto_draft">Auto-draft teams</option>
+              <option value="auto_draft">Blind draw</option>
               <option value="direct">Enter teams directly</option>
             </select>
             <span class="field-hint">{{ teamEntryHint() }}</span>

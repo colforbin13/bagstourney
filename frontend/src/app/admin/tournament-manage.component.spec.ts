@@ -426,6 +426,94 @@ describe('TournamentManageComponent', () => {
     });
   });
 
+  describe('paste a list (fast blind draw)', () => {
+    it('opens in paste mode when the roster is empty', () => {
+      bootstrapWithParticipants([]);
+      fixture.detectChanges();
+
+      expect(component.pasteMode()).toBe(true);
+      expect(fixture.nativeElement.querySelector('textarea.paste-box')).not.toBeNull();
+    });
+
+    it('opens on the single-name box once players exist', () => {
+      bootstrapWithParticipants([{ id: 1, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' }]);
+      fixture.detectChanges();
+
+      expect(component.pasteMode()).toBe(false);
+      expect(fixture.nativeElement.querySelector('textarea.paste-box')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Paste a list of names');
+    });
+
+    it('previews new players, skips ones already on the roster, and counts teams', () => {
+      bootstrapWithParticipants([{ id: 1, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' }]);
+      component.pasteMode.set(true);
+      component.pasteText.set('ann\nBob\nCara\nDev');
+      fixture.detectChanges();
+
+      expect(component.pastePreview().names).toEqual(['Bob', 'Cara', 'Dev']);
+      const summary = fixture.nativeElement.querySelector('.paste-summary').textContent;
+      expect(summary).toContain('3 new players');
+      expect(summary).toContain('1 already listed');
+      expect(summary).toContain('2 teams');
+    });
+
+    it('warns when the roster would end up odd', () => {
+      bootstrapWithParticipants([]);
+      component.pasteText.set('Ann, Bob, Cara');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.paste-summary').textContent).toContain('3 total, odd number');
+    });
+
+    it('posts the raw text, then reloads so the cap badge recounts', () => {
+      bootstrapWithParticipants([]);
+      component.pasteText.set('Ann\nBob\nCara\nDev');
+      component.addPastedParticipants();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/bulk`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ tournament_id: tournamentId, text: 'Ann\nBob\nCara\nDev' });
+      req.flush({
+        added: ['Ann', 'Bob', 'Cara', 'Dev'].map((name, i) => ({ id: i + 1, tournament_id: tournamentId, name, registration_status: 'approved' })),
+        skipped_duplicates: [],
+        skipped_too_long: 0,
+      });
+
+      expect(component.pasteText()).toBe('');
+      expect(component.toast()).toBe('Added 4 players.');
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      // Reloading must not flip the organizer back out of the mode they were in.
+      expect(component.pasteMode()).toBe(true);
+    });
+
+    it('shows the server error and keeps the text when the add is refused', () => {
+      bootstrapWithParticipants([]);
+      component.pasteText.set('Ann\nBob');
+      component.addPastedParticipants();
+
+      httpMock.expectOne(`${environment.apiUrl}/participants/bulk`)
+        .flush({ error: 'That list has 40 new players, but this tournament has room for 32 more.' }, { status: 400, statusText: 'Bad Request' });
+
+      expect(component.addError()).toContain('room for 32 more');
+      expect(component.pasteText()).toBe('Ann\nBob');
+      expect(component.adding()).toBe(false);
+    });
+
+    it('does not post when nothing new was pasted', () => {
+      bootstrapWithParticipants([{ id: 1, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' }]);
+      component.pasteText.set('ann');
+      component.addPastedParticipants();
+
+      httpMock.expectNone(`${environment.apiUrl}/participants/bulk`);
+    });
+  });
+
   describe('saveParticipant', () => {
     const participant: Participant = { id: 5, tournament_id: tournamentId, name: 'Alice', email: 'alice@example.com' };
 
@@ -736,10 +824,10 @@ describe('TournamentManageComponent', () => {
       component.addTeam();
 
       httpMock.expectOne(`${environment.apiUrl}/teams/direct`)
-        .flush({ error: 'This tournament uses auto-draft team entry — add participants and draw teams instead' },
+        .flush({ error: 'This tournament uses blind draw team entry — add participants and draw teams instead' },
           { status: 400, statusText: 'Bad Request' });
 
-      expect(component.addTeamError()).toBe('This tournament uses auto-draft team entry — add participants and draw teams instead');
+      expect(component.addTeamError()).toBe('This tournament uses blind draw team entry — add participants and draw teams instead');
       expect(component.newTeamName).toBe('The Ringers');
     });
 

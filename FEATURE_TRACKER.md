@@ -450,6 +450,83 @@ marketplace build. Be aware this is a bigger engine change than anything shipped
 if it needs to be split, the natural seam is single-elimination-preserving schema and
 gating first, then the losers-bracket construction, then the two-tree rendering.
 
+### 18. Pool play to set bracket seeds
+
+Let a tournament play a set number of pool games before the bracket, and seed the bracket
+from the pool standings instead of randomly or by hand. Added 2026-10-15 per Matt: it gives
+every team more games for the night (nobody drives across town to lose once and go home),
+and it makes seeding earned rather than drawn.
+
+**Proposed shape: "rounds of pool play", not separate pools.** The organizer picks how many
+pool games every team plays (say 3). Each pool round, every team plays exactly one game;
+after N rounds every team has played N. The schedule is a round robin across the whole
+field (the standard circle method), stopped after N rounds, which guarantees no rematches
+and needs no "pool A / pool B" concept. With an odd number of teams one team sits out each
+round, so standings rank by win percentage rather than raw wins. Splitting the field into
+named pools of four is the other common format; it is a v2 option if organizers ask for it,
+since it adds pool assignment and cross-pool ranking without adding games.
+
+How it fits the code as it stands:
+
+- **It reuses manual seeding's waiting room.** Manual seeding already has the state this
+  needs: teams formed, tournament still in `setup`, bracket not generated until
+  `generateBracketAction()` is called with a seed order. Pool play becomes a third
+  `seeding_mode` value (`pool_play`) alongside `automatic` and `manual`. After the pool,
+  standings order *is* the seed order, written through the existing `reorder()` path, and
+  the organizer can still drag a tweak in before generating, exactly as manual seeding
+  allows today. Both formats (single and double elimination) take the seeds unchanged.
+- **Pool games are matches with no edges.** A `matches.stage ENUM('pool','bracket')`
+  column (default `bracket`, so every existing row is unaffected) and `round` reused as the
+  pool round. Pool matches have no `next_match_id`/`loser_match_id`, so the score cascade
+  and its clear-downstream risk (item 16's hard part) simply never runs for them. Score
+  entry reuses `MatchController::updateScore()` with the cascade skipped for `stage='pool'`.
+- **Every reader of `matches` needs a stage filter.** `MatchController::bracket()` groups by
+  round, `championOf()`, finality detection, round-completed notifications and
+  `TournamentController::LIST_STATS_SQL` would all misread pool games as bracket games.
+  This is the main source of bugs, and the reason to land it as a column every query names
+  rather than inferring "pool" from missing edges.
+- **Tournament status during the pool.** Open question below. Recommendation: the
+  tournament goes `active` when pool play starts (so it appears on the public list and
+  spectators can follow along), with a `tournaments.stage` (`pool`/`bracket`) column saying
+  which part is live. The alternative, staying in `setup`, keeps the public list and link
+  previews describing a tournament with games underway as "Starting soon".
+- **Pool results lock once the bracket is generated**, since the seeds were taken from them.
+  Before that, a corrected pool score just re-ranks the standings.
+- **Standings tiebreakers (proposed, the usual cornhole order):** win percentage, then point
+  differential, then points scored, then head-to-head if exactly two teams are tied, then a
+  random draw. Point differential uses each game's actual score difference.
+
+Pure logic, so it goes in `api/lib/` with PHPUnit tests per `AGENTS.md`: a `PoolPlay`
+class with `schedule(teamIds, rounds)` (circle method, byes, no rematches) and
+`standings(teams, results)` (the tiebreak chain). Both are where a quiet bug puts the wrong
+team in the 1 seed, so they need the "prove the tests bite" pass.
+
+Frontend: a pool-play option and games-per-team picker on the create form and manage
+screen; pool matches on the score-entry screen grouped by pool round; a standings table on
+the manage screen, the public bracket page and the TV/kiosk view while the pool is running;
+and a "Seed bracket from standings" step. `/how-it-works` copy for the new mode.
+
+Suggested slices, each shippable on its own: (1) `PoolPlay` schedule + standings with tests;
+(2) migration, setup option, generating pool matches at the draw, scoring them; (3) standings
+endpoint and seeding the bracket from them; (4) standings on the public bracket and TV view.
+Smaller than item 16 overall, since pool games never feed one another.
+
+Open questions for Matt:
+
+- **Free or Pro?** Recommendation: Pro (and the one-time upgrade), gated through
+  `tournamentHasPaidFeatures()` like double elimination. More games per team is exactly the
+  "bigger event" value Pro sells, and the "Powered by Bracketway" tag is staying on free.
+- **Games per team:** proposed 2 to 5, default 3.
+- **Does everyone advance?** Recommendation for v1: yes, standings only set seeds. A "top N
+  advance" cut is a natural follow-up but changes the bracket size after the draw.
+- **Status during the pool:** `active` with a stage column (recommended) or `setup`.
+
+Not the same as the marketing handoff's "rotating partners round robin" (players switch
+partners each round and are ranked individually). That needs individual scoring rather than
+team standings and stays a separate idea.
+
+Status: Planned — scoped 2026-10-15, not started.
+
 ### 10. Payment provider integration for tournament registration fees
 
 Let an organizer charge participants a registration fee to enter a tournament, with the
@@ -705,6 +782,16 @@ than a product, so it needs its own monetization answer before it becomes an ite
 Built and verified. The top entries are **built but not yet deployed** — they've accumulated
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
+
+- **Fast blind-draw setup** (2026-10-15) — organizers can paste a whole list of names into
+  the manage screen instead of adding players one at a time: one per line, a spreadsheet
+  column or row, or a single comma-separated line, with list numbers and bullets stripped.
+  The box shows a live count, flags names already on the roster (skipped, not doubled) and
+  warns on an odd total; it opens by default while the roster is empty. New
+  `POST /participants/bulk`, parsing in `api/lib/NameList.php` (15 tests, mirrored by
+  `shared/name-list.ts` for the preview). The random-pairing mode is now labelled
+  **Blind draw** in the UI to match what organizers search for. No migration.
+  [Full notes](FEATURE_ARCHIVE.md#fast-blind-draw-setup)
 
 - **Link previews for shared bracket URLs** (2026-08-22) — sharing a bracket link in
   iMessage, Slack or WhatsApp previewed as an unlabelled "Bracketway" for every tournament,

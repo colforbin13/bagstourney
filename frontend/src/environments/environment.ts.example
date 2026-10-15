@@ -6,4 +6,6 @@ export const environment = {
   // Base URL for API. For local dev with PHP built-in server: http://localhost:8000
   // For deployed setups where API is served at /bags/api, use '/bags/api'
   apiUrl: 'http://localhost:8000/bags/api',
+  // Path the app is served under; '/' for the domain root.
+  baseHref: '/',
 };

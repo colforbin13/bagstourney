@@ -159,7 +159,7 @@ class TeamController {
                 throw new Exception('Tournament is not in setup phase');
             }
             if (($tournament['team_entry_mode'] ?? 'auto_draft') !== 'direct') {
-                throw new Exception('This tournament uses auto-draft team entry — add participants and draw teams instead');
+                throw new Exception('This tournament uses blind draw team entry — add participants and draw teams instead');
             }
 
             $cap = effectiveParticipantCap($this->db, $tournamentId);

@@ -9,6 +9,9 @@ class ParticipantController {
         notify_match_completed, notify_round_completed, notify_tournament_finalized,
         notification_confirmed_at, notification_manage_token_version, created_at';
 
+    /** A few hundred names is well past the 256-player paid cap; this only stops abuse. */
+    const MAX_BULK_TEXT_BYTES = 65536;
+
     public function __construct(private readonly PDO $db) {}
 
     public function listByTournament(int $tournamentId): void {
@@ -29,31 +32,15 @@ class ParticipantController {
             return;
         }
 
-        // Ensure tournament is still in setup phase and teams haven't been drawn yet —
-        // manual seeding leaves a tournament in 'setup' with teams already formed while
-        // awaiting bracket generation, and the roster must be locked for that window too,
-        // not just once the tournament goes 'active'.
-        $stmt = $this->db->prepare('SELECT status, team_entry_mode FROM tournaments WHERE id = ?');
-        $stmt->execute([$tournamentId]);
-        $t = $stmt->fetch();
-        if (!$t || $t['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
+        $error = $this->rosterClosedReason($tournamentId);
+        if ($error !== null) {
             http_response_code(400);
-            echo json_encode(['error' => 'Tournament is not in setup phase']);
-            return;
-        }
-        if (($t['team_entry_mode'] ?? 'auto_draft') !== 'auto_draft') {
-            // Direct-entry tournaments create both members of a team together via
-            // TeamController::createDirect() — there's no unpaired-participant pool here
-            // for a lone participant to join.
-            http_response_code(400);
-            echo json_encode(['error' => 'This tournament uses direct team entry — add teams directly instead']);
+            echo json_encode(['error' => $error]);
             return;
         }
 
         $cap = effectiveParticipantCap($this->db, $tournamentId);
-        $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
-        $countStmt->execute([$tournamentId]);
-        if ((int)$countStmt->fetchColumn() >= $cap) {
+        if ($this->participantCount($tournamentId) >= $cap) {
             http_response_code(400);
             echo json_encode(['error' => "This tournament has reached its {$cap}-participant plan limit. Upgrade to add more."]);
             return;
@@ -66,6 +53,91 @@ class ParticipantController {
         $id = (int)$this->db->lastInsertId();
 
         echo json_encode(['id' => $id, 'tournament_id' => $tournamentId, 'name' => $name, 'registration_status' => 'approved']);
+    }
+
+    /**
+     * POST /participants/bulk — fast blind-draw setup: add a whole pasted list of players
+     * in one request. NameList::parse() does the splitting and cleanup; names already on
+     * the roster (or repeated in the paste) are skipped and reported rather than added
+     * twice, since pasting the same sign-up sheet again is a likelier mistake than two
+     * players sharing a name — a genuine second "Mike" can still be added one at a time.
+     *
+     * All or nothing against the plan cap: a list that would overflow it adds no one and
+     * says how many would fit, rather than silently cutting off whoever came last.
+     */
+    public function bulkCreate(array $body): void {
+        $tournamentId = (int)($body['tournament_id'] ?? 0);
+        $text = $body['text'] ?? '';
+        if (!$tournamentId || !is_string($text) || trim($text) === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'tournament_id and text required']);
+            return;
+        }
+        if (strlen($text) > self::MAX_BULK_TEXT_BYTES) {
+            http_response_code(400);
+            echo json_encode(['error' => 'That list is too long. Paste fewer names at a time.']);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // Lock the tournament row so a concurrent add or self-registration can't slip
+            // in between the cap check and the inserts below.
+            $this->db->prepare('SELECT id FROM tournaments WHERE id = ? FOR UPDATE')->execute([$tournamentId]);
+
+            $error = $this->rosterClosedReason($tournamentId);
+            if ($error !== null) throw new Exception($error);
+
+            $stmt = $this->db->prepare('SELECT name FROM participants WHERE tournament_id = ?');
+            $stmt->execute([$tournamentId]);
+            $existing = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            $parsed = NameList::parse($text, $existing);
+            if (!$parsed['names']) {
+                throw new Exception($parsed['duplicates']
+                    ? 'Everyone on that list is already in this tournament.'
+                    : 'No names found. Put one name on each line.');
+            }
+
+            $cap = effectiveParticipantCap($this->db, $tournamentId);
+            $room = max(0, $cap - count($existing));
+            if (count($parsed['names']) > $room) {
+                $n = count($parsed['names']);
+                throw new Exception($room === 0
+                    ? "This tournament has reached its {$cap}-participant plan limit. Upgrade to add more."
+                    : "That list has {$n} new players, but this tournament has room for {$room} more under its {$cap}-participant plan limit. Upgrade to add more, or trim the list.");
+            }
+
+            $insert = $this->db->prepare('INSERT INTO participants (tournament_id, name) VALUES (?, ?)');
+            $added = [];
+            foreach ($parsed['names'] as $name) {
+                $insert->execute([$tournamentId, $name]);
+                $added[] = [
+                    'id' => (int)$this->db->lastInsertId(),
+                    'tournament_id' => $tournamentId,
+                    'name' => $name,
+                    'registration_status' => 'approved',
+                ];
+            }
+
+            $this->db->commit();
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+            return;
+        } catch (Throwable $e) {
+            // Separate from the catch above: an Error is not a validation failure and must
+            // not be echoed as a 400, but it still has to unwind the transaction. See AGENTS.md.
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
+
+        echo json_encode([
+            'added' => $added,
+            'skipped_duplicates' => $parsed['duplicates'],
+            'skipped_too_long' => count($parsed['too_long']),
+        ]);
     }
 
     public function delete(int $id): void {
@@ -354,6 +426,34 @@ class ParticipantController {
     // 'setup' status alone no longer means "roster is still editable": manual seeding
     // (TeamController::draw()) leaves a tournament in 'setup' with teams already formed
     // while it awaits bracket generation via generateBracketAction().
+    /**
+     * Why players can't be added to this tournament right now, or null if they can.
+     *
+     * The roster locks once teams exist, not only once the tournament goes 'active':
+     * manual seeding leaves a tournament in 'setup' with teams already formed while it
+     * awaits bracket generation. Direct-entry tournaments create both members of a team
+     * together via TeamController::createDirect(), so there's no unpaired-participant pool
+     * for a lone player to join.
+     */
+    private function rosterClosedReason(int $tournamentId): ?string {
+        $stmt = $this->db->prepare('SELECT status, team_entry_mode FROM tournaments WHERE id = ?');
+        $stmt->execute([$tournamentId]);
+        $t = $stmt->fetch();
+        if (!$t || $t['status'] !== 'setup' || $this->teamsExist($tournamentId)) {
+            return 'Tournament is not in setup phase';
+        }
+        if (($t['team_entry_mode'] ?? 'auto_draft') !== 'auto_draft') {
+            return 'This tournament uses direct team entry — add teams directly instead';
+        }
+        return null;
+    }
+
+    private function participantCount(int $tournamentId): int {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+        $stmt->execute([$tournamentId]);
+        return (int)$stmt->fetchColumn();
+    }
+
     private function teamsExist(int $tournamentId): bool {
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
         $stmt->execute([$tournamentId]);

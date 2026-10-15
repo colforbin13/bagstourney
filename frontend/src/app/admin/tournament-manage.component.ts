@@ -8,6 +8,7 @@ import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
 import { BillingService } from '../shared/services/billing.service';
 import { championName } from '../shared/bracket-labels';
+import { parseNameList } from '../shared/name-list';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
@@ -212,7 +213,7 @@ interface SetupStep {
             <div class="section-label">Team Entry</div>
             <select class="input" [ngModel]="tournament()!.team_entry_mode"
               (ngModelChange)="updateTeamEntryMode($event)" [disabled]="teamEntryModeBusy()">
-              <option value="auto_draft">Auto-draft — add participants, randomly pair them into teams</option>
+              <option value="auto_draft">Blind draw — add players, randomly pair them into teams</option>
               <option value="direct">Direct entry — create each team by typing both member names</option>
             </select>
           </div>
@@ -264,18 +265,54 @@ interface SetupStep {
             </div>
           }
         } @else {
-          <!-- Add participant (auto-draft) -->
+          <!-- Add participants (auto-draft): paste a whole list, or one at a time -->
           @if (canManageSetup() && teams().length === 0) {
             <div class="card" style="margin-bottom:24px">
-              <div class="section-label">Add Participant</div>
-              <div class="row">
-                <input class="input" type="text" [(ngModel)]="newParticipant"
-                  placeholder="Full name" (keyup.enter)="addParticipant()" />
-                <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
-                  @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
-                  Add
-                </button>
-              </div>
+              @if (pasteMode()) {
+                <div class="section-label">Add Players</div>
+                <textarea class="input paste-box" rows="8" [ngModel]="pasteText()" (ngModelChange)="pasteText.set($event)"
+                  aria-label="Player names, one per line"
+                  placeholder="Paste or type names, one per line.&#10;Ann Smith&#10;Bob Jones&#10;Cara Lee"></textarea>
+                <div class="paste-footer">
+                  <div class="paste-summary" aria-live="polite">
+                    @if (pastePreview().names.length > 0) {
+                      {{ pastePreview().names.length }} new player{{ pastePreview().names.length === 1 ? '' : 's' }}
+                      @if (pastePreview().duplicates.length > 0) {
+                        · {{ pastePreview().duplicates.length }} already listed, will be skipped
+                      }
+                      @if (pasteRosterAfter() >= 4 && pasteRosterAfter() % 2 === 0) {
+                        · {{ pasteRosterAfter() / 2 }} teams
+                      } @else if (pasteRosterAfter() % 2 !== 0) {
+                        <span class="warn-inline">· {{ pasteRosterAfter() }} total, odd number</span>
+                      }
+                    } @else if (pastePreview().duplicates.length > 0) {
+                      Everyone on that list is already in this tournament.
+                    } @else {
+                      One name per line, or a single line separated by commas.
+                    }
+                  </div>
+                  <div class="row">
+                    <button type="button" class="link-btn" (click)="pasteMode.set(false)">Add one at a time</button>
+                    <button class="btn btn-primary" [disabled]="adding() || pastePreview().names.length === 0" (click)="addPastedParticipants()">
+                      @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                      Add {{ pastePreview().names.length || '' }} player{{ pastePreview().names.length === 1 ? '' : 's' }}
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <div class="section-label">Add Participant</div>
+                <div class="row">
+                  <input class="input" type="text" [(ngModel)]="newParticipant"
+                    placeholder="Full name" (keyup.enter)="addParticipant()" />
+                  <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
+                    @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                    Add
+                  </button>
+                </div>
+                <div style="margin-top:8px;font-size:.8rem">
+                  <button type="button" class="link-btn" (click)="pasteMode.set(true)">Paste a list of names</button>
+                </div>
+              }
               @if (addError()) { <div class="form-error">{{ addError() }}</div> }
             </div>
           }
@@ -611,6 +648,11 @@ interface SetupStep {
     }
     .warn { color: var(--danger); font-size: .65rem; }
     .row { display: flex; gap: 8px; }
+    .paste-box { resize: vertical; min-height: 140px; line-height: 1.4; }
+    .paste-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+    .paste-footer .row { align-items: center; gap: 14px; margin-left: auto; }
+    .paste-summary { font-size: .8rem; color: var(--text-dim); }
+    .warn-inline { color: var(--danger); }
     .form-error { font-size: .8rem; color: var(--danger); margin-top: 8px; }
 
     /* Toolbar row */
@@ -882,7 +924,7 @@ export class TournamentManageComponent implements OnInit {
         label: 'Add your players',
         detail: pending > 0
           ? `${pending} self sign-up${pending === 1 ? '' : 's'} waiting on your approval below.`
-          : 'Add them by name, or share the sign-up link. You need an even number, four or more.',
+          : 'Paste a list of names, or share the sign-up link. You need an even number, four or more.',
         done: teamsDrawn,
       });
       steps.push({
@@ -929,6 +971,14 @@ export class TournamentManageComponent implements OnInit {
   toast = signal('');
 
   newParticipant = '';
+  // Fast blind-draw setup. Paste mode is the default while the roster is empty (set in
+  // load()), since pasting a sign-up sheet is the quickest way from nothing to a draw;
+  // organizers adding a straggler to an existing roster get the single-name box.
+  pasteMode = signal(false);
+  private pasteModeChosen = false;
+  pasteText = signal('');
+  pastePreview = computed(() => parseNameList(this.pasteText(), this.participants().map(p => p.name)));
+  pasteRosterAfter = computed(() => this.approvedParticipants().length + this.pastePreview().names.length);
   tournamentId!: number;
 
   // Direct team entry
@@ -1038,7 +1088,13 @@ export class TournamentManageComponent implements OnInit {
       next: t => {
         this.tournament.set(t);
         // Always load participants so names can be edited at any time
-        this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
+        this.svc.getParticipants(this.tournamentId).subscribe(p => {
+          this.participants.set(p);
+          if (!this.pasteModeChosen) {
+            this.pasteModeChosen = true;
+            this.pasteMode.set(p.length === 0);
+          }
+        });
 
         // Always load teams too — manual seeding leaves a tournament in 'setup' with
         // teams already formed while awaiting bracket generation, so this can no longer
@@ -1401,6 +1457,28 @@ export class TournamentManageComponent implements OnInit {
       error: err => {
         this.adding.set(false);
         this.addError.set(err?.error?.error ?? 'Failed to add participant.');
+      },
+    });
+  }
+
+  addPastedParticipants() {
+    if (this.pastePreview().names.length === 0) return;
+    this.adding.set(true);
+    this.addError.set('');
+    this.svc.addParticipantsBulk(this.tournamentId, this.pasteText()).subscribe({
+      next: r => {
+        this.adding.set(false);
+        this.pasteText.set('');
+        const skipped = r.skipped_duplicates.length + r.skipped_too_long;
+        this.showToast(`Added ${r.added.length} player${r.added.length === 1 ? '' : 's'}.`
+          + (skipped ? ` Skipped ${skipped} already listed or too long.` : ''));
+        // Reload rather than splice in: the participant/cap badge in the header comes from
+        // the tournament's capabilities, which only the server can recount.
+        this.load();
+      },
+      error: err => {
+        this.adding.set(false);
+        this.addError.set(err?.error?.error ?? 'Failed to add players.');
       },
     });
   }
