@@ -80,13 +80,22 @@ class BillingController {
      * Deliberately not cached in our config: an amount duplicated here is an amount that
      * can disagree with what the customer is actually charged. Stripe is the price of
      * record, so changing what you charge is a dashboard edit with no deploy. This is the
-     * only endpoint that calls out to Stripe on a page load, and only the upgrade screen
-     * calls it.
+     * only endpoint that calls out to Stripe on a page load; the upgrade screen and the
+     * public Pricing page call it.
+     *
+     * Public, with no auth helper: a price list is not private, and the Pricing page is most
+     * useful to someone who has not signed up yet. The participant caps ride along so that
+     * page never has to restate them either. With billing off it answers 200 with no plans
+     * rather than 503, so the Pricing page can still describe the tiers.
      */
-    public function plans(array $actor): void {
+    public function plans(): void {
+        $caps = [
+            'free_participant_cap' => FREEMIUM_FREE_TIER_MAX_PARTICIPANTS,
+            'paid_participant_cap' => FREEMIUM_PAID_TIER_MAX_PARTICIPANTS,
+        ];
+
         if (!$this->billingEnabled()) {
-            http_response_code(503);
-            echo json_encode(['error' => 'Billing is not available']);
+            echo json_encode(['billing_enabled' => false, 'plans' => []] + $caps);
             return;
         }
 
@@ -120,7 +129,7 @@ class BillingController {
             ];
         }
 
-        echo json_encode(['plans' => $plans]);
+        echo json_encode(['billing_enabled' => true, 'plans' => $plans] + $caps);
     }
 
     // ----------------------------------------------------------------------------------

@@ -297,7 +297,8 @@ try {
             } elseif ($method === 'GET' && $billingAction === 'status') {
                 $ctrl->status(requireCurrentUser(getDB()));
             } elseif ($method === 'GET' && $billingAction === 'plans') {
-                $ctrl->plans(requireCurrentUser(getDB()));
+                // Public: the Pricing page shows it to visitors who have no account yet.
+                $ctrl->plans();
             } elseif ($method === 'GET' && $billingAction === 'confirm') {
                 $ctrl->confirm($_GET, requireCurrentUser(getDB()));
             } elseif ($method === 'POST' && $billingAction === 'checkout' && $billingSubAction === 'subscription') {

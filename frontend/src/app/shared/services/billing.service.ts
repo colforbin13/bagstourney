@@ -13,7 +13,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import {
   BillingStatus,
-  BillingPlanOption,
+  BillingPlans,
   BillingCheckoutSession,
   BillingConfirmation,
 } from '../models/tournament.models';
@@ -27,9 +27,12 @@ export class BillingService {
     return this.http.get<BillingStatus>(`${this.api}/billing/status`);
   }
 
-  /** Hits Stripe server-side, so only call it from a screen that actually shows prices. */
+  /**
+   * Hits Stripe server-side, so only call it from a screen that actually shows prices.
+   * Public: the Pricing page calls it for visitors with no account.
+   */
   getPlans() {
-    return this.http.get<{ plans: BillingPlanOption[] }>(`${this.api}/billing/plans`);
+    return this.http.get<BillingPlans>(`${this.api}/billing/plans`);
   }
 
   startSubscriptionCheckout(interval: 'monthly' | 'annual') {

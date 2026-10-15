@@ -62,7 +62,7 @@ interface TournamentGroup {
               <a class="btn" routerLink="/admin/login">Sign in</a>
             }
           </div>
-          <p class="hero-note">Free to start · Nothing to install · Works on the phone in your pocket</p>
+          <p class="hero-note"><a routerLink="/pricing">Free to start</a> · Nothing to install · Works on the phone in your pocket</p>
         </div>
       </header>
 
@@ -232,6 +232,7 @@ interface TournamentGroup {
       color: var(--muted);
       margin-top: 18px;
     }
+    .hero-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
     .steps {
       padding: 40px 16px 8px;

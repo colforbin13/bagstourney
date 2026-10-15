@@ -61,6 +61,7 @@ import { AuthService } from '../services/auth.service';
             </div>
           </div>
         } @else {
+          <a routerLink="/pricing" routerLinkActive="active">Pricing</a>
           <a routerLink="/admin/login" routerLinkActive="active">Sign in</a>
           <a routerLink="/admin/register" routerLinkActive="active">Create account</a>
         }

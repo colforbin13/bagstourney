@@ -68,7 +68,7 @@ import { AuthService } from '../shared/services/auth.service';
               team a second chance: your first loss drops you into a losers bracket, and only
               a second knocks you out. It's kinder to a team that draws the eventual champion
               early, at the cost of roughly twice as many games.
-              <strong>Double elimination is a paid-plan feature</strong>, and unlike the other
+              <strong>Double elimination is a <a routerLink="/pricing">paid-plan feature</a></strong>, and unlike the other
               choices here it's locked once the bracket is generated — the bracket's whole
               shape depends on it.
             </dd>

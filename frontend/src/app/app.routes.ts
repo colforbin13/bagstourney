@@ -24,6 +24,11 @@ export const routes: Routes = [
   },
   // Public for the same reason, and the answer to the first question a visitor has now
   // that the rest of the copy no longer names a sport: "does this do my game?"
+  // Public: the price list matters most before someone signs up.
+  {
+    path: 'pricing',
+    loadComponent: () => import('./bracket/pricing.component').then(m => m.PricingComponent),
+  },
   {
     path: 'sports',
     loadComponent: () => import('./bracket/sports.component').then(m => m.SportsComponent),

@@ -110,4 +110,15 @@ describe('NavComponent', () => {
     expect(text).toContain('Create account');
     expect(text).not.toContain('Sign out');
   });
+
+  it('should link to Pricing for a logged-out visitor only', () => {
+    setup(false);
+    const hrefs = () => Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.nav-links a'))
+      .map(a => a.getAttribute('href'));
+    expect(hrefs()).toContain('/pricing');
+
+    TestBed.resetTestingModule();
+    setup(true);
+    expect(hrefs()).not.toContain('/pricing');
+  });
 });

@@ -209,7 +209,16 @@ export interface BillingStatus {
   paid_participant_cap: number;
 }
 
-/** GET /billing/plans — prices read live from Stripe, never duplicated in our config. */
+/** GET /billing/plans — public; the plan list plus the caps the Pricing page describes. */
+export interface BillingPlans {
+  /** False when this installation can't sell anything; plans is then empty. */
+  billing_enabled: boolean;
+  plans: BillingPlanOption[];
+  free_participant_cap: number;
+  paid_participant_cap: number;
+}
+
+/** One entry of GET /billing/plans — prices read live from Stripe, never duplicated in our config. */
 export interface BillingPlanOption {
   key: 'tournament_unlock' | 'subscription_monthly' | 'subscription_annual';
   /** Minor units (cents), as Stripe reports them. Formatting is the frontend's job. */

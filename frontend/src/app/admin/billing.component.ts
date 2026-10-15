@@ -50,7 +50,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
           <div class="plan-row">
             <div>
               <div class="plan-label">Current plan</div>
-              <div class="plan-name">{{ status()!.plan === 'paid' ? 'Paid' : 'Free' }}</div>
+              <div class="plan-name">{{ status()!.plan === 'paid' ? 'Pro' : 'Free' }}</div>
               <div class="plan-detail">
                 Up to {{ status()!.plan === 'paid' ? status()!.paid_participant_cap : status()!.free_participant_cap }}
                 participants per tournament@if (status()!.plan === 'paid') {, plus double elimination}.
@@ -79,7 +79,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
         </section>
 
         @if (!status()!.has_subscription && subscriptionOptions().length > 0) {
-          <h2 class="section-title">Upgrade</h2>
+          <h2 class="section-title">Upgrade to Pro</h2>
           <div class="offers">
             @for (opt of subscriptionOptions(); track opt.key) {
               <div class="offer">
@@ -111,6 +111,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
             tournament's page, with no subscription.
           </p>
         }
+        <p class="footnote"><a routerLink="/pricing">Compare plans and read the pricing FAQ</a></p>
       }
 
       @if (toast()) {
