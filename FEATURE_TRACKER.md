@@ -527,7 +527,32 @@ today.
   byes — a match's schedule assignment shouldn't need to be redone by hand every time
   the bracket structure changes upstream of it.
 
-Status: Planned — not yet scoped in detail; added 2026-08-10 per Matt's request.
+**Proposed v1 shape (scoped 2026-10-16): boards and an "up next" queue, no clock times.**
+A bar night runs on board availability, not a schedule: the next game starts when a board
+frees up. So v1 assigns boards, not start times.
+
+- **Setup:** the organizer sets how many boards the venue has (`tournaments.boards`,
+  default 0 = feature off, so nothing changes for existing tournaments). Boards are
+  numbered "Board 1..N"; custom names are a later nicety.
+- **Automatic assignment:** a nullable `board_number` on `matches` and `pool_matches`.
+  Whenever a game becomes playable (both teams known) or a board frees up (a score is
+  entered), the lowest free board goes to the next waiting game: earliest round first,
+  then match number, never putting a team on two boards at once. Pool play and bracket
+  games share the same queue. This answers the open question above: assignment is derived
+  from current state each time, so regenerating or re-seeding needs no manual redo, and
+  byes never take a board.
+- **Manual override:** staff can move a game to another board or swap two, for a board
+  that's broken or a team that's late.
+- **Pure logic** in `api/lib/BoardQueue.php` (given ready games, busy teams and free boards,
+  return assignments) with PHPUnit tests, per `AGENTS.md`.
+- **Screens:** "Board 3" on each live game in score entry and the public bracket; a "Now
+  playing / Up next" panel on the TV view, which is what players at a venue actually look
+  at; score entry sorts live games by board.
+- **Open for Matt:** Pro or free (recommend Pro, alongside pool play); whether to email a
+  team "You're up on Board 3" through the existing notification system (recommend a
+  follow-up, not v1).
+
+Status: Planned — added 2026-08-10 per Matt's request; v1 scoped 2026-10-16.
 
 Priority note: a real, directly-requested organizer feature with no dependencies, but
 ranked below the monetization chain — per Matt's 2026-08-12 call, no further feature
