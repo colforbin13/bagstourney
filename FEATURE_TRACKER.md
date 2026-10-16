@@ -698,6 +698,12 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Sign-up invite in the footer** (2026-10-16) — signed-out visitors see "Run your own
+  tournament free" above "Powered by Bracketway" on every page, linking to organizer sign-up,
+  so each public bracket and TV view invites its players and spectators to run one. Hidden for
+  signed-in organizers and in print. First share-loop step from the marketing handoff (item 1);
+  "Powered by Bracketway" stays on every tournament, paid or free. Frontend only.
+
 - **Board assignments** (2026-10-16, item 8) — the organizer sets how many boards the venue
   has, and each playable game goes to the next free board automatically as boards open up:
   earliest round first, never a team on two boards, never a later pool round before an

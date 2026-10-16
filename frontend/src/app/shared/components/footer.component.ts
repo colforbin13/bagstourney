@@ -1,6 +1,7 @@
 // src/app/shared/components/footer.component.ts
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-footer',
@@ -8,6 +9,11 @@ import { RouterLink } from '@angular/router';
   imports: [RouterLink],
   template: `
     <footer class="app-footer">
+      <!-- Every public bracket ends here, so this is the line that turns players and
+           spectators into organizers. Signed-in organizers already have an account. -->
+      @if (!auth.isLoggedIn()) {
+        <a routerLink="/admin/register" class="app-footer-cta">Run your own tournament free</a>
+      }
       <a routerLink="/" class="app-footer-brand">
         <svg width="14" height="12" viewBox="0 0 30 26" fill="none" aria-hidden="true">
           <circle cx="4" cy="4" r="3.2" fill="var(--accent)"/>
@@ -47,7 +53,14 @@ import { RouterLink } from '@angular/router';
       }
     }
     /* Posters and the printed bracket shouldn't carry site links. */
-    @media print { .app-footer-links { display: none; } }
+    @media print { .app-footer-links, .app-footer-cta { display: none; } }
+    .app-footer-cta {
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      &:hover { text-decoration: underline; }
+    }
     .app-footer-brand {
       display: flex;
       align-items: center;
@@ -59,4 +72,6 @@ import { RouterLink } from '@angular/router';
     }
   `]
 })
-export class FooterComponent {}
+export class FooterComponent {
+  readonly auth = inject(AuthService);
+}
