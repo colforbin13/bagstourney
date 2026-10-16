@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__ . '/../api/controllers/TeamController.php';
 require_once __DIR__ . '/../api/controllers/MatchController.php';
 require_once __DIR__ . '/../api/controllers/PoolController.php';
+require_once __DIR__ . '/../api/controllers/BoardController.php';
 
 /**
  * Exercises the match-state machine — cascadePropagate(), cascadeClearDownstream() and
@@ -47,7 +48,8 @@ final class MatchCascadeTest extends TestCase
                 status TEXT NOT NULL DEFAULT "setup",
                 format TEXT NOT NULL DEFAULT "single",
                 seeding_mode TEXT NOT NULL DEFAULT "automatic",
-                pool_games INTEGER NOT NULL DEFAULT 3
+                pool_games INTEGER NOT NULL DEFAULT 3,
+                boards INTEGER NOT NULL DEFAULT 0
             )
         ');
         $this->db->exec('
@@ -63,7 +65,19 @@ final class MatchCascadeTest extends TestCase
                 winner_id INTEGER,
                 next_match_id INTEGER, next_match_slot INTEGER,
                 loser_match_id INTEGER, loser_match_slot INTEGER,
-                status TEXT NOT NULL DEFAULT "pending"
+                status TEXT NOT NULL DEFAULT "pending",
+                board_number INTEGER
+            )
+        ');
+        // BoardController reads pool games alongside bracket games (migrations 018/019).
+        $this->db->exec('
+            CREATE TABLE pool_matches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tournament_id INTEGER NOT NULL,
+                round INTEGER NOT NULL, match_number INTEGER NOT NULL,
+                team1_id INTEGER NOT NULL, team2_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT "ready",
+                board_number INTEGER
             )
         ');
         // bracket() joins these for display names. Minimal shapes; only the columns the
@@ -472,5 +486,87 @@ final class MatchCascadeTest extends TestCase
 
         $this->call($this->matches, 'syncTournamentStatus', [self::TOURNAMENT_ID, $this->champion()]);
         $this->assertSame('active', $this->tournamentStatus(), 'an upstream edit must reopen the tournament');
+    }
+
+    // ------------------------------------------------------------- board assignments
+
+    private function boards(): BoardController
+    {
+        return new BoardController($this->db);
+    }
+
+    private function setBoards(int $count): void
+    {
+        $this->db->prepare('UPDATE tournaments SET boards = ? WHERE id = ?')->execute([$count, self::TOURNAMENT_ID]);
+        $this->boards()->reconcile(self::TOURNAMENT_ID);
+    }
+
+    private function onBoards(): array
+    {
+        return $this->db->query('SELECT * FROM matches WHERE board_number IS NOT NULL ORDER BY board_number')->fetchAll();
+    }
+
+    public function testBoardsFollowADoubleEliminationBracketToTheEnd(): void
+    {
+        // Item 8: after every result the freed board goes to the next playable game. Play a
+        // whole double-elimination bracket on three boards and check the invariants after
+        // each game: only playable games hold boards, no board or team twice, and no board
+        // sits empty while a playable game waits for one.
+        $this->buildBracket(12, 'double');
+        $this->setBoards(3);
+
+        for ($guard = 0; $guard < 100; $guard++) {
+            $on = $this->onBoards();
+            $ready = (int)$this->db->query('SELECT COUNT(*) FROM matches WHERE status = "ready"')->fetchColumn();
+            if ($ready === 0) break;
+
+            $boards = array_column($on, 'board_number');
+            $this->assertSame(count($boards), count(array_unique($boards)), 'board used twice');
+            $teams = array_merge(array_column($on, 'team1_id'), array_column($on, 'team2_id'));
+            $this->assertSame(count($teams), count(array_unique($teams)), 'team on two boards');
+            foreach ($on as $m) {
+                $this->assertSame('ready', $m['status'], "match {$m['id']} holds a board but is not playable");
+            }
+            $this->assertSame(min(3, $ready), count($on), 'a board is idle while a game waits');
+
+            $match = $on[0];
+            $this->recordResult((int)$match['id'], min((int)$match['team1_id'], (int)$match['team2_id']));
+            $this->boards()->reconcile(self::TOURNAMENT_ID);
+        }
+
+        $this->assertSame(101, $this->champion());
+        $this->assertSame([], $this->onBoards(), 'a finished bracket holds no boards');
+    }
+
+    public function testTurningBoardsOffClearsThem(): void
+    {
+        $this->buildBracket(8, 'single');
+        $this->setBoards(4);
+        $this->assertCount(4, $this->onBoards());
+
+        $this->setBoards(0);
+        $this->assertSame([], $this->onBoards());
+        $this->assertNull($this->boards()->summary(self::TOURNAMENT_ID));
+    }
+
+    public function testFewerBoardsSendsGamesBackToTheQueue(): void
+    {
+        $this->buildBracket(8, 'single');
+        $this->setBoards(4);
+        $this->setBoards(2);
+        $this->assertSame([1, 2], array_map('intval', array_column($this->onBoards(), 'board_number')));
+
+        $summary = $this->boards()->summary(self::TOURNAMENT_ID);
+        $this->assertSame(2, $summary['count']);
+        $this->assertCount(2, $summary['playing']);
+        $this->assertCount(2, $summary['up_next']);
+    }
+
+    public function testBoardsStayClearUntilTheTournamentIsLive(): void
+    {
+        $this->db->exec('UPDATE tournaments SET status = "setup" WHERE id = 1');
+        $this->buildBracket(8, 'single');
+        $this->setBoards(4);
+        $this->assertSame([], $this->onBoards());
     }
 }

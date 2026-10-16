@@ -63,8 +63,19 @@ interface ScoreEntry { team1: string; team2: string; }
           } @else {
             <div class="match-list">
               @for (row of readyMatches(); track row.key) {
-                <div class="score-card">
-                  <div class="score-card-round">{{ row.label }} · Match {{ row.match.match_number }}</div>
+                <div class="score-card" [class.on-board]="!!row.match.board_number">
+                  <div class="score-card-round">
+                    @if (boards()) {
+                      @if (row.match.board_number) {
+                        <span class="board-tag">Board {{ row.match.board_number }}</span>
+                      } @else if (upNextPosition(row); as pos) {
+                        <span class="board-tag waiting">Up next · {{ pos }}</span>
+                      } @else {
+                        <span class="board-tag waiting">Waiting</span>
+                      }
+                    }
+                    {{ row.label }} · Match {{ row.match.match_number }}
+                  </div>
                   <div class="score-row">
                     <div class="score-team">
                       <div class="score-team-name">{{ row.match.team1_name }}</div>
@@ -98,6 +109,19 @@ interface ScoreEntry { team1: string; team2: string; }
                       Save result
                     }
                   </button>
+                  @if (boards()) {
+                    <label class="move-board">
+                      {{ row.match.board_number ? 'Move to' : 'Send to' }}
+                      <select class="input" [ngModel]="row.match.board_number ?? null"
+                        (ngModelChange)="moveTo(row, $event)" [disabled]="moving() === row.key"
+                        [attr.aria-label]="'Board for ' + row.match.team1_name + ' vs ' + row.match.team2_name">
+                        <option [ngValue]="null" disabled>Choose a board</option>
+                        @for (b of boardChoices(); track b) {
+                          <option [ngValue]="b">Board {{ b }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
                 </div>
               }
             </div>
@@ -191,6 +215,18 @@ interface ScoreEntry { team1: string; team2: string; }
       gap: 10px;
     }
     .score-card.is-complete { border-left-color: var(--marker); }
+    .board-tag {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-right: 6px;
+      letter-spacing: .06em;
+    }
+    .board-tag.waiting { background: var(--border); color: var(--text); }
+    .move-board { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-dim); }
+    .move-board select { flex: 1; padding: 6px 8px; font-size: .85rem; }
     .score-card-round {
       font-family: var(--mono);
       font-size: .65rem;
@@ -228,6 +264,7 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
   loading = signal(true);
   loadError = signal('');
   submitting = signal<string | null>(null);
+  moving = signal<string | null>(null);
   rowError = signal<Record<string, string>>({});
   showCompleted = signal(false);
   editing = signal<string | null>(null);
@@ -270,8 +307,23 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
     return out;
   });
 
-  // Byes never appear: they're auto-advanced placeholders with no score to enter.
-  readyMatches = computed(() => this.flatMatches().filter(r => r.match.status === 'ready'));
+  // Board assignments (FEATURE_TRACKER item 8). Null when the tournament has boards off.
+  boards = computed(() => this.bracketData()?.boards ?? null);
+  boardChoices = computed(() => Array.from({ length: this.boards()?.count ?? 0 }, (_, i) => i + 1));
+  private upNextIndex = computed(() => new Map((this.boards()?.up_next ?? []).map((key, i) => [key, i])));
+
+  // Byes never appear: they're auto-advanced placeholders with no score to enter. With
+  // boards on, the games being played come first in board order, then the queue, so the
+  // card a scorekeeper wants is the one they'd expect to find by walking the room.
+  readyMatches = computed(() => {
+    const ready = this.flatMatches().filter(r => r.match.status === 'ready');
+    if (!this.boards()) return ready;
+    const next = this.upNextIndex();
+    const rank = (r: ScoreRow) => r.match.board_number
+      ? r.match.board_number
+      : 1000 + (next.get(r.key) ?? 1000);
+    return [...ready].sort((a, b) => rank(a) - rank(b));
+  });
 
   // Newest first — a scorekeeper fixing a typo almost always means the one just entered.
   completedMatches = computed(() =>
@@ -386,6 +438,29 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** 1-based place in the up-next queue, or null for a game that can't be played yet. */
+  upNextPosition(row: ScoreRow): number | null {
+    const i = this.upNextIndex().get(row.key);
+    return i === undefined ? null : i + 1;
+  }
+
+  moveTo(row: ScoreRow, board: number | null) {
+    if (board == null || board === row.match.board_number) return;
+    this.moving.set(row.key);
+    this.svc.moveToBoard(this.tournamentId, row.kind === 'pool' ? 'pool' : 'match', row.match.id, board).subscribe({
+      next: () => {
+        this.moving.set(null);
+        this.showToast(`Moved to board ${board}.`, 'success');
+        this.load(true);
+      },
+      error: err => {
+        this.moving.set(null);
+        this.showToast(err?.error?.error ?? 'Could not move that game.', 'error');
+        this.load(true);
+      },
+    });
+  }
+
   private setRowError(key: string, message: string) {
     this.rowError.update(errs => ({ ...errs, [key]: message }));
   }
@@ -404,7 +479,7 @@ function poolAsMatch(pm: PoolMatch): Match {
     id: pm.id, tournament_id: 0, round: pm.round, match_number: pm.match_number,
     team1_id: pm.team1_id, team2_id: pm.team2_id,
     team1_score: pm.team1_score, team2_score: pm.team2_score, winner_id: pm.winner_id,
-    next_match_id: null, next_match_slot: null, status: pm.status,
+    next_match_id: null, next_match_slot: null, status: pm.status, board_number: pm.board_number ?? null,
     team1_name: pm.team1_name, team2_name: pm.team2_name, winner_name: null,
     team1_participant1_name: null, team1_participant2_name: null,
     team2_participant1_name: null, team2_participant2_name: null,

@@ -709,4 +709,37 @@ describe('BracketViewComponent', () => {
       expect(fixture.nativeElement.querySelector('.pool-view')).toBeNull();
     });
   });
+
+  describe('board assignments', () => {
+    const live = (id: number, board: number | null) => ({
+      id, tournament_id: 1, round: 1, match_number: id, team1_id: id * 10, team2_id: id * 10 + 1,
+      team1_score: null, team2_score: null, winner_id: null, next_match_id: null, next_match_slot: null,
+      status: 'ready', board_number: board, team1_name: 'T' + id, team2_name: 'U' + id, winner_name: null,
+      team1_participant1_name: null, team1_participant2_name: null, team2_participant1_name: null, team2_participant2_name: null,
+    } as any);
+
+    function boot(status: Tournament['status'] = 'active') {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({ ...tournamentWith(), status, boards: 1 });
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({
+        ...singleEliminationBracket({ 1: [live(1, 1), live(2, null)] }),
+        boards: { count: 1, playing: [{ board: 1, key: 'b1' }], up_next: ['b2'] },
+      });
+      fixture.detectChanges();
+    }
+
+    it('marks the live game with its board and shows the boards panel', () => {
+      boot();
+      const el: HTMLElement = fixture.nativeElement;
+      const chips = Array.from(el.querySelectorAll('.match-card .board-chip')).map(c => c.textContent!.trim());
+      expect(chips).toEqual(['Board 1']);
+      expect(el.querySelector('app-boards-panel .tile')!.textContent).toContain('T1');
+      expect(el.querySelector('app-boards-panel .next-list')!.textContent).toContain('T2');
+    });
+
+    it('hides the boards panel once the tournament is over', () => {
+      boot('complete');
+      expect(fixture.nativeElement.querySelector('app-boards-panel')).toBeNull();
+    });
+  });
 });

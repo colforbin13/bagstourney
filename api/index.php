@@ -16,12 +16,14 @@ require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/lib/BracketBuilder.php';
 require_once __DIR__ . '/lib/NameList.php';
 require_once __DIR__ . '/lib/PoolPlay.php';
+require_once __DIR__ . '/lib/BoardQueue.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/TournamentController.php';
 require_once __DIR__ . '/controllers/ParticipantController.php';
 require_once __DIR__ . '/controllers/TeamController.php';
 require_once __DIR__ . '/controllers/MatchController.php';
 require_once __DIR__ . '/controllers/PoolController.php';
+require_once __DIR__ . '/controllers/BoardController.php';
 require_once __DIR__ . '/controllers/TournamentAccessController.php';
 require_once __DIR__ . '/controllers/UserController.php';
 require_once __DIR__ . '/controllers/NotificationController.php';
@@ -226,6 +228,22 @@ try {
                 $stmt->execute([$id]);
                 $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager', 'scorekeeper']);
                 $ctrl->updateScore($id, $body, $actor);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Board assignments (FEATURE_TRACKER item 8) ---
+        // Reading needs no route of its own: GET /matches carries each game's board and the
+        // up-next order. The count itself is a tournament setting (PUT /tournaments/{id}).
+        case 'boards':
+            $db = getDB();
+            if ($method === 'PUT' && $id) {
+                // PUT /boards/{tournamentId} — move a game to a board by hand. Scorekeepers run
+                // the boards at a venue, so they can do this too.
+                $actor = requireTournamentRole($db, $id, ['owner', 'manager', 'scorekeeper']);
+                (new BoardController($db))->moveAction($id, $body, $actor);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);

@@ -264,7 +264,28 @@ class TournamentController {
             $fields[] = 'pool_games = ?';
             $params[] = $poolGames;
         }
-                if (isset($body['team_entry_mode'])) {
+        $boardsChanged = false;
+        if (isset($body['boards'])) {
+            // Board assignments (item 8). Changeable at any time, mid-event included: a board
+            // breaks, or a second room opens up. The Pro check applies to turning boards on or
+            // changing the count, never to turning them off, so a lapsed plan can always drop
+            // back to no boards.
+            $boards = is_numeric($body['boards']) ? (int)$body['boards'] : -1;
+            if ($boards < 0 || $boards > BoardQueue::MAX_BOARDS) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Boards must be between 0 and ' . BoardQueue::MAX_BOARDS]);
+                return;
+            }
+            if ($boards > 0 && !tournamentHasPaidFeatures($this->db, $id)) {
+                http_response_code(403);
+                echo json_encode(['error' => BOARDS_PAID_MESSAGE]);
+                return;
+            }
+            $fields[] = 'boards = ?';
+            $params[] = $boards;
+            $boardsChanged = true;
+        }
+        if (isset($body['team_entry_mode'])) {
             if (!in_array($body['team_entry_mode'], ['auto_draft', 'direct'], true)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid team entry mode']);
@@ -339,7 +360,18 @@ class TournamentController {
         }
         if (!$fields) { http_response_code(400); echo json_encode(['error' => 'Nothing to update']); return; }
         $params[] = $id;
-        $this->db->prepare('UPDATE tournaments SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+        $this->db->beginTransaction();
+        try {
+            $this->db->prepare('UPDATE tournaments SET ' . implode(', ', $fields) . ' WHERE id = ?')->execute($params);
+            // More boards fill from the queue at once; fewer send the games on the removed
+            // boards back to the front of it.
+            // A manual status change (ending a tournament early) frees its boards too.
+            if ($boardsChanged || isset($body['status'])) (new BoardController($this->db))->reconcile($id);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
         writeAuditLog($this->db, $id, (int)$actor['id'], 'tournament_updated', 'tournament', (string)$id, $body);
         $this->get($id, $actor);
     }

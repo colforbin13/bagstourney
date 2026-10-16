@@ -99,6 +99,19 @@ Bracket outer shell: one flex column per round
     &.match-complete { border-color: rgba(var(--marker-rgb), 0.4); }
     &.match-pending  { opacity: .5; }
     &.match-bye      { opacity: .75; }
+    &.on-board       { border-color: var(--accent); }
+}
+
+/* Board assignments (item 8): a strip across the top of a live game's card. It takes a
+   little height, which the bracket's fixed row unit already leaves room for. */
+.board-chip {
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 2px 12px;
 }
 
 .match-team {
@@ -409,3 +422,9 @@ Double elimination: the two trees stacked
 .pool-view-kiosk .pool-round-label { font-size: 1rem; margin-bottom: 10px; }
 .pool-view-kiosk .pool-game { font-size: 2rem; padding: 16px 0; }
 .pool-view-kiosk .pool-score { font-size: 1.6rem; min-width: 90px; }
+
+/* Board assignments (item 8) */
+.boards-wrap { max-width: 680px; margin: 0 auto 24px; }
+.boards-wrap-kiosk { max-width: none; margin: 0; flex-shrink: 0; }
+.pool-board { font-family: var(--mono); font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.pool-view-kiosk .pool-board { font-size: 1rem; }

@@ -511,52 +511,19 @@ Priority note: sequenced right after item 10 since it's a small add-on once paym
 exist; both now sit behind items 12/13 in the overall order (see item 10's priority
 note).
 
-### 8. Match scheduling (location and start time)
+### 8. Match scheduling (start times)
 
-Let organizers assign a physical location (court, field, lane, etc.) and a scheduled
-start time to each match, rather than matches being location/time-agnostic as they are
-today.
+Board assignments, the first half of this item, shipped 2026-10-16 (see Done). What remains
+is clock-based scheduling: a planned start time per game, for leagues and events that run
+to a timetable rather than to board availability. Bar nights don't, which is why boards
+came first.
 
-- Define a pool of locations for a tournament (e.g. "Court 1", "Field A") that matches
-  can be assigned to.
-- Assign a location and a scheduled start time per match, settable/editable by
-  tournament staff.
-- Surface the assigned location and time on the public bracket view so participants and
-  spectators know where and when to show up.
-- Open question: how this interacts with bracket regeneration/re-seeding (item 3) and
-  byes — a match's schedule assignment shouldn't need to be redone by hand every time
-  the bracket structure changes upstream of it.
+- Open question: how a timetable interacts with the board queue (a game with a start time
+  shouldn't be put on a board early), and with bracket regeneration and byes.
+- A "You're up on Board 3" email or text through the existing notification system is a
+  natural follow-up to boards, deliberately left out of v1.
 
-**Proposed v1 shape (scoped 2026-10-16): boards and an "up next" queue, no clock times.**
-A bar night runs on board availability, not a schedule: the next game starts when a board
-frees up. So v1 assigns boards, not start times.
-
-- **Setup:** the organizer sets how many boards the venue has (`tournaments.boards`,
-  default 0 = feature off, so nothing changes for existing tournaments). Boards are
-  numbered "Board 1..N"; custom names are a later nicety.
-- **Automatic assignment:** a nullable `board_number` on `matches` and `pool_matches`.
-  Whenever a game becomes playable (both teams known) or a board frees up (a score is
-  entered), the lowest free board goes to the next waiting game: earliest round first,
-  then match number, never putting a team on two boards at once. Pool play and bracket
-  games share the same queue. This answers the open question above: assignment is derived
-  from current state each time, so regenerating or re-seeding needs no manual redo, and
-  byes never take a board.
-- **Manual override:** staff can move a game to another board or swap two, for a board
-  that's broken or a team that's late.
-- **Pure logic** in `api/lib/BoardQueue.php` (given ready games, busy teams and free boards,
-  return assignments) with PHPUnit tests, per `AGENTS.md`.
-- **Screens:** "Board 3" on each live game in score entry and the public bracket; a "Now
-  playing / Up next" panel on the TV view, which is what players at a venue actually look
-  at; score entry sorts live games by board.
-- **Open for Matt:** Pro or free (recommend Pro, alongside pool play); whether to email a
-  team "You're up on Board 3" through the existing notification system (recommend a
-  follow-up, not v1).
-
-Status: Planned — added 2026-08-10 per Matt's request; v1 scoped 2026-10-16.
-
-Priority note: a real, directly-requested organizer feature with no dependencies, but
-ranked below the monetization chain — per Matt's 2026-08-12 call, no further feature
-work beyond hobby scope until monetization has a clear path.
+Status: Planned — the board half is done; start times not yet scoped.
 
 ### 5. Revisit default participant notification settings
 
@@ -730,6 +697,15 @@ than a product, so it needs its own monetization answer before it becomes an ite
 Built and verified. The top entries are **built but not yet deployed** — they've accumulated
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
+
+- **Board assignments** (2026-10-16, item 8) — the organizer sets how many boards the venue
+  has, and each playable game goes to the next free board automatically as boards open up:
+  earliest round first, never a team on two boards, never a later pool round before an
+  earlier one. A game keeps its board until it has a result. Score entry lists games by board
+  with a "Move to board" control for staff (scorekeepers included); the public bracket shows
+  "Board N" on live games and a Now playing / Up next panel, also on the TV view. Works for
+  pool play and both bracket formats. Pro, checked only when turning boards on or changing
+  the count. **Migration 019.** [Full notes](FEATURE_ARCHIVE.md#board-assignments)
 
 - **Pool play to set bracket seeds** (2026-10-15, item 18) — a third seeding mode, Pro only
   like double elimination. Every team plays 2 to 5 pool games (default 3) in a round robin

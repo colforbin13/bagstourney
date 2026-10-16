@@ -197,6 +197,10 @@ function seedingModeRequiresPaidPlan(string $mode): bool {
     return in_array($mode, PAID_ONLY_SEEDING_MODES, true);
 }
 
+// Board assignments (FEATURE_TRACKER.md item 8): Pro, checked only when the organizer turns
+// boards on or changes the count. Assignment itself keeps running if the plan lapses.
+const BOARDS_PAID_MESSAGE = 'Board assignments are a Pro feature. Upgrade to use them.';
+
 // Like requireTournamentRole() but for anonymous-allowed GET endpoints: public
 // tournaments are visible to everyone, private ones require a role on the tournament
 // (or super_admin) — the same gate that forces private tournaments to be reached via

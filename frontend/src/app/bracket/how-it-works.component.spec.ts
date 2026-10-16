@@ -52,7 +52,7 @@ describe('HowItWorksComponent', () => {
     expect(text).toContain('save as a PDF');
   });
 
-  it('should explain all four creation choices', () => {
+  it('should explain every creation choice', () => {
     setup();
     const terms: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.choices dt'))
       .map(dt => dt.textContent!.trim());
@@ -61,6 +61,7 @@ describe('HowItWorksComponent', () => {
       'Blind draw or direct entry',
       'Automatic, manual or pool play seeding',
       'Single or double elimination',
+      'Board assignments',
     ]);
   });
 
@@ -69,6 +70,13 @@ describe('HowItWorksComponent', () => {
     const text: string = fixture.nativeElement.textContent;
     expect(text).toContain('seeds the bracket from the standings');
     expect(text).toContain('Pool play is a paid-plan feature');
+  });
+
+  it('should explain board assignments and that they are paid', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('next free');
+    expect(text).toContain('Board assignments are a paid-plan feature');
   });
 
   it('should say double elimination is paid and locks at bracket generation', () => {

@@ -32,7 +32,7 @@ const FALLBACK_PAID_CAP = 256;
         <h1>Free to run. Pro when it gets big.</h1>
         <p class="lede">
           Most tournaments never need to pay for anything. Upgrade when your field outgrows the
-          free tier or you want double elimination or pool play, either for every tournament you run or
+          free tier or you want double elimination, pool play or board assignments, either for every tournament you run or
           just for one.
         </p>
       </header>
@@ -70,6 +70,7 @@ const FALLBACK_PAID_CAP = 256;
             <li>Up to {{ paidCap() }} players in every tournament you create</li>
             <li>Double elimination</li>
             <li>Pool play to seed the bracket</li>
+            <li>Board assignments with an up-next queue</li>
             <li>Cancel anytime</li>
           </ul>
         </section>
@@ -87,6 +88,7 @@ const FALLBACK_PAID_CAP = 256;
             <li>Up to {{ paidCap() }} players in that tournament</li>
             <li>Double elimination</li>
             <li>Pool play to seed the bracket</li>
+            <li>Board assignments with an up-next queue</li>
             <li>Buy it from the tournament's own page</li>
           </ul>
         </section>
@@ -222,7 +224,7 @@ export class PricingComponent implements OnInit {
   readonly faq: { q: string; a: (free: number, paid: number) => string }[] = [
     {
       q: 'Do I need to pay to run a tournament?',
-      a: free => `No. Free covers tournaments of up to ${free} players with single elimination, and you can run as many as you like. You only pay for a bigger field, double elimination or pool play.`,
+      a: free => `No. Free covers tournaments of up to ${free} players with single elimination, and you can run as many as you like. You only pay for a bigger field, double elimination, pool play or board assignments.`,
     },
     {
       q: 'Should I get Pro or upgrade one tournament?',

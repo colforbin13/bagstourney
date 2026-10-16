@@ -62,6 +62,8 @@ export interface Tournament {
   seeding_mode: 'automatic' | 'manual' | 'pool_play';
   // Pool games per team (FEATURE_TRACKER item 18). Only meaningful in pool_play mode.
   pool_games?: number;
+  // Board assignments (FEATURE_TRACKER item 8). 0 or absent = off. Pro to turn on.
+  boards?: number;
   team_entry_mode: 'auto_draft' | 'direct';
   // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
   // bracket is generated. Optional so responses predating migration 016 still parse.
@@ -167,6 +169,8 @@ export interface Match {
   bracket_side?: 'winners' | 'losers' | 'grand_final';
   is_reset?: 0 | 1;
   status: 'pending' | 'ready' | 'complete' | 'bye';
+  /** The board this game is being played on, while it is being played (item 8). */
+  board_number?: number | null;
   team1_name: string | null;
   team2_name: string | null;
   winner_name: string | null;
@@ -198,6 +202,17 @@ export interface BracketData {
   /** Pool play (FEATURE_TRACKER item 18). Null, or absent from an older API, unless the
    *  tournament uses pool play. */
   pool?: PoolData | null;
+  /** Board assignments (item 8). Null, or absent from an older API, when boards are off. */
+  boards?: BoardsData | null;
+}
+
+/** Keys name a game across both tables: 'b' + match id, or 'p' + pool match id. */
+export interface BoardsData {
+  count: number;
+  /** Games on a board, ordered by board. */
+  playing: { board: number; key: string }[];
+  /** Waiting games in the order they will get a board. */
+  up_next: string[];
 }
 
 export interface PoolMatch {
@@ -212,6 +227,7 @@ export interface PoolMatch {
   team2_score: number | null;
   winner_id: number | null;
   status: 'ready' | 'complete';
+  board_number?: number | null;
 }
 
 export interface PoolStanding {

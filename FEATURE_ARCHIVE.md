@@ -4,6 +4,54 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Board assignments
+
+FEATURE_TRACKER item 8 (its board half), chosen by Matt 2026-10-16 as the next feature after
+pool play: at a busy venue the biggest question is where to go and when. Pro, without the
+"you're up" email for v1.
+
+**Shape.** `tournaments.boards` (0 = off, up to `BoardQueue::MAX_BOARDS` = 24) and a nullable
+`board_number` on `matches` and `pool_matches`, set only while a game is being played
+(migration `019_boards.sql`, additive and defaulted). No start times: bar nights run on
+boards freeing up, not on a clock.
+
+**Rules** are pure, in `api/lib/BoardQueue.php`, with 20 tests in `tests/BoardQueueTest.php`
+(including a whole 12-team, 3-game pool on 4 boards), each rule mutation-checked:
+- A game on a board keeps it; nobody is moved mid-game.
+- A free board goes to the first waiting game in queue order (earliest round, then match
+  number; winners before losers within a round) whose teams are both free.
+- A team never holds two boards and never starts a later pool round while it owes an
+  earlier one. Eligibility counts only *waiting* games, since a game on a board already
+  makes its teams busy; that keeps the up-next list useful.
+- `upNext()` lists games that can start now first, then games waiting on a team still
+  playing.
+- `move()` is the staff override: onto a free board, or a swap with the game there (a
+  waiting game moved onto a busy board sends the other back to the front of the queue).
+  Refused if it would put a team on two boards.
+
+**Derived, not scheduled.** `BoardController::reconcile()` recomputes assignments from current
+state after every change: a bracket or pool score, bracket generation, pool start, the board
+count, or a manual status change. So a re-scored match, a regenerated bracket or a bye needs
+no cleanup. It locks the tournament row so two scores entered at once can't take the same
+free board. A non-live tournament or 0 boards just clears any boards left.
+
+**API.** `PUT /tournaments/{id}` takes `boards` (Pro to turn on or change, never to turn off).
+`PUT /boards/{tournamentId}` `{kind: match|pool, id, board}` moves a game (owner, manager or
+scorekeeper; audit `board_moved`). `GET /matches` carries `board_number` on each game and a
+`boards` summary `{count, playing, up_next}`, null when off.
+
+**Frontend.** Manage screen Boards card (setup and live). Score entry orders games by board,
+then the queue, with a Board N / Up next tag and a Move to select. Shared
+`BoardsPanelComponent` (Now playing tiles, Up next list) on the public bracket and, in larger
+type, under the TV bar. Live bracket cards get a Board N strip; pool games show their board.
+`/how-it-works` and `/pricing` copy updated.
+
+**Verified** 2026-10-16: PHP suite including SQLite tests that play a whole 12-team double
+elimination bracket on 3 boards checking every invariant after each game; API end to end on
+MariaDB (pool play on 3 boards, scoring frees and refills, moves and swaps, bad board,
+moving a finished game refused, shrinking to 2 boards, Pro gate, turning off while free,
+anonymous 401, bracket after the pool); browser at phone, desktop and 1920x1080 TV.
+
 ### Pool play to set bracket seeds
 
 FEATURE_TRACKER item 18, added and built 2026-10-15 per Matt: give every team more games

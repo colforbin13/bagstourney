@@ -62,6 +62,7 @@ class PoolController {
 
         $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')->execute(['active', $tournamentId]);
         $this->syncSeeds($tournamentId);
+        (new BoardController($this->db))->reconcile($tournamentId);
     }
 
     /** POST /pool/start — direct entry's "Start pool play" button. */
@@ -135,6 +136,7 @@ class PoolController {
             // That overrides any drag tweak made after the pool finished, which is the
             // right call: the tweak was made against results that have since changed.
             $this->syncSeeds($tournamentId);
+            (new BoardController($this->db))->reconcile($tournamentId);
             $this->db->commit();
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -167,7 +169,7 @@ class PoolController {
 
         $stmt = $this->db->prepare('
             SELECT pm.id, pm.round, pm.match_number, pm.team1_id, pm.team2_id,
-                   pm.team1_score, pm.team2_score, pm.winner_id, pm.status,
+                   pm.team1_score, pm.team2_score, pm.winner_id, pm.status, pm.board_number,
                    t1.name AS team1_name, t2.name AS team2_name
             FROM pool_matches pm
             JOIN teams t1 ON t1.id = pm.team1_id
@@ -182,7 +184,7 @@ class PoolController {
         $played = 0;
         foreach ($games as $g) {
             foreach (['id', 'round', 'match_number', 'team1_id', 'team2_id'] as $k) $g[$k] = (int)$g[$k];
-            foreach (['team1_score', 'team2_score', 'winner_id'] as $k) $g[$k] = $g[$k] === null ? null : (int)$g[$k];
+            foreach (['team1_score', 'team2_score', 'winner_id', 'board_number'] as $k) $g[$k] = $g[$k] === null ? null : (int)$g[$k];
             $rounds[$g['round']][] = $g;
             if ($g['status'] === 'complete') $played++;
         }

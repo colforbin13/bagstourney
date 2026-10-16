@@ -775,6 +775,33 @@ describe('TournamentManageComponent', () => {
       expect(component.tournament()!.pool_games).toBe(5);
     });
 
+    // Board assignments (item 8) share this setup: a paid tournament, setup or live.
+    it('PUTs the board count', () => {
+      bootstrapPool('setup', null);
+      component.updateBoards(4);
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.body).toEqual({ boards: 4 });
+      req.flush({ ...component.tournament()!, boards: 4 });
+      expect(component.tournament()!.boards).toBe(4);
+      expect(component.boardsBusy()).toBe(false);
+    });
+
+    it('keeps the Boards card while the tournament is live', () => {
+      bootstrapPool('active', pool());
+      const labels = Array.from(fixture.nativeElement.querySelectorAll('.section-label') as NodeListOf<HTMLElement>)
+        .map(l => l.textContent!.trim());
+      expect(labels).toContain('Boards');
+    });
+
+    it('shows the server message when the board count is refused', () => {
+      bootstrapPool('setup', null);
+      component.updateBoards(2);
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({ error: 'Board assignments are a Pro feature. Upgrade to use them.' }, { status: 403, statusText: 'Forbidden' });
+      expect(component.boardsError()).toContain('Pro feature');
+      expect(component.boardsBusy()).toBe(false);
+    });
+
     it('shows the server plan-gate message when pool play is refused', () => {
       bootstrapCore();
       httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);

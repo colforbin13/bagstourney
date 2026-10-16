@@ -7,6 +7,7 @@ import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
 import { Tournament, Match, BracketData } from '../shared/models/tournament.models';
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
+import { BoardsPanelComponent } from '../shared/components/boards-panel.component';
 import {
   roundLabel as labelForRound,
   teamParticipants as participantsFor,
@@ -56,7 +57,7 @@ interface MirrorLayout {
 @Component({
   selector: 'app-bracket-view',
   standalone: true,
-  imports: [RouterLink, FormsModule, NgTemplateOutlet, PoolStandingsComponent],
+  imports: [RouterLink, FormsModule, NgTemplateOutlet, PoolStandingsComponent, BoardsPanelComponent],
   templateUrl: './bracket-view.component.html',
   styleUrl: './bracket-view.component.css'
 })
@@ -126,6 +127,9 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Pool play (FEATURE_TRACKER item 18). Null unless the tournament uses it.
   pool = computed(() => this.bracketData()?.pool ?? null);
+
+  // Board assignments (FEATURE_TRACKER item 8): shown only while games are being played.
+  showBoards = computed(() => !!this.bracketData()?.boards && this.tournament()?.status === 'active');
 
   // On a TV only the round being played fits alongside the standings; anywhere else, every
   // round, newest first, so the latest results are at the top of a phone screen.

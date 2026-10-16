@@ -6,7 +6,11 @@
     <div class="match-card"
             [class.match-complete]="match.status === 'complete'"
             [class.match-pending]="match.status === 'pending'"
-            [class.match-bye]="match.status === 'bye'">
+            [class.match-bye]="match.status === 'bye'"
+            [class.on-board]="!!match.board_number">
+        @if (match.board_number) {
+        <div class="board-chip">Board {{ match.board_number }}</div>
+        }
         <!-- Team 1 -->
         <div class="match-team"
             [class.winner]="match.winner_id === match.team1_id && match.status === 'complete'"
@@ -152,6 +156,12 @@
         <button type="button" class="btn btn-sm" (click)="setKiosk(true)"
             title="Scale the bracket to fill the screen — for a TV or projector">TV mode</button>
     </div>
+    </div>
+    }
+
+    @if (!loading() && showBoards()) {
+    <div class="boards-wrap" [class.boards-wrap-kiosk]="kiosk()">
+        <app-boards-panel [data]="bracketData()" [large]="kiosk()" />
     </div>
     }
 
@@ -336,7 +346,9 @@
                 <div class="pool-game" [class.done]="g.status === 'complete'">
                     <span class="pool-team" [class.won]="g.winner_id === g.team1_id">{{ g.team1_name }}</span>
                     <span class="pool-score">
-                        @if (g.status === 'complete') { {{ g.team1_score }}–{{ g.team2_score }} } @else { vs }
+                        @if (g.status === 'complete') { {{ g.team1_score }}–{{ g.team2_score }} }
+                        @else if (g.board_number) { <span class="pool-board">Board {{ g.board_number }}</span> }
+                        @else { vs }
                     </span>
                     <span class="pool-team right" [class.won]="g.winner_id === g.team2_id">{{ g.team2_name }}</span>
                 </div>

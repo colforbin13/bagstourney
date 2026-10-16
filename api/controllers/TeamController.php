@@ -101,6 +101,7 @@ class TeamController {
                 $this->generateBracket($tournamentId, $teams, $tournament['format'] ?? 'single');
                 $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                     ->execute(['active', $tournamentId]);
+                (new BoardController($this->db))->reconcile($tournamentId);
             } elseif ($tournament['seeding_mode'] === 'pool_play') {
                 // Like automatic seeding, one step: the draw forms teams and starts the
                 // pool, and the tournament goes live. The bracket comes after the pool.
@@ -322,6 +323,7 @@ class TeamController {
 
             $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                 ->execute(['active', $tournamentId]);
+            (new BoardController($this->db))->reconcile($tournamentId);
 
             $this->db->commit();
 

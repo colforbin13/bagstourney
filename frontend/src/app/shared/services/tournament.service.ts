@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, BulkAddResult, PoolData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
+import { Tournament, Participant, BulkAddResult, PoolData, BoardsData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -234,6 +234,12 @@ export class TournamentService {
 
   updatePoolScore(poolMatchId: number, team1Score: number, team2Score: number) {
     return this.http.put<PoolData>(`${this.api}/pool/${poolMatchId}`, { team1_score: team1Score, team2_score: team2Score });
+  }
+
+  // Board assignments (FEATURE_TRACKER item 8): move a live or waiting game to a board.
+  // The board count itself is a tournament setting (updateTournament({ boards })).
+  moveToBoard(tournamentId: number, kind: 'match' | 'pool', id: number, board: number) {
+    return this.http.put<BoardsData>(`${this.api}/boards/${tournamentId}`, { kind, id, board });
   }
 
   // Bracket / Matches

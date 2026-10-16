@@ -295,4 +295,52 @@ describe('ScoreEntryComponent', () => {
       expect(fixture.nativeElement.querySelector('.empty').textContent).toContain('Pool play is finished');
     });
   });
+
+  describe('board assignments', () => {
+    // Three ready games: 102 on board 1, 103 first in the queue, 101 waiting behind it.
+    const withBoards: BracketData = {
+      ...singleEliminationBracket({
+        1: [
+          match({ id: 101, match_number: 1 }),
+          match({ id: 102, match_number: 2, team1_name: 'Charlie', team2_name: 'Delta', board_number: 1 }),
+          match({ id: 103, match_number: 3, team1_name: 'Echo', team2_name: 'Foxtrot' }),
+        ],
+      }),
+      boards: { count: 2, playing: [{ board: 1, key: 'b102' }], up_next: ['b103', 'b101'] },
+    };
+
+    it('lists games on a board first, then the queue in order', () => {
+      bootstrap(tournamentWith(scorer), withBoards);
+
+      expect(component.readyMatches().map(r => r.match.id)).toEqual([102, 103, 101]);
+      const tags = Array.from(fixture.nativeElement.querySelectorAll('.board-tag') as NodeListOf<HTMLElement>)
+        .map(t => t.textContent!.trim());
+      expect(tags).toEqual(['Board 1', 'Up next · 1', 'Up next · 2']);
+    });
+
+    it('moves a game to a board and reloads', () => {
+      bootstrap(tournamentWith(scorer), withBoards);
+
+      component.moveTo(component.readyMatches()[1], 2);
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/boards/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ kind: 'match', id: 103, board: 2 });
+      req.flush(withBoards.boards!);
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith(scorer));
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(withBoards);
+    });
+
+    it('does nothing when the chosen board is the one the game is already on', () => {
+      bootstrap(tournamentWith(scorer), withBoards);
+      component.moveTo(component.readyMatches()[0], 1);
+      httpMock.expectNone(`${environment.apiUrl}/boards/${tournamentId}`);
+    });
+
+    it('shows no board controls when boards are off', () => {
+      bootstrap();
+      expect(fixture.nativeElement.querySelector('.board-tag')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.move-board')).toBeNull();
+    });
+  });
 });

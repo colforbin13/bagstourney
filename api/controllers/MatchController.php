@@ -53,6 +53,10 @@ class MatchController {
         // double elimination, so grouping on `round` alone — as this used to — merges
         // winners round 2 with losers round 2 and renders them as one column.
         $bySide = [];
+        foreach ($matches as &$match) {
+            $match['board_number'] = isset($match['board_number']) ? (int)$match['board_number'] : null;
+        }
+        unset($match);
         foreach ($matches as $match) {
             $side = isset($match['bracket_side']) && $match['bracket_side'] ? $match['bracket_side'] : 'winners';
             $bySide[$side][(int)$match['round']][] = $match;
@@ -80,6 +84,8 @@ class MatchController {
         // Pool play (item 18) rides along with the bracket so every screen that shows one
         // gets the other from the same request. Null unless the tournament uses pool play.
         $payload['pool'] = (new PoolController($this->db))->payload($tournamentId);
+        // Board assignments (item 8): the count and the up-next order. Null when boards are off.
+        $payload['boards'] = (new BoardController($this->db))->summary($tournamentId);
 
         if ($format !== 'double') {
             // Legacy shape, for a client cached before the two-tree response existed. It is
@@ -186,6 +192,10 @@ class MatchController {
             // clears the deciding match via cascadeClearDownstream(), which previously left
             // the tournament marked 'complete' with no champion.
             $this->syncTournamentStatus((int)$match['tournament_id'], $championId);
+
+            // The board this game was on is free now, and the result may have made new games
+            // playable (item 8). A no-op when the tournament has boards off.
+            (new BoardController($this->db))->reconcile((int)$match['tournament_id']);
 
             $this->db->commit();
 

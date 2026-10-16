@@ -76,6 +76,14 @@ import { AuthService } from '../shared/services/auth.service';
               choices here it's locked once the bracket is generated — the bracket's whole
               shape depends on it.
             </dd>
+            <dt>Board assignments</dt>
+            <dd>
+              Tell Bracketway how many boards you have, and each game goes to the next free
+              board as soon as one opens up. The bracket and TV view show who's on which board
+              and who's up next, so players know where to go without asking. Staff can move a
+              game to a different board, and you can change the count mid-event.
+              <strong>Board assignments are a <a routerLink="/pricing">paid-plan feature</a>.</strong>
+            </dd>
           </dl>
         </li>
 

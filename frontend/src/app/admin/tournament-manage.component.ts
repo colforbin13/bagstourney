@@ -202,6 +202,29 @@ interface SetupStep {
           </div>
       </ng-template>
 
+      <!-- Board assignments (FEATURE_TRACKER item 8). Changeable during setup and while the
+           tournament is live: a board breaks, or another one frees up mid-event. -->
+      <ng-template #boardsCard>
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Boards</div>
+            <select class="input" style="max-width:280px" [ngModel]="tournament()!.boards ?? 0"
+              (ngModelChange)="updateBoards($event)"
+              [disabled]="boardsBusy() || (!canUsePaidFeatures() && !tournament()!.boards)"
+              aria-label="Number of boards">
+              <option [ngValue]="0">Off — no board assignments</option>
+              @for (n of boardChoices; track n) {
+                <option [ngValue]="n">{{ n }} {{ n === 1 ? 'board' : 'boards' }}</option>
+              }
+            </select>
+            <div class="field-hint" style="margin-top:6px">
+              Each game goes to the next free board automatically. The bracket and TV view show
+              who's on which board and who's up next, and staff can move a game from Enter Scores.
+              @if (!canUsePaidFeatures()) { Board assignments are a <a routerLink="/pricing">Pro feature</a>. }
+            </div>
+            @if (boardsError()) { <div class="form-error">{{ boardsError() }}</div> }
+          </div>
+      </ng-template>
+
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
         <!-- Where-am-I checklist. The individual controls below already explain themselves
@@ -263,6 +286,7 @@ interface SetupStep {
              manual-seeding organizer can still change it while arranging the ladder. -->
         @if (canManageSetup() && tournament()!.status === 'setup') {
           <ng-container *ngTemplateOutlet="formatCard" />
+          <ng-container *ngTemplateOutlet="boardsCard" />
         }
 
         @if (isDirectEntry()) {
@@ -510,6 +534,9 @@ interface SetupStep {
 
       <!-- ── ACTIVE / COMPLETE PHASE ── -->
       @if (tournament()?.status !== 'setup') {
+        @if (tournament()?.status === 'active' && canManageSetup()) {
+          <ng-container *ngTemplateOutlet="boardsCard" />
+        }
         <!-- Pool play (FEATURE_TRACKER item 18): standings while the pool runs, then the
              seed-and-generate step once every pool game is in. -->
         @if (pool(); as p) {
@@ -986,6 +1013,8 @@ export class TournamentManageComponent implements OnInit {
   startingPool = signal(false);
   seedingError = signal('');
   readonly poolGameChoices = [2, 3, 4, 5];
+  // Mirrors BoardQueue::MAX_BOARDS in the API.
+  readonly boardChoices = Array.from({ length: 24 }, (_, i) => i + 1);
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
 
   // The setup sequence is a different length depending on the two modes: auto-draft with
@@ -1063,6 +1092,8 @@ export class TournamentManageComponent implements OnInit {
   visibilityBusy = signal(false);
   seedingModeBusy = signal(false);
   teamEntryModeBusy = signal(false);
+  boardsBusy = signal(false);
+  boardsError = signal('');
   formatBusy = signal(false);
   formatError = signal('');
 
@@ -1364,6 +1395,25 @@ export class TournamentManageComponent implements OnInit {
       error: err => {
         this.formatBusy.set(false);
         this.formatError.set(err?.error?.error || 'Failed to update tournament format.');
+      },
+    });
+  }
+
+  updateBoards(boards: number) {
+    if ((this.tournament()?.boards ?? 0) === boards) return;
+    this.boardsBusy.set(true);
+    this.boardsError.set('');
+    this.svc.updateTournament(this.tournamentId, { boards }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.boardsBusy.set(false);
+        this.showToast(boards ? `Using ${boards} ${boards === 1 ? 'board' : 'boards'}.` : 'Board assignments off.');
+      },
+      error: err => {
+        this.boardsBusy.set(false);
+        this.boardsError.set(err?.error?.error || 'Failed to update boards.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t });
       },
     });
   }
