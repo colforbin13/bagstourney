@@ -8,6 +8,7 @@ import { AuthService } from '../shared/services/auth.service';
 import { Tournament, Match, BracketData } from '../shared/models/tournament.models';
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { BoardsPanelComponent } from '../shared/components/boards-panel.component';
+import { boardWord } from '../shared/board-labels';
 import {
   roundLabel as labelForRound,
   teamParticipants as participantsFor,
@@ -129,6 +130,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   pool = computed(() => this.bracketData()?.pool ?? null);
 
   // Board assignments (FEATURE_TRACKER item 8): shown only while games are being played.
+  boardWord = computed(() => boardWord(this.bracketData()?.boards?.label));
   showBoards = computed(() => !!this.bracketData()?.boards && this.tournament()?.status === 'active');
 
   // On a TV only the round being played fits alongside the standings; anywhere else, every

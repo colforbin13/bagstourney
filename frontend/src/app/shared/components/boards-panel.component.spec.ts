@@ -70,6 +70,15 @@ describe('BoardsPanelComponent', () => {
     expect(el.querySelectorAll('.next-list li').length).toBe(3);
   });
 
+  it("uses the tournament's word for its playing spots", () => {
+    const el = render({
+      ...singleEliminationBracket({ 1: [match(1, 'Alpha', 'Bravo')] }),
+      boards: { count: 2, label: 'court', playing: [{ board: 2, key: 'b1' }], up_next: [] },
+    });
+    expect(el.querySelector('.tile-board')!.textContent!.trim()).toBe('Court 2');
+    expect(el.querySelector('.boards')!.getAttribute('aria-label')).toBe('Courts');
+  });
+
   it('says so when no game is on a board', () => {
     const el = render({ ...singleEliminationBracket({}), boards: { count: 4, playing: [], up_next: [] } });
     expect(el.querySelector('.boards-empty')).not.toBeNull();

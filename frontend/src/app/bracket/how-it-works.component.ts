@@ -81,7 +81,8 @@ import { AuthService } from '../shared/services/auth.service';
               Tell Bracketway how many boards you have, and each game goes to the next free
               board as soon as one opens up. The bracket and TV view show who's on which board
               and who's up next, so players know where to go without asking. Staff can move a
-              game to a different board, and you can change the count mid-event.
+              game to a different board, and you can change the count mid-event. Not playing on
+              boards? Call them courts, lanes, tables, pits or fields instead.
               <strong>Board assignments are a <a routerLink="/pricing">paid-plan feature</a>.</strong>
             </dd>
           </dl>

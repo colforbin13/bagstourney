@@ -46,6 +46,14 @@ then the queue, with a Board N / Up next tag and a Move to select. Shared
 type, under the TV bar. Live bracket cards get a Board N strip; pool games show their board.
 `/how-it-works` and `/pricing` copy updated.
 
+**Naming (added 2026-10-16 per Matt).** Not every game has boards, so each tournament picks
+the word: board, court, lane, table, pit or field (`tournaments.board_label`, migration
+`020_board_label.sql`, default `board`). Deliberately a word choice rather than a sport field,
+in keeping with the sport-neutral design: nothing else changes. Allowed values are
+`BoardController::LABELS`, mirrored by `shared/board-labels.ts`; the API sends it as
+`boards.label` and an unknown value falls back to board. Changing it is free on any plan.
+API error messages from a move avoid the word "board" so they read right for courts too.
+
 **Verified** 2026-10-16: PHP suite including SQLite tests that play a whole 12-team double
 elimination bracket on 3 boards checking every invariant after each game; API end to end on
 MariaDB (pool play on 3 boards, scoring frees and refills, moves and swaps, bad board,

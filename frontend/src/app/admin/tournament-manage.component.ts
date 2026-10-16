@@ -12,6 +12,7 @@ import { championName } from '../shared/bracket-labels';
 import { parseNameList } from '../shared/name-list';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus, PoolData } from '../shared/models/tournament.models';
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
+import { BOARD_WORDS, BoardLabel, boardWord } from '../shared/board-labels';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
@@ -206,20 +207,31 @@ interface SetupStep {
            tournament is live: a board breaks, or another one frees up mid-event. -->
       <ng-template #boardsCard>
           <div class="card" style="margin-bottom:24px">
-            <div class="section-label">Boards</div>
-            <select class="input" style="max-width:280px" [ngModel]="tournament()!.boards ?? 0"
-              (ngModelChange)="updateBoards($event)"
-              [disabled]="boardsBusy() || (!canUsePaidFeatures() && !tournament()!.boards)"
-              aria-label="Number of boards">
-              <option [ngValue]="0">Off — no board assignments</option>
-              @for (n of boardChoices; track n) {
-                <option [ngValue]="n">{{ n }} {{ n === 1 ? 'board' : 'boards' }}</option>
-              }
-            </select>
+            <div class="section-label">{{ word().many }}</div>
+            <div class="row" style="align-items:center;flex-wrap:wrap;gap:8px">
+              <select class="input" style="max-width:240px" [ngModel]="tournament()!.boards ?? 0"
+                (ngModelChange)="updateBoards($event)"
+                [disabled]="boardsBusy() || (!canUsePaidFeatures() && !tournament()!.boards)"
+                [attr.aria-label]="'Number of ' + word().many.toLowerCase()">
+                <option [ngValue]="0">Off — no {{ word().one.toLowerCase() }} assignments</option>
+                @for (n of boardChoices; track n) {
+                  <option [ngValue]="n">{{ n }} {{ (n === 1 ? word().one : word().many).toLowerCase() }}</option>
+                }
+              </select>
+              <!-- The word only: board for bags, court for pickleball. Free on any plan. -->
+              <select class="input" style="max-width:180px" [ngModel]="word().value"
+                (ngModelChange)="updateBoardLabel($event)" [disabled]="boardsBusy()"
+                aria-label="What to call them">
+                @for (w of boardWords; track w.value) {
+                  <option [ngValue]="w.value">Call them {{ w.many.toLowerCase() }}</option>
+                }
+              </select>
+            </div>
             <div class="field-hint" style="margin-top:6px">
-              Each game goes to the next free board automatically. The bracket and TV view show
-              who's on which board and who's up next, and staff can move a game from Enter Scores.
-              @if (!canUsePaidFeatures()) { Board assignments are a <a routerLink="/pricing">Pro feature</a>. }
+              Each game goes to the next free {{ word().one.toLowerCase() }} automatically. The bracket and TV
+              view show who's on which {{ word().one.toLowerCase() }} and who's up next, and staff can move a
+              game from Enter Scores.
+              @if (!canUsePaidFeatures()) { {{ word().one }} assignments are a <a routerLink="/pricing">Pro feature</a>. }
             </div>
             @if (boardsError()) { <div class="form-error">{{ boardsError() }}</div> }
           </div>
@@ -1014,6 +1026,8 @@ export class TournamentManageComponent implements OnInit {
   seedingError = signal('');
   readonly poolGameChoices = [2, 3, 4, 5];
   // Mirrors BoardQueue::MAX_BOARDS in the API.
+  readonly boardWords = BOARD_WORDS;
+  word = computed(() => boardWord(this.tournament()?.board_label));
   readonly boardChoices = Array.from({ length: 24 }, (_, i) => i + 1);
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
 
@@ -1407,11 +1421,32 @@ export class TournamentManageComponent implements OnInit {
       next: updated => {
         this.tournament.set(updated);
         this.boardsBusy.set(false);
-        this.showToast(boards ? `Using ${boards} ${boards === 1 ? 'board' : 'boards'}.` : 'Board assignments off.');
+        const w = this.word();
+        this.showToast(boards
+          ? `Using ${boards} ${(boards === 1 ? w.one : w.many).toLowerCase()}.`
+          : `${w.one} assignments off.`);
       },
       error: err => {
         this.boardsBusy.set(false);
         this.boardsError.set(err?.error?.error || 'Failed to update boards.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  updateBoardLabel(label: BoardLabel) {
+    if (this.word().value === label) return;
+    this.boardsBusy.set(true);
+    this.boardsError.set('');
+    this.svc.updateTournament(this.tournamentId, { board_label: label }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.boardsBusy.set(false);
+      },
+      error: err => {
+        this.boardsBusy.set(false);
+        this.boardsError.set(err?.error?.error || 'Failed to update.');
         const t = this.tournament();
         if (t) this.tournament.set({ ...t });
       },

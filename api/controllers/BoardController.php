@@ -11,6 +11,12 @@
  * manual cleanup: the next reconcile simply sees the games as they now are.
  */
 class BoardController {
+    /**
+     * What a tournament may call its playing spots. Only the word on screen changes. The
+     * frontend mirrors this list in shared/board-labels.ts.
+     */
+    public const LABELS = ['board', 'court', 'lane', 'table', 'pit', 'field'];
+
     public function __construct(private readonly PDO $db) {}
 
     /**
@@ -81,10 +87,12 @@ class BoardController {
      * up-next order. Null when boards are off. Embedded in GET /matches.
      */
     public function summary(int $tournamentId): ?array {
-        $stmt = $this->db->prepare('SELECT boards FROM tournaments WHERE id = ?');
+        $stmt = $this->db->prepare('SELECT boards, board_label FROM tournaments WHERE id = ?');
         $stmt->execute([$tournamentId]);
-        $count = (int)($stmt->fetchColumn() ?: 0);
+        $t = $stmt->fetch();
+        $count = $t ? (int)$t['boards'] : 0;
         if ($count === 0) return null;
+        $label = in_array($t['board_label'] ?? null, self::LABELS, true) ? $t['board_label'] : 'board';
 
         $games = $this->games($tournamentId);
         $playing = [];
@@ -92,7 +100,7 @@ class BoardController {
             if ($g['board'] !== null) $playing[] = ['board' => $g['board'], 'key' => $g['key']];
         }
         usort($playing, fn ($a, $b) => $a['board'] <=> $b['board']);
-        return ['count' => $count, 'playing' => $playing, 'up_next' => BoardQueue::upNext($games)];
+        return ['count' => $count, 'label' => $label, 'playing' => $playing, 'up_next' => BoardQueue::upNext($games)];
     }
 
     /**

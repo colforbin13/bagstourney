@@ -786,6 +786,18 @@ describe('TournamentManageComponent', () => {
       expect(component.boardsBusy()).toBe(false);
     });
 
+    it('PUTs what to call the playing spots, and relabels the card', () => {
+      bootstrapPool('setup', null);
+      component.updateBoardLabel('court');
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.body).toEqual({ board_label: 'court' });
+      req.flush({ ...component.tournament()!, board_label: 'court' });
+      fixture.detectChanges();
+      const labels = Array.from(fixture.nativeElement.querySelectorAll('.section-label') as NodeListOf<HTMLElement>)
+        .map(l => l.textContent!.trim());
+      expect(labels).toContain('Courts');
+    });
+
     it('keeps the Boards card while the tournament is live', () => {
       bootstrapPool('active', pool());
       const labels = Array.from(fixture.nativeElement.querySelectorAll('.section-label') as NodeListOf<HTMLElement>)

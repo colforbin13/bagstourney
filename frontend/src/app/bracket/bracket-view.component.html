@@ -9,7 +9,7 @@
             [class.match-bye]="match.status === 'bye'"
             [class.on-board]="!!match.board_number">
         @if (match.board_number) {
-        <div class="board-chip">Board {{ match.board_number }}</div>
+        <div class="board-chip">{{ boardWord().one }} {{ match.board_number }}</div>
         }
         <!-- Team 1 -->
         <div class="match-team"
@@ -347,7 +347,7 @@
                     <span class="pool-team" [class.won]="g.winner_id === g.team1_id">{{ g.team1_name }}</span>
                     <span class="pool-score">
                         @if (g.status === 'complete') { {{ g.team1_score }}–{{ g.team2_score }} }
-                        @else if (g.board_number) { <span class="pool-board">Board {{ g.board_number }}</span> }
+                        @else if (g.board_number) { <span class="pool-board">{{ boardWord().one }} {{ g.board_number }}</span> }
                         @else { vs }
                     </span>
                     <span class="pool-team right" [class.won]="g.winner_id === g.team2_id">{{ g.team2_name }}</span>

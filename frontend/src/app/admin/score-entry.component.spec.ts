@@ -337,6 +337,14 @@ describe('ScoreEntryComponent', () => {
       httpMock.expectNone(`${environment.apiUrl}/boards/${tournamentId}`);
     });
 
+    it("labels games with the tournament's word, such as court", () => {
+      bootstrap(tournamentWith(scorer), { ...withBoards, boards: { ...withBoards.boards!, label: 'court' } });
+      expect(fixture.nativeElement.querySelector('.board-tag').textContent.trim()).toBe('Court 1');
+      const options = Array.from(fixture.nativeElement.querySelectorAll('.move-board option') as NodeListOf<HTMLElement>)
+        .map(o => o.textContent!.trim());
+      expect(options).toContain('Court 2');
+    });
+
     it('shows no board controls when boards are off', () => {
       bootstrap();
       expect(fixture.nativeElement.querySelector('.board-tag')).toBeNull();

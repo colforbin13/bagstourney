@@ -49,7 +49,8 @@ final class MatchCascadeTest extends TestCase
                 format TEXT NOT NULL DEFAULT "single",
                 seeding_mode TEXT NOT NULL DEFAULT "automatic",
                 pool_games INTEGER NOT NULL DEFAULT 3,
-                boards INTEGER NOT NULL DEFAULT 0
+                boards INTEGER NOT NULL DEFAULT 0,
+                board_label TEXT NOT NULL DEFAULT "board"
             )
         ');
         $this->db->exec('
@@ -558,8 +559,21 @@ final class MatchCascadeTest extends TestCase
 
         $summary = $this->boards()->summary(self::TOURNAMENT_ID);
         $this->assertSame(2, $summary['count']);
+        $this->assertSame('board', $summary['label']);
         $this->assertCount(2, $summary['playing']);
         $this->assertCount(2, $summary['up_next']);
+    }
+
+    public function testTheSummaryCarriesTheTournamentsWordForABoard(): void
+    {
+        $this->buildBracket(4, 'single');
+        $this->db->exec('UPDATE tournaments SET board_label = "court" WHERE id = 1');
+        $this->setBoards(2);
+        $this->assertSame('court', $this->boards()->summary(self::TOURNAMENT_ID)['label']);
+
+        // Anything unexpected in the column falls back to "board" rather than reaching the page.
+        $this->db->exec('UPDATE tournaments SET board_label = "<b>" WHERE id = 1');
+        $this->assertSame('board', $this->boards()->summary(self::TOURNAMENT_ID)['label']);
     }
 
     public function testBoardsStayClearUntilTheTournamentIsLive(): void

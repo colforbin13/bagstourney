@@ -123,7 +123,8 @@ final class BoardQueue
     public static function move(int $boards, array $games, string $key, int $board): array
     {
         if ($board < 1 || $board > $boards) {
-            throw new InvalidArgumentException("Board {$board} does not exist");
+            // Worded without "board": the tournament may call them courts or lanes.
+            throw new InvalidArgumentException("There is no number {$board}; this tournament has {$boards}");
         }
         $index = null;
         $occupant = null;
@@ -145,7 +146,7 @@ final class BoardQueue
             if ($i === $index || $i === $occupant || ($g['board'] ?? null) === null) continue;
             $teams = [$g['team1'], $g['team2']];
             if (in_array($moving['team1'], $teams, true) || in_array($moving['team2'], $teams, true)) {
-                throw new InvalidArgumentException('One of those teams is already playing on another board');
+                throw new InvalidArgumentException('One of those teams is already playing somewhere else');
             }
         }
         // No such check is needed for the occupant: it was on a board, so its teams were

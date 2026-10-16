@@ -705,7 +705,8 @@ Everything below them is live in production.
   with a "Move to board" control for staff (scorekeepers included); the public bracket shows
   "Board N" on live games and a Now playing / Up next panel, also on the TV view. Works for
   pool play and both bracket formats. Pro, checked only when turning boards on or changing
-  the count. **Migration 019.** [Full notes](FEATURE_ARCHIVE.md#board-assignments)
+  the count. Organizers pick what to call them (board, court, lane, table, pit or field;
+  free on any plan). **Migrations 019 and 020.** [Full notes](FEATURE_ARCHIVE.md#board-assignments)
 
 - **Pool play to set bracket seeds** (2026-10-15, item 18) — a third seeding mode, Pro only
   like double elimination. Every team plays 2 to 5 pool games (default 3) in a round robin

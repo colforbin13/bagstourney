@@ -6,6 +6,7 @@
 // (api/lib/BoardQueue.php); this only draws it.
 import { Component, computed, input } from '@angular/core';
 import { BracketData } from '../models/tournament.models';
+import { boardWord } from '../board-labels';
 
 interface BoardGame { key: string; team1: string; team2: string; }
 
@@ -14,14 +15,14 @@ interface BoardGame { key: string; team1: string; team2: string; }
   standalone: true,
   template: `
     @if (boards(); as b) {
-      <section class="boards" [class.large]="large()" aria-label="Boards">
+      <section class="boards" [class.large]="large()" [attr.aria-label]="word().many">
         <div class="boards-col">
           <div class="boards-title">Now playing</div>
           @if (playing().length) {
             <div class="tiles">
               @for (p of playing(); track p.board) {
                 <div class="tile">
-                  <div class="tile-board">Board {{ p.board }}</div>
+                  <div class="tile-board">{{ word().one }} {{ p.board }}</div>
                   <div class="tile-team">{{ p.game.team1 }}</div>
                   <div class="tile-vs">vs</div>
                   <div class="tile-team">{{ p.game.team2 }}</div>
@@ -29,7 +30,7 @@ interface BoardGame { key: string; team1: string; team2: string; }
               }
             </div>
           } @else {
-            <div class="boards-empty">No games on the boards right now.</div>
+            <div class="boards-empty">Nothing is being played right now.</div>
           }
         </div>
         @if (upNext().length) {
@@ -79,6 +80,7 @@ export class BoardsPanelComponent {
   nextCount = input(4);
 
   boards = computed(() => this.data()?.boards ?? null);
+  word = computed(() => boardWord(this.boards()?.label));
 
   private games = computed(() => {
     const map = new Map<string, BoardGame>();

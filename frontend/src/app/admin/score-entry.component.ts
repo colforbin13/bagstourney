@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament, Match, BracketData, PoolMatch } from '../shared/models/tournament.models';
 import { roundLabel, teamParticipants } from '../shared/bracket-labels';
+import { boardWord } from '../shared/board-labels';
 
 // `key` rather than the match id identifies a row: pool games (FEATURE_TRACKER item 18) live
 // in their own table, so a pool game and a bracket match can share an id.
@@ -67,7 +68,7 @@ interface ScoreEntry { team1: string; team2: string; }
                   <div class="score-card-round">
                     @if (boards()) {
                       @if (row.match.board_number) {
-                        <span class="board-tag">Board {{ row.match.board_number }}</span>
+                        <span class="board-tag">{{ word().one }} {{ row.match.board_number }}</span>
                       } @else if (upNextPosition(row); as pos) {
                         <span class="board-tag waiting">Up next · {{ pos }}</span>
                       } @else {
@@ -114,10 +115,10 @@ interface ScoreEntry { team1: string; team2: string; }
                       {{ row.match.board_number ? 'Move to' : 'Send to' }}
                       <select class="input" [ngModel]="row.match.board_number ?? null"
                         (ngModelChange)="moveTo(row, $event)" [disabled]="moving() === row.key"
-                        [attr.aria-label]="'Board for ' + row.match.team1_name + ' vs ' + row.match.team2_name">
-                        <option [ngValue]="null" disabled>Choose a board</option>
+                        [attr.aria-label]="word().one + ' for ' + row.match.team1_name + ' vs ' + row.match.team2_name">
+                        <option [ngValue]="null" disabled>Choose a {{ word().one.toLowerCase() }}</option>
                         @for (b of boardChoices(); track b) {
-                          <option [ngValue]="b">Board {{ b }}</option>
+                          <option [ngValue]="b">{{ word().one }} {{ b }}</option>
                         }
                       </select>
                     </label>
@@ -309,6 +310,7 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
 
   // Board assignments (FEATURE_TRACKER item 8). Null when the tournament has boards off.
   boards = computed(() => this.bracketData()?.boards ?? null);
+  word = computed(() => boardWord(this.boards()?.label));
   boardChoices = computed(() => Array.from({ length: this.boards()?.count ?? 0 }, (_, i) => i + 1));
   private upNextIndex = computed(() => new Map((this.boards()?.up_next ?? []).map((key, i) => [key, i])));
 
@@ -450,7 +452,7 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
     this.svc.moveToBoard(this.tournamentId, row.kind === 'pool' ? 'pool' : 'match', row.match.id, board).subscribe({
       next: () => {
         this.moving.set(null);
-        this.showToast(`Moved to board ${board}.`, 'success');
+        this.showToast(`Moved to ${this.word().one.toLowerCase()} ${board}.`, 'success');
         this.load(true);
       },
       error: err => {

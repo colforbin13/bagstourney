@@ -64,6 +64,7 @@ export interface Tournament {
   pool_games?: number;
   // Board assignments (FEATURE_TRACKER item 8). 0 or absent = off. Pro to turn on.
   boards?: number;
+  board_label?: string;
   team_entry_mode: 'auto_draft' | 'direct';
   // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
   // bracket is generated. Optional so responses predating migration 016 still parse.
@@ -209,6 +210,8 @@ export interface BracketData {
 /** Keys name a game across both tables: 'b' + match id, or 'p' + pool match id. */
 export interface BoardsData {
   count: number;
+  /** What the tournament calls them: 'board', 'court', 'lane'... See shared/board-labels.ts. */
+  label?: string;
   /** Games on a board, ordered by board. */
   playing: { board: number; key: string }[];
   /** Waiting games in the order they will get a board. */

@@ -285,6 +285,17 @@ class TournamentController {
             $params[] = $boards;
             $boardsChanged = true;
         }
+        if (isset($body['board_label'])) {
+            // Just the word for a playing spot (board, court, lane...). Free to change at
+            // any time and on any plan: it gates nothing.
+            if (!in_array($body['board_label'], BoardController::LABELS, true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid name for the playing spots']);
+                return;
+            }
+            $fields[] = 'board_label = ?';
+            $params[] = $body['board_label'];
+        }
         if (isset($body['team_entry_mode'])) {
             if (!in_array($body['team_entry_mode'], ['auto_draft', 'direct'], true)) {
                 http_response_code(400);
