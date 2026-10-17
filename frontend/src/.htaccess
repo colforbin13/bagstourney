@@ -15,17 +15,16 @@ RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
 # script falls back to the shell untouched on any error.
 RewriteRule ^bracket/[^/]+/?$ api/preview.php [QSA,L]
 
-# Public pages the build prerendered (frontend/src/app/app.routes.server.ts) are folders
-# holding a finished index.html: /pricing is pricing/index.html. Serve that file directly,
-# so search engines get the page's real content and title. A trailing slash is sent to the
-# slashless address first, so each page has one URL, the one its canonical link names.
-# The internal rewrite also stops Apache answering /pricing with its own slash redirect.
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteCond %{REQUEST_FILENAME}/index.html -f
-RewriteRule ^(.+)/$ /$1 [R=301,L]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteCond %{REQUEST_FILENAME}/index.html -f
-RewriteRule ^(.+)$ $1/index.html [L]
+# Public pages the build prerendered (frontend/src/app/app.routes.server.ts) are plain
+# files: /pricing is pricing.html (scripts/flatten-prerendered.mjs moves them out of the
+# folders Angular writes, because a folder makes Apache 301 /pricing to /pricing/). Serve
+# that file, so search engines get the page's real content and title. A trailing slash is
+# redirected away so each page has one URL, the one its canonical link names.
+# The list is checked against the prerendered routes at build time; the build fails if a
+# page is missing here or in sitemap.xml.
+RewriteRule ^(how-it-works|pricing|sports|terms|refunds|privacy)/$ /$1 [R=301,L]
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(how-it-works|pricing|sports|terms|refunds|privacy)$ $1.html [L]
 
 # Every other URL gets the empty app shell and is drawn in the browser. That shell is
 # index.csr.html, not index.html: index.html is now the prerendered landing page, and

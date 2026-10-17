@@ -49,6 +49,20 @@ client navigation updates title and canonical; no console errors beyond fonts th
 blocks. `ng serve` still works. Not verified against real Apache: the rewrite rules were
 checked by reading only, so check `/pricing`, `/pricing/` and `/admin` after the first deploy.
 
+**Fixed after the first deploy (2026-10-17).** That unverified rewrite was wrong. On the live
+site `/pricing` looped forever: Apache's mod_dir redirected the folder `/pricing` to
+`/pricing/` before mod_rewrite ran, and the rule removing the trailing slash sent it back.
+Reproduced on a local Apache 2.4. Rather than `DirectorySlash Off`, which needs an
+`AllowOverride` the host may not grant and would 500 the whole site if refused, the build
+now flattens each page to a file (`scripts/flatten-prerendered.mjs`, run by `build:prod`):
+`/pricing` serves `pricing.html` from an explicit page list in `.htaccess`. The script also
+fails the build when a prerendered route is missing from that list or from `sitemap.xml`
+(mutation-checked by dropping `terms`). Verified on the same Apache with the real `.htaccess`
+and `api/.htaccess`: all seven pages return 200 with their own titles, `/pricing/` 301s once
+to `/pricing`, query strings pass through, `/admin`, `/tournaments` and unknown paths get the
+shell, `/bracket/...` still reaches `preview.php`, `/api/...` reaches `index.php`; headless
+Chromium loaded each page with no console errors.
+
 ### Board assignments
 
 FEATURE_TRACKER item 8 (its board half), chosen by Matt 2026-10-16 as the next feature after
