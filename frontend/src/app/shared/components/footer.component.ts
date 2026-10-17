@@ -12,7 +12,7 @@ import { AuthService } from '../services/auth.service';
       <!-- Every public bracket ends here, so this is the line that turns players and
            spectators into organizers. Signed-in organizers already have an account. -->
       @if (!auth.isLoggedIn()) {
-        <a routerLink="/admin/register" class="app-footer-cta">Run your own tournament free</a>
+        <a routerLink="/admin/register" class="app-footer-cta">Run your own tournament for free</a>
       }
       <a routerLink="/" class="app-footer-brand">
         <svg width="14" height="12" viewBox="0 0 30 26" fill="none" aria-hidden="true">
