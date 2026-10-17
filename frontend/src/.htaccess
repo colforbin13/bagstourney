@@ -12,10 +12,24 @@ RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
 # iMessage/Slack/WhatsApp preview the tournament instead of an unlabelled app. Those
 # crawlers don't run JavaScript, so the tags have to be present in the served HTML.
 # Browsers are served the same shell they always were, plus the extra <meta> tags; the
-# script falls back to index.html untouched on any error.
+# script falls back to the shell untouched on any error.
 RewriteRule ^bracket/[^/]+/?$ api/preview.php [QSA,L]
 
-# For all other URLs, serve index.html for Angular routing.
+# Public pages the build prerendered (frontend/src/app/app.routes.server.ts) are folders
+# holding a finished index.html: /pricing is pricing/index.html. Serve that file directly,
+# so search engines get the page's real content and title. A trailing slash is sent to the
+# slashless address first, so each page has one URL, the one its canonical link names.
+# The internal rewrite also stops Apache answering /pricing with its own slash redirect.
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteCond %{REQUEST_FILENAME}/index.html -f
+RewriteRule ^(.+)/$ /$1 [R=301,L]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteCond %{REQUEST_FILENAME}/index.html -f
+RewriteRule ^(.+)$ $1/index.html [L]
+
+# Every other URL gets the empty app shell and is drawn in the browser. That shell is
+# index.csr.html, not index.html: index.html is now the prerendered landing page, and
+# serving it for /admin would flash the landing page before the real screen appeared.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [QSA,L]
+RewriteRule ^ index.csr.html [QSA,L]

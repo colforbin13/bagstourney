@@ -698,6 +698,14 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Prerendered public pages for search** (2026-10-17) — `/`, `/how-it-works`, `/pricing`,
+  `/sports` and the three legal pages are now built as finished HTML with their own title,
+  description and canonical link, so search engines can read and rank them; the app takes
+  over in the browser and swaps in signed-in content. Plus `sitemap.xml` and `robots.txt`.
+  Static files only, no Node server. **Deploy note:** `.htaccess` changed (new fallback
+  shell `index.csr.html`), so deploy the whole build, not just changed files. Marketing
+  handoff item 4, first step. [Full notes](FEATURE_ARCHIVE.md#prerendered-public-pages-for-search)
+
 - **Sign-up invite in the footer** (2026-10-16) — signed-out visitors see "Run your own
   tournament free" above "Powered by Bracketway" on every page, linking to organizer sign-up,
   so each public bracket and TV view invites its players and spectators to run one. Hidden for

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The prerendered public pages. Keep in step with src/app/app.routes.server.ts. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://bracketway.com/</loc></url>
+  <url><loc>https://bracketway.com/how-it-works</loc></url>
+  <url><loc>https://bracketway.com/pricing</loc></url>
+  <url><loc>https://bracketway.com/sports</loc></url>
+  <url><loc>https://bracketway.com/terms</loc></url>
+  <url><loc>https://bracketway.com/refunds</loc></url>
+  <url><loc>https://bracketway.com/privacy</loc></url>
+</urlset>

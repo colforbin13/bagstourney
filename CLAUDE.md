@@ -141,13 +141,24 @@ dashboard walkthrough and the go-live checklist.
 
 ### Link previews
 
-`/bracket/...` is rewritten to `api/preview.php` (see the rewrite in `frontend/src/.htaccess`), which serves the built `index.html` with per-tournament Open Graph and Twitter Card tags injected, and replaces the generic `<title>`. Messaging apps don't run JavaScript, so a single-page app's tags have to be in the HTML as served — otherwise every shared bracket previews identically as "Bracketway".
+`/bracket/...` is rewritten to `api/preview.php` (see the rewrite in `frontend/src/.htaccess`), which serves the built app shell (`index.csr.html`, see Prerendering below) with per-tournament Open Graph and Twitter Card tags injected, and replaces the generic `<title>`. Messaging apps don't run JavaScript, so a single-page app's tags have to be in the HTML as served — otherwise every shared bracket previews identically as "Bracketway".
 
-The tag-building is pure and lives in `api/lib/LinkPreview.php` (tested in `tests/LinkPreviewTest.php`); `preview.php` only fetches the row and serves the page. It **fails safe**: no shell, no database, unknown tournament, or any exception all fall through to serving `index.html` untouched, which is exactly the pre-existing behavior. A link preview is never worth taking the bracket page down for.
+The tag-building is pure and lives in `api/lib/LinkPreview.php` (tested in `tests/LinkPreviewTest.php`); `preview.php` only fetches the row and serves the page. It **fails safe**: no shell, no database, unknown tournament, or any exception all fall through to serving the shell untouched, which is exactly the pre-existing behavior. A link preview is never worth taking the bracket page down for.
 
 Private tournaments are described like public ones — knowing the link already grants full access to the bracket, so withholding the name would protect nothing while making a deliberately shared link look broken.
 
 `og:image` is a static brand card at `frontend/src/assets/og-card.png`, generated once with GD from the favicon's geometry and Bebas Neue. Production needs neither GD nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
+
+### Prerendering
+
+The public marketing pages (`/`, `/how-it-works`, `/pricing`, `/sports`, `/terms`, `/refunds`, `/privacy`) are rendered to static HTML **at build time**, so search engines see their content, titles and descriptions. There is no Node server in production: `angular.json` sets `outputMode: "static"` with `src/main.server.ts` as the build-time entry, and `npm run build:prod` writes `dist/browser/pricing/index.html` and so on alongside the usual bundle. `deploy.ps1` ships them like any other file.
+
+- `src/app/app.routes.server.ts` picks which routes are prerendered; everything else is `RenderMode.Client`. Keep `frontend/src/sitemap.xml` in step with it.
+- `index.html` in the build is now the **prerendered landing page**; the empty client shell is `index.csr.html`. `.htaccess` serves a prerendered folder's `index.html` for its route (and 301s a trailing slash away), and falls back to `index.csr.html` for every other route. `api/preview.php` uses `index.csr.html` too.
+- Pages are prerendered as a signed-out visitor sees them. In the browser, `provideClientHydration()` adopts the HTML, then swaps in the signed-in nav and buttons. That swap waits for the app to be **stable**, so never leave a long-running timer inside Angular's zone on these pages (see `AuthService.scheduleExpiryCheck()`, which runs its 8-hour timer outside the zone for exactly this reason).
+- Code that runs on a prerendered page must not touch browser globals (`localStorage`, `window`, `document` outside Angular's `DOCUMENT`) at construction. `AuthService` reads storage only when `isPlatformBrowser`.
+- The build makes no API calls: `app.config.server.ts` swaps in an `HttpBackend` that completes every request empty, so pages are baked in their loading state and fetch live data in the browser. Anything that must be in the HTML for search engines therefore has to come from the template, not the API.
+- Page `<title>`, meta description, canonical link and basic Open Graph tags come from each route's `title` and `data.description` via `SeoTitleStrategy` (`src/app/shared/seo.ts`).
 
 ### Frontend structure
 

@@ -1,5 +1,6 @@
 // src/app/shared/services/auth.service.ts
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, NgZone, PLATFORM_ID, signal, computed, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs/operators';
@@ -18,8 +19,12 @@ export interface AuthenticatedUser {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private _token = signal<string | null>(localStorage.getItem('bb_token'));
-  private _username = signal<string | null>(localStorage.getItem('bb_user'));
+  // The public pages are also rendered at build time (app.routes.server.ts), where there is
+  // no localStorage and nobody is signed in. Declared first: the signals below read it.
+  private readonly storage: Storage | null = isPlatformBrowser(inject(PLATFORM_ID)) ? localStorage : null;
+
+  private _token = signal<string | null>(this.storage?.getItem('bb_token') ?? null);
+  private _username = signal<string | null>(this.storage?.getItem('bb_user') ?? null);
   private _user = signal<AuthenticatedUser | null>(this.readUser());
 
   readonly isLoggedIn = computed(() => !!this._token());
@@ -30,6 +35,7 @@ export class AuthService {
   readonly token = computed(() => this._token());
 
   private expiryTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly zone = inject(NgZone);
 
   constructor(private http: HttpClient, private router: Router) {
     // A token can already be expired at load (tab reopened after JWT_EXPIRY elapsed), or
@@ -79,12 +85,12 @@ export class AuthService {
     if (!current || current.plan === plan) return;
     const updated = { ...current, plan };
     this._user.set(updated);
-    localStorage.setItem('bb_user_profile', JSON.stringify(updated));
+    this.storage?.setItem('bb_user_profile', JSON.stringify(updated));
   }
 
   private readUser(): AuthenticatedUser | null {
     try {
-      const raw = localStorage.getItem('bb_user_profile');
+      const raw = this.storage?.getItem('bb_user_profile');
       return raw ? JSON.parse(raw) as AuthenticatedUser : null;
     } catch {
       return null;
@@ -95,9 +101,9 @@ export class AuthService {
     this._token.set(res.token);
     this._username.set(res.user.username ?? res.user.email);
     this._user.set(res.user);
-    localStorage.setItem('bb_token', res.token);
-    localStorage.setItem('bb_user', res.user.username ?? res.user.email ?? '');
-    localStorage.setItem('bb_user_profile', JSON.stringify(res.user));
+    this.storage?.setItem('bb_token', res.token);
+    this.storage?.setItem('bb_user', res.user.username ?? res.user.email ?? '');
+    this.storage?.setItem('bb_user_profile', JSON.stringify(res.user));
     this.scheduleExpiryCheck(res.token);
   }
 
@@ -109,9 +115,9 @@ export class AuthService {
     this._token.set(null);
     this._username.set(null);
     this._user.set(null);
-    localStorage.removeItem('bb_token');
-    localStorage.removeItem('bb_user');
-    localStorage.removeItem('bb_user_profile');
+    this.storage?.removeItem('bb_token');
+    this.storage?.removeItem('bb_user');
+    this.storage?.removeItem('bb_user_profile');
   }
 
   // JWTs are signed HS256 (see api/middleware/auth.php) but that's irrelevant here — this
@@ -144,6 +150,10 @@ export class AuthService {
       return;
     }
     // JWT_EXPIRY is 8h, well within setTimeout's ~24.8-day max delay.
-    this.expiryTimer = setTimeout(() => this.clearSession(), delay);
+    // Scheduled outside Angular's zone: a timer pending for hours keeps the app from ever
+    // counting as stable, and hydration waits for stable before it removes the signed-out
+    // parts of a prerendered page that a signed-in visitor shouldn't see.
+    this.expiryTimer = this.zone.runOutsideAngular(() =>
+      setTimeout(() => this.zone.run(() => this.clearSession()), delay));
   }
 }

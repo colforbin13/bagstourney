@@ -10,14 +10,22 @@
 // get the same shell they always did plus some extra <meta> tags, which Angular ignores.
 //
 // Fails safe: any problem at all — no shell, no database, unknown tournament — falls through
-// to serving index.html untouched, which is exactly today's behaviour. A link preview is
+// to serving the app shell untouched, which is exactly today's behaviour. A link preview is
 // never worth taking the bracket page down for.
 
 require_once __DIR__ . '/lib/LinkPreview.php';
 
-/** The built SPA shell sits one level up, at the web root. */
+/**
+ * The built SPA shell sits one level up, at the web root.
+ *
+ * Since public pages started being prerendered, index.html is the finished landing page and
+ * the empty shell is index.csr.html. Serving index.html here would flash the landing page
+ * before the bracket appeared. index.html stays as the fallback for a build from before that
+ * change, where it is still the empty shell.
+ */
 function previewShellPath(): string {
-    return __DIR__ . '/../index.html';
+    $shell = __DIR__ . '/../index.csr.html';
+    return is_file($shell) ? $shell : __DIR__ . '/../index.html';
 }
 
 function serveShell(string $html): void {

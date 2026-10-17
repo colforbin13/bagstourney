@@ -10,17 +10,28 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
-    data: { landing: true },
+    // Titles and descriptions on public pages are what search results show (shared/seo.ts).
+    // Written for the words organizers search with, per the marketing handoff.
+    title: 'Blind draw cornhole and bags tournament brackets',
+    data: {
+      landing: true,
+      description: 'Run a cornhole, bags or any two-player team tournament from your phone: blind draw teams, seeding, live scoring and the bracket on the TV. Free up to 32 players.',
+    },
   },
   {
     path: 'tournaments',
     loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
+    title: 'Tournaments',
     data: { landing: false },
   },
   // Public on purpose: it's most useful to someone deciding whether to sign up at all.
   {
     path: 'how-it-works',
     loadComponent: () => import('./bracket/how-it-works.component').then(m => m.HowItWorksComponent),
+    title: 'How to run a tournament',
+    data: {
+      description: 'From a pile of players to a champion: sign-ups, blind draw or set teams, seeding, live scoring from any phone and the bracket on the wall.',
+    },
   },
   // Public for the same reason, and the answer to the first question a visitor has now
   // that the rest of the copy no longer names a sport: "does this do my game?"
@@ -28,26 +39,37 @@ export const routes: Routes = [
   {
     path: 'pricing',
     loadComponent: () => import('./bracket/pricing.component').then(m => m.PricingComponent),
+    title: 'Pricing',
+    data: {
+      description: 'Free for tournaments up to 32 players. Pro adds bigger fields, double elimination, pool play and board assignments, monthly, yearly or for a single tournament.',
+    },
   },
   // Terms, Refund and Privacy policies: one component, the route's data picks the page.
   {
     path: 'terms',
     loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
-    data: { doc: 'terms' },
+    title: 'Terms of service',
+    data: { doc: 'terms', description: 'The terms for using Bracketway to run tournaments.' },
   },
   {
     path: 'refunds',
     loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
-    data: { doc: 'refunds' },
+    title: 'Refund policy',
+    data: { doc: 'refunds', description: 'When Bracketway Pro and one-time tournament upgrades can be refunded.' },
   },
   {
     path: 'privacy',
     loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
-    data: { doc: 'privacy' },
+    title: 'Privacy policy',
+    data: { doc: 'privacy', description: 'What Bracketway collects about organizers and players, and how it is used.' },
   },
   {
     path: 'sports',
     loadComponent: () => import('./bracket/sports.component').then(m => m.SportsComponent),
+    title: 'Sports and games',
+    data: {
+      description: "Bags, cornhole, KanJam, pickleball, horseshoes, darts, euchre and more. If it's played in two-player teams, Bracketway runs the bracket.",
+    },
   },
   {
     path: 'bracket/:id',

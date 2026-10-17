@@ -1,4 +1,5 @@
 // src/app/shared/services/auth.service.spec.ts
+import { PLATFORM_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
@@ -90,5 +91,27 @@ describe('AuthService', () => {
 
     expect(service.isLoggedIn()).toBe(false);
     expect(localStorage.getItem('bb_token')).toBeNull();
+  });
+
+  // The public pages are prerendered at build time, where there is no localStorage.
+  describe('when prerendering', () => {
+    it('should start signed out and leave storage alone, even with a session stored', () => {
+      localStorage.setItem('bb_token', fakeToken);
+      localStorage.setItem('bb_user_profile', JSON.stringify(user));
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        imports: [HttpClientTestingModule],
+        providers: [AuthService, provideRouter([]), { provide: PLATFORM_ID, useValue: 'server' }],
+      });
+      const getItem = spyOn(localStorage, 'getItem').and.callThrough();
+      const server = TestBed.inject(AuthService);
+      httpMock = TestBed.inject(HttpTestingController);
+
+      expect(server.isLoggedIn()).toBe(false);
+      expect(server.user()).toBeNull();
+      server.logout();
+      expect(getItem).not.toHaveBeenCalled();
+      expect(localStorage.getItem('bb_token')).toBe(fakeToken);
+    });
   });
 });

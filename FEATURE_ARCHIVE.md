@@ -4,6 +4,51 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Prerendered public pages for search
+
+Every URL used to return the same empty `index.html` with a bare `<title>Bracketway</title>`,
+so search engines that don't run JavaScript saw nothing, and even Google saw one title for the
+whole site. The marketing handoff (`Bracketway Marketing → Code Handoff.md`, item 4) names
+prerendering as the prerequisite for any page ranking. Added 2026-10-17 per Matt.
+
+**What changed.** `angular.json` builds with `outputMode: "static"` and a build-time entry
+(`src/main.server.ts`). `app.routes.server.ts` prerenders `/`, `/how-it-works`, `/pricing`,
+`/sports`, `/terms`, `/refunds` and `/privacy`; everything else stays client-rendered. Each
+route now carries a `title` and `data.description`, which `SeoTitleStrategy`
+(`shared/seo.ts`) turns into the page title, meta description, canonical link and basic Open
+Graph tags, at build time and on every client navigation. `sitemap.xml` and `robots.txt` are
+new build assets.
+
+**Design decisions.**
+- **Static files, not a Node server.** The host is Apache with PHP; build-time output deploys
+  through the existing `deploy.ps1` unchanged. Tournament pages are not prerendered: their
+  content changes by the minute, and `/bracket/...` already gets per-tournament tags from
+  `api/preview.php`.
+- **The build makes no API calls.** A server-only `HttpBackend` completes every request empty,
+  so nothing from build day (a stale tournament list, an error) is frozen into the HTML. The
+  catch: Pro prices on `/pricing` come from Stripe through the API, so they appear only once
+  the page loads in a browser. The page's description names the plans instead.
+- **Prerendered as signed out, hydrated in the browser.** `provideClientHydration()` adopts
+  the HTML instead of redrawing it. Signed-in visitors see the nav and buttons swap once the
+  app is stable. That exposed a real problem: `AuthService`'s 8-hour session-expiry timer kept
+  the app permanently unstable, so the signed-out footer link never went away for signed-in
+  users. The timer now runs outside Angular's zone.
+- **`index.html` is the landing page now; the empty shell is `index.csr.html`.** `.htaccess`
+  serves a prerendered folder's `index.html` for its route (301ing a trailing slash away so
+  each page has one URL) and falls back to `index.csr.html`. Falling back to `index.html`
+  would flash the landing page before every admin screen. `preview.php` reads
+  `index.csr.html`, falling back to `index.html` for an older build.
+
+**Verified.** 472 frontend unit tests pass (new: `seo.spec.ts`; an `AuthService` case for
+build time; the footer spec now matches Matt's wording change). `npm run build:prod` reports
+7 prerendered routes, each with its own title, description and canonical in the HTML. Driven
+in headless Chromium against the production build, with a mock API and routing that mirrors
+`.htaccess`: prerendered pages serve their own file and client routes get the shell; signed-in
+visitors get the signed-in nav, hero buttons and no footer sign-up link; live prices load;
+client navigation updates title and canonical; no console errors beyond fonts the sandbox
+blocks. `ng serve` still works. Not verified against real Apache: the rewrite rules were
+checked by reading only, so check `/pricing`, `/pricing/` and `/admin` after the first deploy.
+
 ### Board assignments
 
 FEATURE_TRACKER item 8 (its board half), chosen by Matt 2026-10-16 as the next feature after

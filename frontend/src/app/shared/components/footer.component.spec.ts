@@ -28,7 +28,7 @@ describe('FooterComponent', () => {
   it('should invite signed-out visitors to sign up', () => {
     const cta = render(false).querySelector<HTMLAnchorElement>('.app-footer-cta');
     expect(cta?.getAttribute('href')).toBe('/admin/register');
-    expect(cta?.textContent?.trim()).toBe('Run your own tournament free');
+    expect(cta?.textContent?.trim()).toBe('Run your own tournament for free');
   });
 
   it('should not show the sign-up invite to signed-in organizers', () => {
