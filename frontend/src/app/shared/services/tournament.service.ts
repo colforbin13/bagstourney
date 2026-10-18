@@ -150,6 +150,10 @@ export class TournamentService {
     return this.http.put<Participant>(`${this.api}/participants/${id}`, { name });
   }
 
+  setParticipantDrawGroup(id: number, draw_group: 'A' | 'B') {
+    return this.http.put<Participant>(`${this.api}/participants/${id}`, { draw_group });
+  }
+
   setParticipantNotificationEmail(participantId: number, email: string) {
     return this.http.put<Participant & { warning?: string }>(
       `${this.api}/participants/${participantId}/notification-email`, { email });

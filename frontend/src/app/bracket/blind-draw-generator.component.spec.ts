@@ -67,6 +67,36 @@ describe('BlindDrawGeneratorComponent', () => {
     expect(button().textContent!.trim()).toBe('Draw again');
   });
 
+  it('should pair every A with a B in a balanced draw', () => {
+    setup();
+    el.querySelector<HTMLInputElement>('.advanced input[type=checkbox]')!.click();
+    fixture.detectChanges();
+    type('A1\nA2\nA3');
+    const areaB = el.querySelector<HTMLTextAreaElement>('#names-b')!;
+    areaB.value = 'B1\nB2\nB3\na1';
+    areaB.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(status()).toBe('6 players make 3 teams. 3 A, 3 B. (1 repeated name skipped)');
+
+    button().click();
+    fixture.detectChanges();
+    const teams = Array.from(el.querySelectorAll('.teams li')).map(li => li.textContent!);
+    expect(teams.length).toBe(3);
+    teams.forEach(t => expect(t).toMatch(/A\d & B\d/));
+  });
+
+  it('should say when a balanced split is uneven', () => {
+    setup();
+    el.querySelector<HTMLInputElement>('.advanced input[type=checkbox]')!.click();
+    fixture.detectChanges();
+    type('A1\nA2\nA3\nA4');
+    const areaB = el.querySelector<HTMLTextAreaElement>('#names-b')!;
+    areaB.value = 'B1\nB2';
+    areaB.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(status()).toContain('The 2 extra A players will be paired with each other.');
+  });
+
   it('should not have drawn anything before a click, so the prerendered page is empty of results', () => {
     setup();
     type('Ann\nBob\nCara\nDev');

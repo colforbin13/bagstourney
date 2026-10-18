@@ -5,7 +5,7 @@ class ParticipantController {
     // Excludes notification_confirm_token_hash / notification_confirm_token_expires_at —
     // once those columns exist, a bare SELECT * here would leak the confirm token hash to
     // every participant list/edit response.
-    const SAFE_COLUMNS = 'id, tournament_id, name, registration_status, email, notification_lifecycle,
+    const SAFE_COLUMNS = 'id, tournament_id, name, registration_status, draw_group, email, notification_lifecycle,
         notify_match_completed, notify_round_completed, notify_tournament_finalized,
         notification_confirmed_at, notification_manage_token_version, created_at';
 
@@ -172,6 +172,10 @@ class ParticipantController {
     }
 
     public function update(int $id, array $body): void {
+        if (array_key_exists('draw_group', $body) && !array_key_exists('name', $body)) {
+            $this->setDrawGroup($id, $body['draw_group']);
+            return;
+        }
         $name = trim($body['name'] ?? '');
         if (!$name) {
             http_response_code(400);
@@ -222,6 +226,34 @@ class ParticipantController {
             throw $e;
         }
 
+        echo json_encode($this->getSafeParticipant($id));
+    }
+
+    /**
+     * PUT /participants/{id} with only `draw_group` — tags a player A or B for the balanced
+     * draw (BlindDraw). Allowed whenever the roster is still drawable, including after a
+     * draw, since the organizer may retag and redraw before the bracket starts.
+     */
+    private function setDrawGroup(int $id, mixed $group): void {
+        if (!in_array($group, BlindDraw::GROUPS, true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'draw_group must be A or B']);
+            return;
+        }
+        $stmt = $this->db->prepare('SELECT t.status FROM participants p JOIN tournaments t ON t.id = p.tournament_id WHERE p.id = ?');
+        $stmt->execute([$id]);
+        $status = $stmt->fetchColumn();
+        if ($status === false) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Participant not found']);
+            return;
+        }
+        if ($status !== 'setup') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Players can only be regrouped before the tournament starts']);
+            return;
+        }
+        $this->db->prepare('UPDATE participants SET draw_group = ? WHERE id = ?')->execute([$group, $id]);
         echo json_encode($this->getSafeParticipant($id));
     }
 

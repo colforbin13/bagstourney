@@ -56,6 +56,23 @@ export function pairTeams(players: readonly string[]): DrawnTeam[] {
   return teams;
 }
 
+/**
+ * The balanced, or A/B, draw: every A player is paired with a random B, so the weakest
+ * players can't end up together. Mirrors api/lib/BlindDraw.php: with uneven groups, the
+ * extra players are paired within their own group rather than refused, and the team order
+ * (the seed order) is shuffled last so a leftover team isn't always the bottom seed.
+ */
+export function pairBalanced(a: readonly string[], b: readonly string[], random: () => number = cryptoRandom): DrawnTeam[] {
+  const as = shuffle(a, random);
+  const bs = shuffle(b, random);
+  const mixed = Math.min(as.length, bs.length);
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < mixed; i++) pairs.push([as[i], bs[i]]);
+  const leftover = as.length > mixed ? as.slice(mixed) : bs.slice(mixed);
+  for (let i = 0; i + 1 < leftover.length; i += 2) pairs.push([leftover[i], leftover[i + 1]]);
+  return shuffle(pairs, random).map((players, i) => ({ seed: i + 1, players }));
+}
+
 export function teamName(team: DrawnTeam): string {
   return `${team.players[0]} & ${team.players[1]}`;
 }

@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '../shared/services/auth.service';
 import { parseNameList } from '../shared/name-list';
 import {
-  DrawnTeam, MAX_PLAYERS, MIN_PLAYERS, PreviewRound, Slot, isBye, pairTeams, previewBracket, shuffle, teamName,
+  DrawnTeam, MAX_PLAYERS, MIN_PLAYERS, PreviewRound, Slot, isBye, pairBalanced, pairTeams, previewBracket, shuffle, teamName,
 } from '../shared/blind-draw';
 
 /**
@@ -33,9 +33,14 @@ import {
       </header>
 
       <section class="card tool">
-        <label for="names" class="section-label">Players, one per line</label>
+        <label for="names" class="section-label">{{ balanced() ? 'A players (stronger), one per line' : 'Players, one per line' }}</label>
         <textarea id="names" class="input" rows="8" [value]="text()" (input)="onInput($event)"
           placeholder="Ann&#10;Bob&#10;Cara&#10;Dev"></textarea>
+        @if (balanced()) {
+          <label for="names-b" class="section-label group-b">B players, one per line</label>
+          <textarea id="names-b" class="input" rows="8" [value]="textB()" (input)="onInputB($event)"
+            placeholder="Eve&#10;Finn&#10;Gus&#10;Hana"></textarea>
+        }
         <p class="status" [class.warn]="problem()" aria-live="polite">{{ status() }}</p>
         <div class="actions">
           <button type="button" class="btn btn-primary" [disabled]="!!problem()" (click)="draw()">
@@ -45,6 +50,17 @@ import {
             <button type="button" class="btn" (click)="copy()">{{ copied() ? 'Copied' : 'Copy teams' }}</button>
           }
         </div>
+        <details class="advanced" [open]="balanced()">
+          <summary>Advanced</summary>
+          <label class="check">
+            <input type="checkbox" [checked]="balanced()" (change)="setBalanced($any($event.target).checked)" />
+            Balanced draw (A/B)
+          </label>
+          <p class="hint">
+            List your stronger players as A and everyone else as B. Every A is paired with a
+            random B, so the weakest players never end up on the same team.
+          </p>
+        </details>
       </section>
 
       @if (teams(); as list) {
@@ -94,6 +110,13 @@ import {
           nobody picks a partner. It mixes regulars with newcomers, keeps stacked teams from
           forming, and is the usual format for bar leagues, fundraisers and social nights.
         </p>
+        <h2>Balanced A/B blind draw</h2>
+        <p>
+          When a field is lopsided, a fully random draw can put two of the best players together
+          and leave two beginners on their own. A balanced draw, also called an A/B or 50/50
+          draw, splits players into a stronger half and the rest, then pairs one from each. It
+          keeps the luck of the draw and the teams even. Turn it on under Advanced.
+        </p>
         <h2>Running a blind draw cornhole tournament</h2>
         <ol>
           <li>Collect names as players arrive. You need an even number, since teams are pairs.</li>
@@ -140,6 +163,11 @@ import {
     .live { margin-top: 32px; }
     .live h2 { margin-top: 0; }
     .live p { color: var(--text-dim); line-height: 1.6; margin-bottom: 16px; }
+    .group-b { margin-top: 14px; }
+    .advanced { margin-top: 16px; font-size: 0.85rem; }
+    .advanced summary { cursor: pointer; color: var(--text-dim); }
+    .advanced .check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
+    .advanced .hint { color: var(--text-dim); line-height: 1.5; }
     .about p, .about li { color: var(--text-dim); line-height: 1.6; }
     .about ol { padding-left: 20px; display: grid; gap: 6px; margin-bottom: 12px; }
   `],
@@ -148,11 +176,21 @@ export class BlindDrawGeneratorComponent {
   readonly auth = inject(AuthService);
 
   readonly text = signal('');
+  /** The B list, used only by the balanced draw; `text` is then the A list. */
+  readonly textB = signal('');
+  readonly balanced = signal(false);
   readonly teams = signal<DrawnTeam[] | null>(null);
   readonly copied = signal(false);
   readonly isBye = isBye;
 
-  private readonly parsed = computed(() => parseNameList(this.text()));
+  private readonly parsedA = computed(() => parseNameList(this.text()));
+  // A name already on the A list counts as a repeat on the B list.
+  private readonly parsedB = computed(() => parseNameList(this.balanced() ? this.textB() : '', this.parsedA().names));
+  private readonly parsed = computed(() => {
+    const a = this.parsedA();
+    const b = this.parsedB();
+    return { names: [...a.names, ...b.names], duplicates: [...a.duplicates, ...b.duplicates] };
+  });
   readonly rounds = computed<PreviewRound[]>(() => previewBracket(this.teams() ?? []));
 
   /** Why the draw can't run yet, or null when it can. */
@@ -167,16 +205,36 @@ export class BlindDrawGeneratorComponent {
   readonly status = computed(() => {
     const { names, duplicates } = this.parsed();
     const skipped = duplicates.length ? ` (${duplicates.length} repeated ${duplicates.length === 1 ? 'name' : 'names'} skipped)` : '';
-    return (this.problem() ?? `${names.length} players make ${names.length / 2} teams.`) + skipped;
+    let groups = '';
+    if (this.balanced()) {
+      const a = this.parsedA().names.length;
+      const b = this.parsedB().names.length;
+      groups = ` ${a} A, ${b} B.`;
+      if (!this.problem() && a !== b) {
+        groups += ` The ${Math.abs(a - b)} extra ${a > b ? 'A' : 'B'} players will be paired with each other.`;
+      }
+    }
+    return (this.problem() ?? `${names.length} players make ${names.length / 2} teams.`) + groups + skipped;
   });
 
   onInput(event: Event): void {
     this.text.set((event.target as HTMLTextAreaElement).value);
   }
 
+  onInputB(event: Event): void {
+    this.textB.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  setBalanced(on: boolean): void {
+    this.balanced.set(on);
+    this.teams.set(null);
+  }
+
   draw(): void {
     if (this.problem()) return;
-    this.teams.set(pairTeams(shuffle(this.parsed().names)));
+    this.teams.set(this.balanced()
+      ? pairBalanced(this.parsedA().names, this.parsedB().names)
+      : pairTeams(shuffle(this.parsed().names)));
     this.copied.set(false);
   }
 

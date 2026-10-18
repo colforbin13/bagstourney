@@ -268,6 +268,21 @@ interface SetupStep {
               <option value="auto_draft">Blind draw — add players, randomly pair them into teams</option>
               <option value="direct">Direct entry — create each team by typing both member names</option>
             </select>
+            @if (!isDirectEntry()) {
+              <!-- Kept behind a disclosure so the plain blind draw stays the one obvious path. -->
+              <details class="advanced" [open]="isBalancedDraw()">
+                <summary>Advanced</summary>
+                <label class="check">
+                  <input type="checkbox" [checked]="isBalancedDraw()" [disabled]="drawModeBusy()"
+                    (change)="updateDrawMode($any($event.target).checked ? 'balanced' : 'random')" />
+                  Balanced draw (A/B)
+                </label>
+                <div class="field-hint">
+                  Mark your stronger players A. Every A is paired with a random B, so the weakest
+                  players never end up on the same team.
+                </div>
+              </details>
+            }
           </div>
           <div class="card" style="margin-bottom:24px">
             <div class="section-label">Seeding</div>
@@ -388,7 +403,19 @@ interface SetupStep {
             @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
               <span class="warn">— Need an even number</span>
             }
+            @if (isBalancedDraw() && approvedParticipants().length > 0) {
+              <span class="group-count">{{ groupCounts().a }} A · {{ groupCounts().b }} B</span>
+            }
           </div>
+          @if (isBalancedDraw() && canManageSetup() && approvedParticipants().length > 0) {
+            <div class="field-hint" style="margin:-4px 0 10px">
+              Tap a player's letter to switch them between A and B.
+              @if (groupCounts().a !== groupCounts().b) {
+                The groups are uneven, so {{ groupCounts().extra }} {{ groupCounts().a > groupCounts().b ? 'A' : 'B' }}
+                players will be paired with each other.
+              }
+            </div>
+          }
 
           @if (participants().length === 0) {
             <div class="empty" style="padding:24px 0">
@@ -433,6 +460,13 @@ interface SetupStep {
                     </span>
                     @if (canManageSetup()) {
                       <div style="display:flex;gap:6px">
+                        @if (isBalancedDraw()) {
+                          <button class="btn btn-sm group-toggle" [class.is-a]="p.draw_group === 'A'"
+                            [disabled]="groupingParticipantId() === p.id" (click)="toggleDrawGroup(p)"
+                            [attr.aria-label]="p.name + ' is in group ' + (p.draw_group ?? 'B') + '. Switch group.'">
+                            {{ p.draw_group ?? 'B' }}
+                          </button>
+                        }
                         <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
                         @if (teams().length === 0) {
                           <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
@@ -454,11 +488,11 @@ interface SetupStep {
                 <div style="font-size:.8rem;color:var(--text-dim);">
                   {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
                   @if (isManualSeeding()) {
-                    This will randomly pair players into teams. You'll set the final seed order before generating the bracket.
+                    This will {{ pairingPhrase() }}. You'll set the final seed order before generating the bracket.
                   } @else if (isPoolPlay()) {
-                    This will randomly pair players into teams and start pool play. The standings set the bracket seeds.
+                    This will {{ pairingPhrase() }} and start pool play. The standings set the bracket seeds.
                   } @else {
-                    This will randomly pair players, seed teams, and generate the bracket.
+                    This will {{ pairingPhrase() }}, seed them, and generate the bracket.
                   }
                 </div>
               </div>
@@ -761,6 +795,12 @@ interface SetupStep {
       text-decoration: underline;
       cursor: pointer;
     }
+    .advanced { margin-top: 12px; font-size: .85rem; }
+    .advanced summary { cursor: pointer; color: var(--text-dim); font-size: .8rem; }
+    .advanced .check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
+    .group-count { font-family: var(--mono); color: var(--muted); letter-spacing: .04em; }
+    .group-toggle { min-width: 32px; font-family: var(--mono); font-weight: 600; }
+    .group-toggle.is-a { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
     .count {
       background: var(--border);
       color: var(--text-dim);
@@ -1030,6 +1070,16 @@ export class TournamentManageComponent implements OnInit {
   word = computed(() => boardWord(this.tournament()?.board_label));
   readonly boardChoices = Array.from({ length: 24 }, (_, i) => i + 1);
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
+  // Balanced (A/B) draw: api/lib/BlindDraw.php. Off unless the organizer opens Advanced.
+  isBalancedDraw = computed(() => this.tournament()?.draw_mode === 'balanced');
+  drawModeBusy = signal(false);
+  pairingPhrase = computed(() => this.isBalancedDraw() ? 'pair each A player with a random B' : 'randomly pair players into teams');
+  groupingParticipantId = signal<number | null>(null);
+  groupCounts = computed(() => {
+    const a = this.approvedParticipants().filter(p => p.draw_group === 'A').length;
+    const b = this.approvedParticipants().length - a;
+    return { a, b, extra: Math.abs(a - b) };
+  });
 
   // The setup sequence is a different length depending on the two modes: auto-draft with
   // automatic seeding is two steps (the draw seeds and starts the tournament in one go),
@@ -1449,6 +1499,38 @@ export class TournamentManageComponent implements OnInit {
         this.boardsError.set(err?.error?.error || 'Failed to update.');
         const t = this.tournament();
         if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  updateDrawMode(mode: 'random' | 'balanced') {
+    if ((this.tournament()?.draw_mode ?? 'random') === mode) return;
+    this.drawModeBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { draw_mode: mode }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.drawModeBusy.set(false);
+      },
+      error: err => {
+        this.drawModeBusy.set(false);
+        this.showToast(err?.error?.error || 'Failed to update the draw.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t }); // re-sync the checkbox
+      },
+    });
+  }
+
+  toggleDrawGroup(p: Participant) {
+    const group = p.draw_group === 'A' ? 'B' : 'A';
+    this.groupingParticipantId.set(p.id);
+    this.svc.setParticipantDrawGroup(p.id, group).subscribe({
+      next: () => {
+        this.participants.update(list => list.map(x => x.id === p.id ? { ...x, draw_group: group } : x));
+        this.groupingParticipantId.set(null);
+      },
+      error: err => {
+        this.groupingParticipantId.set(null);
+        this.showToast(err?.error?.error || 'Failed to change the group.');
       },
     });
   }

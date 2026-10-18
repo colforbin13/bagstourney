@@ -1304,4 +1304,61 @@ describe('TournamentManageComponent', () => {
       expect(component.toast()).toContain('already upgraded');
     });
   });
+
+  describe('balanced (A/B) draw', () => {
+    const player = (id: number, name: string, draw_group: 'A' | 'B') =>
+      ({ id, tournament_id: tournamentId, name, registration_status: 'approved', draw_group }) as Participant;
+
+    function bootstrapDraw(drawMode: 'random' | 'balanced', players: Participant[]) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Bags Night', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'auto_draft', draw_mode: drawMode,
+        created_at: '2026-01-01', paid_override: false, capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush(players);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      fixture.detectChanges();
+    }
+
+    const roster = () => [player(1, 'Ann', 'A'), player(2, 'Bob', 'B'), player(3, 'Cara', 'A'), player(4, 'Dev', 'B')];
+
+    it('keeps the plain draw by default, with no group buttons and the option folded away', () => {
+      bootstrapDraw('random', roster());
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelectorAll('.group-toggle').length).toBe(0);
+      expect(el.querySelector<HTMLDetailsElement>('details.advanced')!.open).toBeFalse();
+      expect(el.textContent).toContain('randomly pair players into teams');
+    });
+
+    it('PUTs the draw mode from the Advanced checkbox', () => {
+      bootstrapDraw('random', roster());
+      const box = fixture.nativeElement.querySelector('details.advanced input[type=checkbox]') as HTMLInputElement;
+      box.click();
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ draw_mode: 'balanced' });
+      req.flush({ ...component.tournament()!, draw_mode: 'balanced' });
+      fixture.detectChanges();
+      expect(component.isBalancedDraw()).toBeTrue();
+      expect(fixture.nativeElement.querySelectorAll('.group-toggle').length).toBe(4);
+    });
+
+    it('shows the group counts and switches a player between A and B', () => {
+      bootstrapDraw('balanced', roster());
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.group-count')!.textContent).toContain('2 A · 2 B');
+      expect(el.textContent).toContain('pair each A player with a random B');
+
+      el.querySelector<HTMLButtonElement>('.group-toggle')!.click(); // Ann, A -> B
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/1`);
+      expect(req.request.body).toEqual({ draw_group: 'B' });
+      req.flush({ ...roster()[0], draw_group: 'B' });
+      fixture.detectChanges();
+
+      expect(component.groupCounts()).toEqual({ a: 1, b: 3, extra: 2 });
+      expect(el.textContent).toContain('2 B players will be paired with each other');
+    });
+  });
 });

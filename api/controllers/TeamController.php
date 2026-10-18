@@ -20,8 +20,9 @@ class TeamController {
     }
 
     /**
-     * POST /teams — draw teams randomly from all participants, then seed them,
-     * then generate the single-elimination bracket structure.
+     * POST /teams — draw teams from all participants, then seed them, then generate the
+     * bracket structure. BlindDraw::pair() does the pairing: a plain random draw, or the
+     * balanced A/B draw when tournaments.draw_mode says so.
      */
     public function draw(array $body): void {
         $tournamentId = (int)($body['tournament_id'] ?? 0);
@@ -47,7 +48,7 @@ class TeamController {
             // Get participants — only 'approved' rows (self-registered walk-ups start
             // 'pending' and must never end up on a team without the organizer having
             // reviewed them first).
-            $stmt = $this->db->prepare('SELECT * FROM participants WHERE tournament_id = ? AND registration_status = "approved" ORDER BY RAND()');
+            $stmt = $this->db->prepare('SELECT * FROM participants WHERE tournament_id = ? AND registration_status = "approved"');
             $stmt->execute([$tournamentId]);
             $participants = $stmt->fetchAll();
 
@@ -77,8 +78,8 @@ class TeamController {
 
             // Pair participants into teams
             $teams = [];
-            $chunks = array_chunk($participants, 2);
-            foreach ($chunks as $i => $pair) {
+            $pairs = BlindDraw::pair($participants, $tournament['draw_mode'] ?? 'random');
+            foreach ($pairs as $i => $pair) {
                 $teamName = $pair[0]['name'] . ' & ' . $pair[1]['name'];
                 $seed = $i + 1;
                 $stmt = $this->db->prepare(

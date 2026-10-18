@@ -74,6 +74,8 @@ Two things about the double-elimination shape are worth knowing before touching 
 
 Tests: `tests/BracketBuilderTest.php` (single elimination, fields 2–64), `tests/BracketDoubleEliminationTest.php` (double elimination, fields 2–48, including full play-outs that assert every team is eliminated after exactly two losses and that the reset fires only when the losers side wins the grand final), and `tests/BracketPersistenceTest.php` (index → id translation, recording PDO double).
 
+Team pairing for a blind draw lives in `api/lib/BlindDraw.php` (`tests/BlindDrawTest.php`): a plain random draw by default, or the balanced A/B draw when `tournaments.draw_mode` is `balanced` (every `participants.draw_group` A paired with a random B; migration `021`). The free generator's `shared/blind-draw.ts` mirrors it. The option is deliberately tucked behind an "Advanced" disclosure so the plain draw stays the obvious path.
+
 Match/tournament state transitions live in `MatchController`:
 
 - `cascadePropagate()` advances the winner and, in double elimination, drops the loser. It stops short of the reset match when the winners-bracket side wins the grand final, since the reset is then moot.

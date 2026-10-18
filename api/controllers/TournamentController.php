@@ -321,6 +321,25 @@ class TournamentController {
             $fields[] = 'team_entry_mode = ?';
             $params[] = $body['team_entry_mode'];
         }
+        if (isset($body['draw_mode'])) {
+            if (!in_array($body['draw_mode'], BlindDraw::MODES, true)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid draw mode']);
+                return;
+            }
+            // Only matters at the moment teams are drawn, and a redraw is allowed while the
+            // tournament is in setup, so it stays changeable for exactly that long.
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$id]);
+            $t = $stmt->fetch();
+            if (!$t || $t['status'] !== 'setup') {
+                http_response_code(400);
+                echo json_encode(['error' => 'The draw can only be changed during setup']);
+                return;
+            }
+            $fields[] = 'draw_mode = ?';
+            $params[] = $body['draw_mode'];
+        }
         if (isset($body['format'])) {
             if (!in_array($body['format'], ['single', 'double'], true)) {
                 http_response_code(400);

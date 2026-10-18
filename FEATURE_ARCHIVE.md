@@ -4,6 +4,37 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Balanced (A/B) blind draw
+
+Prompted by a 2026-10-18 r/Cornhole thread ("Question about blind draw"): an organizer with 26
+players (14 A, 7 B, 5 C) worried a random draw would stack teams. The top replies suggested
+seeding upper/lower brackets from rounders PPR and pairing with the "50/50 method": split the
+field into a top and bottom half, then pair one random player from each.
+
+What shipped is the 50/50 pairing, as an opt-in:
+
+- `tournaments.draw_mode` (`random` default, `balanced`) and `participants.draw_group` (`B`
+  default, `A`), migration 021. Defaults keep every existing tournament drawing exactly as
+  before, and self-registered or newly added players land in B.
+- `api/lib/BlindDraw.php` does all pairing now (TeamController::draw() used to `ORDER BY RAND()`
+  and `array_chunk`). Balanced: shuffle each group, pair A[i] with B[i], pair any leftovers
+  within their group, then shuffle the team order, since that order is the seed order and a
+  leftover A-A team shouldn't always be the bottom seed. `tests/BlindDrawTest.php`, mutation
+  checked (dropping the final shuffle, the B shuffle, or the group test each fails a test).
+- Uneven groups draw rather than error. Matt asked to keep the plain draw simple, and a hard
+  "groups must be equal" stop at the door is the opposite of that; the page shows the counts
+  and says how many players will pair within their group.
+- UI: Matt asked for no clutter. The option sits in a collapsed "Advanced" disclosure on the
+  Team Entry card; only when it's on do the participant rows grow an A/B button and the
+  label show "2 A · 4 B". `draw_mode` changes only during setup; `draw_group` changes during
+  setup (PUT /participants/{id} with just `draw_group`), so a regroup-and-redraw works.
+- The free generator mirrors it (`pairBalanced()` in `shared/blind-draw.ts`): an Advanced
+  checkbox swaps the one list for an A list and a B list.
+
+Not built, from the same thread: upper/lower brackets (two tournaments already does it) and
+rounders/PPR seeding (needs per-player stats, rotating partners and bag-level scoring; it is
+the marketing plan's "rotating partners" item).
+
 ### Free blind draw generator
 
 Marketing handoff item 3: a free public tool that pairs names into random teams and shows a

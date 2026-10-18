@@ -66,6 +66,8 @@ export interface Tournament {
   boards?: number;
   board_label?: string;
   team_entry_mode: 'auto_draft' | 'direct';
+  // Balanced (A/B) draw, migration 021. Optional so responses predating it still parse.
+  draw_mode?: 'random' | 'balanced';
   // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
   // bracket is generated. Optional so responses predating migration 016 still parse.
   format?: 'single' | 'double';
@@ -116,6 +118,8 @@ export interface Participant {
   tournament_id: number;
   name: string;
   registration_status?: 'approved' | 'pending';
+  // Group for the balanced draw (migration 021). Everyone is B until tagged A.
+  draw_group?: 'A' | 'B';
   email?: string | null;
   notification_lifecycle?: 'none' | 'pending' | 'confirmed' | 'suppressed';
   notify_match_completed?: boolean;

@@ -1,5 +1,5 @@
 // src/app/shared/blind-draw.spec.ts
-import { DrawnTeam, bracketSizeFor, isBye, pairTeams, previewBracket, seedOrder, shuffle, teamName } from './blind-draw';
+import { DrawnTeam, bracketSizeFor, isBye, pairBalanced, pairTeams, previewBracket, seedOrder, shuffle, teamName } from './blind-draw';
 
 const players = (n: number) => Array.from({ length: n }, (_, i) => `P${i + 1}`);
 const label = (slot: { kind: string; team?: DrawnTeam }) =>
@@ -32,6 +32,38 @@ describe('blind draw generator', () => {
 
     it('leaves an odd player out', () => {
       expect(pairTeams(players(5)).length).toBe(2);
+    });
+  });
+
+  describe('pairBalanced', () => {
+    const as = (n: number) => Array.from({ length: n }, (_, i) => `A${i + 1}`);
+    const bs = (n: number) => Array.from({ length: n }, (_, i) => `B${i + 1}`);
+    const kind = (t: DrawnTeam) => t.players.map(p => p[0]).join('');
+
+    it('pairs every A with a B and seeds the teams 1, 2, 3', () => {
+      for (let run = 0; run < 100; run++) {
+        const teams = pairBalanced(as(6), bs(6));
+        expect(teams.map(kind)).toEqual(Array(6).fill('AB'));
+        expect(teams.map(t => t.seed)).toEqual([1, 2, 3, 4, 5, 6]);
+        expect(teams.flatMap(t => t.players).sort()).toEqual([...as(6), ...bs(6)].sort());
+      }
+    });
+
+    it('pairs the extra players of an uneven split with each other', () => {
+      // The Reddit case: 14 strong players and 12 others.
+      const teams = pairBalanced(as(14), bs(12));
+      expect(teams.length).toBe(13);
+      expect(teams.filter(t => kind(t) === 'AB').length).toBe(12);
+      expect(teams.filter(t => kind(t) === 'AA').length).toBe(1);
+      expect(pairBalanced(as(3), bs(7)).filter(t => kind(t) === 'BB').length).toBe(2);
+    });
+
+    it('does not always seed the leftover team last', () => {
+      const seeds = new Set<number>();
+      for (let run = 0; run < 100; run++) {
+        pairBalanced(as(2), bs(6)).filter(t => kind(t) === 'BB').forEach(t => seeds.add(t.seed));
+      }
+      expect(seeds.size).toBeGreaterThan(1);
     });
   });
 

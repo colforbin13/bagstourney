@@ -698,6 +698,12 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Balanced (A/B) blind draw** (2026-10-18) — an opt-in "Advanced" option on the Team Entry
+  card: the organizer taps players to mark them A, and the draw pairs every A with a random B
+  so weak players can't end up together. Uneven groups still draw (extras pair within their
+  group). The plain random draw stays the default and the option stays folded away. Also in
+  the free generator as two lists. Free on every plan. Migration 021.
+  [Full notes](FEATURE_ARCHIVE.md#balanced-ab-blind-draw)
 - **Free blind draw generator** (2026-10-18) — `/blind-draw-generator`, a public no-login
   tool: paste names, draw random two-player teams, see the seeded bracket with byes, copy the
   teams, then "Run it live" leads to sign-up. Runs entirely in the browser; prerendered with
