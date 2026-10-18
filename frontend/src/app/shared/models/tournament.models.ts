@@ -296,7 +296,10 @@ export interface BillingPlans {
   paid_participant_cap: number;
 }
 
-/** One entry of GET /billing/plans — prices read live from Stripe, never duplicated in our config. */
+/**
+ * One entry of GET /billing/plans — prices read live from Stripe. The one copy outside Stripe is
+ * FALLBACK_PLANS in pricing.component.ts, for the prerendered pricing page; keep it in step.
+ */
 export interface BillingPlanOption {
   key: 'tournament_unlock' | 'subscription_monthly' | 'subscription_annual';
   /** Minor units (cents), as Stripe reports them. Formatting is the frontend's job. */

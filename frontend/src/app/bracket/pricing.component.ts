@@ -4,11 +4,13 @@
 // adds, and the questions people ask before paying. Public for the same reason as
 // how-it-works — it matters most to someone who hasn't signed up yet.
 //
-// Nothing here hard-codes a price or a cap. Amounts come live from Stripe through
-// GET /billing/plans (Stripe is the price of record, so changing a price is a dashboard
-// edit, not a deploy), and the participant caps ride along in the same response. If the
-// call fails, or billing is off on this installation, the tiers are still described —
-// only the price lines disappear.
+// Stripe is the price of record. In the browser, amounts come live from Stripe through
+// GET /billing/plans, and the participant caps ride along in the same response, so a price
+// changed in the dashboard shows to visitors without a deploy. The page starts from built-in
+// copies of the prices and caps (FALLBACK_PLANS and the caps below), because it is also
+// prerendered at build time with no API to ask, and that HTML is what search engines read.
+// Those copies need a deploy to change. If the call fails, the built-in prices stay up; if
+// billing is off on this installation, the tiers are still described without price lines.
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../shared/services/auth.service';
@@ -226,7 +228,7 @@ export class PricingComponent implements OnInit {
   readonly annual = computed(() => this.plan('subscription_annual'));
   readonly unlock = computed(() => this.plan('tournament_unlock'));
   readonly hasAnyPrice = computed(() => this.plans().some(p => p.unit_amount !== null));
-  /** Only an explicit "billing is off" from the API — a failed request just hides prices. */
+  /** Only an explicit "billing is off" from the API. A failed request keeps the built-in prices. */
   readonly billingUnavailable = computed(() => this.billingEnabled() === false);
   /** $0 in the same currency the paid prices use, so the three columns read alike. */
   readonly zeroPrice = computed(() => this.billing.formatAmount(0, this.plans()[0]?.currency ?? 'usd'));
