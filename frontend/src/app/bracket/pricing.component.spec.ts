@@ -120,6 +120,20 @@ describe('PricingComponent', () => {
     expect(text()).not.toContain("Paid plans aren't on sale yet");
     expect(text()).toContain('Up to 32 players per tournament');
     expect(text()).toContain('Up to 256 players');
+    // The built-in prices are the real ones, so a failed request keeps them.
+    expect(text()).toContain('$9.99');
+  });
+
+  // What the prerendered page shows: the build has no API, so nothing ever answers.
+  it('should show the built-in prices before the API answers', () => {
+    setup();
+    fixture.detectChanges();
+    const prices = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.tier-price'))
+      .map(el => el.textContent ?? '');
+    expect(prices[1]).toContain('$9.99');
+    expect(fixture.nativeElement.querySelector('.tier-alt').textContent).toContain('$99.99');
+    expect(prices[2]).toContain('$12.99');
+    httpMock.expectOne(plansUrl);
   });
 
   it('should answer the questions people ask before paying', () => {

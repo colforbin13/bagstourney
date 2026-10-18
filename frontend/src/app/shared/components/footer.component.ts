@@ -25,6 +25,7 @@ import { AuthService } from '../services/auth.service';
         <span>Powered by Bracketway</span>
       </a>
       <nav class="app-footer-links" aria-label="Site information">
+        <a routerLink="/blind-draw-generator">Blind draw generator</a>
         <a routerLink="/pricing">Pricing</a>
         <a routerLink="/terms">Terms</a>
         <a routerLink="/refunds">Refunds</a>

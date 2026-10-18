@@ -4,6 +4,43 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Free blind draw generator
+
+Marketing handoff item 3: a free public tool that pairs names into random teams and shows a
+preview bracket, ending in a "Run it live" button to sign-up, indexable by search engines.
+Added 2026-10-18 per Matt, right after the pricing fix below.
+
+**What changed.** `/blind-draw-generator` (`bracket/blind-draw-generator.component.ts`). Paste
+names (parsed by the same `shared/name-list.ts` as the fast blind-draw paste box, so repeats
+are skipped the same way), draw, see the teams by seed and a single-elimination preview, copy
+the teams, draw again. 4 to 64 players, even numbers only, matching the app's own draw rule.
+The logic is pure in `shared/blind-draw.ts`: a crypto-random Fisher-Yates shuffle, pairs in
+order seeded 1, 2, 3 like `TeamController::draw()`, and 1 v N seeding with byes to the top
+seeds using the same `seedOrder` recursion and bracket size as `BracketBuilder`, so the preview
+is the bracket a real tournament would get. Byes advance into round 2 in the preview, as the
+live bracket does. Prerendered with explanatory copy ("How a blind draw works", "Running a
+blind draw cornhole tournament"), added to the sitemap, the `.htaccess` page list and the
+footer links.
+
+**Design decisions.** Nothing is saved and nothing leaves the browser: no API, no account,
+no abuse surface. The draw only happens on a click, never at build time, so the prerendered
+page can't ship a frozen result. "Run it live" goes to sign-up (signed-out) or the dashboard;
+carrying the names over into a new tournament is a possible follow-up.
+
+**Pricing in the prerendered page.** The build has no API, so `/pricing` was prerendered with
+plan names but no prices. `pricing.component.ts` now starts from `FALLBACK_PLANS` ($9.99/mo,
+$99.99/yr, $12.99 one tournament, per Matt); the API's answer still replaces them in the
+browser, an explicit "billing is off" still hides them, and a failed request now keeps them
+rather than blanking the prices. The page description names the prices too.
+
+**Verified.** 488 frontend tests pass (new: `blind-draw.spec.ts` for shuffle, pairing, seed
+order, byes and match numbering; `blind-draw-generator.component.spec.ts`; pricing specs for
+the built-in prices). Production build prerenders 8 routes; `pricing.html` contains all three
+prices. On local Apache 2.4 with the real `.htaccess`: `/blind-draw-generator` 200 with its
+own title, trailing slash 301s once. Headless Chromium at 390px and 1280px: 12 names drew 6
+teams, quarterfinals/semifinals/final with seeds 1 and 2 on byes, no console errors; with the
+API unreachable, `/pricing` still shows $9.99 / $99.99 / $12.99.
+
 ### Prerendered public pages for search
 
 Every URL used to return the same empty `index.html` with a bare `<title>Bracketway</title>`,

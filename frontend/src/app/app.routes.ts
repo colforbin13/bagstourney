@@ -41,7 +41,7 @@ export const routes: Routes = [
     loadComponent: () => import('./bracket/pricing.component').then(m => m.PricingComponent),
     title: 'Pricing',
     data: {
-      description: 'Free for tournaments up to 32 players. Pro adds bigger fields, double elimination, pool play and board assignments, monthly, yearly or for a single tournament.',
+      description: 'Free for tournaments up to 32 players. Pro is $9.99 a month or $99.99 a year, or upgrade one tournament for $12.99, for bigger fields, double elimination, pool play and board assignments.',
     },
   },
   // Terms, Refund and Privacy policies: one component, the route's data picks the page.
@@ -62,6 +62,16 @@ export const routes: Routes = [
     loadComponent: () => import('./bracket/legal.component').then(m => m.LegalComponent),
     title: 'Privacy policy',
     data: { doc: 'privacy', description: 'What Bracketway collects about organizers and players, and how it is used.' },
+  },
+  // The free generator (marketing handoff item 3): a public tool that ranks for "blind draw"
+  // searches and ends in sign-up.
+  {
+    path: 'blind-draw-generator',
+    loadComponent: () => import('./bracket/blind-draw-generator.component').then(m => m.BlindDrawGeneratorComponent),
+    title: 'Free blind draw generator for cornhole',
+    data: {
+      description: 'Paste in your players and get random two-player teams and a seeded bracket in one click. Free blind draw generator for cornhole, bags, darts and doubles. No account needed.',
+    },
   },
   {
     path: 'sports',

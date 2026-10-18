@@ -21,6 +21,17 @@ import { LEGAL } from '../shared/legal';
 const FALLBACK_FREE_CAP = 32;
 const FALLBACK_PAID_CAP = 256;
 
+// The live Stripe prices, as of 2026-10-18 (per Matt). The page is prerendered at build time,
+// when there is no API to ask (app.routes.server.ts), so without these the HTML search engines
+// read would name the plans but not what they cost. The API's answer replaces them in the
+// browser, so a price changed in Stripe shows correctly to visitors; update these to match so
+// the prerendered page does too.
+const FALLBACK_PLANS: BillingPlanOption[] = [
+  { key: 'subscription_monthly', unit_amount: 999, currency: 'usd', interval: 'month', interval_count: 1 },
+  { key: 'subscription_annual', unit_amount: 9999, currency: 'usd', interval: 'year', interval_count: 1 },
+  { key: 'tournament_unlock', unit_amount: 1299, currency: 'usd', interval: null, interval_count: null },
+];
+
 @Component({
   selector: 'app-pricing',
   standalone: true,
@@ -206,7 +217,7 @@ export class PricingComponent implements OnInit {
   auth = inject(AuthService);
   billing = inject(BillingService);
 
-  private plans = signal<BillingPlanOption[]>([]);
+  private plans = signal<BillingPlanOption[]>(FALLBACK_PLANS);
   private billingEnabled = signal<boolean | null>(null);
   readonly freeCap = signal(FALLBACK_FREE_CAP);
   readonly paidCap = signal(FALLBACK_PAID_CAP);
@@ -264,8 +275,9 @@ export class PricingComponent implements OnInit {
         if (r.free_participant_cap) this.freeCap.set(r.free_participant_cap);
         if (r.paid_participant_cap) this.paidCap.set(r.paid_participant_cap);
       },
-      // The page is still complete without prices; say nothing rather than alarm a visitor.
-      error: () => this.plans.set([]),
+      // Keep the fallback prices: they are the real ones, and the page reads complete without
+      // alarming a visitor. An explicit "billing is off" still hides them, via billingEnabled.
+      error: () => {},
     });
   }
 

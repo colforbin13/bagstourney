@@ -19,10 +19,10 @@ describe('FooterComponent', () => {
     return fixture.nativeElement;
   }
 
-  it('should link to pricing and every legal page', () => {
+  it('should link to the generator, pricing and every legal page', () => {
     const hrefs = Array.from<HTMLAnchorElement>(render(false).querySelectorAll('.app-footer-links a'))
       .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/pricing', '/terms', '/refunds', '/privacy']);
+    expect(hrefs).toEqual(['/blind-draw-generator', '/pricing', '/terms', '/refunds', '/privacy']);
   });
 
   it('should invite signed-out visitors to sign up', () => {

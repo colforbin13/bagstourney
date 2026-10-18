@@ -698,6 +698,14 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Free blind draw generator** (2026-10-18) — `/blind-draw-generator`, a public no-login
+  tool: paste names, draw random two-player teams, see the seeded bracket with byes, copy the
+  teams, then "Run it live" leads to sign-up. Runs entirely in the browser; prerendered with
+  how-a-blind-draw-works copy so it can rank, and linked from the footer. Same day: the
+  prerendered pricing page now carries the Pro prices ($9.99/mo, $99.99/yr, $12.99 one
+  tournament). Marketing handoff item 3. Frontend only.
+  [Full notes](FEATURE_ARCHIVE.md#free-blind-draw-generator)
+
 - **Prerendered public pages for search** (2026-10-17) — `/`, `/how-it-works`, `/pricing`,
   `/sports` and the three legal pages are now built as finished HTML with their own title,
   description and canonical link, so search engines can read and rank them; the app takes
