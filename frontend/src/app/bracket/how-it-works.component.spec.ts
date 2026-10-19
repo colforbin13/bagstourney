@@ -69,20 +69,20 @@ describe('HowItWorksComponent', () => {
     setup();
     const text: string = fixture.nativeElement.textContent;
     expect(text).toContain('seeds the bracket from the standings');
-    expect(text).toContain('Pool play is a paid-plan feature');
+    expect(text).toContain('Pool play is a Pro feature');
   });
 
   it('should explain board assignments and that they are paid', () => {
     setup();
     const text: string = fixture.nativeElement.textContent;
     expect(text).toContain('next free');
-    expect(text).toContain('Board assignments are a paid-plan feature');
+    expect(text).toContain('Board assignments are a Pro feature');
   });
 
   it('should say double elimination is paid and locks at bracket generation', () => {
     setup();
     const text: string = fixture.nativeElement.textContent;
-    expect(text).toContain('Double elimination is a paid-plan feature');
+    expect(text).toContain('Double elimination is a Pro feature');
     expect(text).toContain("locked once the bracket is generated");
   });
 

@@ -195,7 +195,7 @@ interface SetupStep {
               (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
               <option value="single">Single elimination — one loss and a team is out</option>
               <option value="double" [disabled]="!canUseDoubleElimination()">
-                Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (paid plan)' }}
+                Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (Pro)' }}
               </option>
             </select>
             <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
@@ -291,7 +291,7 @@ interface SetupStep {
               <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
               <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
               <option value="pool_play" [disabled]="!canUsePaidFeatures()">
-                Pool play — teams play pool games first, and the standings set the seeds{{ canUsePaidFeatures() ? '' : ' (paid plan)' }}
+                Pool play — teams play pool games first, and the standings set the seeds{{ canUsePaidFeatures() ? '' : ' (Pro)' }}
               </option>
             </select>
             @if (isPoolPlay()) {

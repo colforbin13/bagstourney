@@ -100,7 +100,8 @@ describe('TournamentListComponent', () => {
 
     expect(features).toContain('Bracket on the TV');
     expect(features).toContain('Printable QR signs');
-    expect(features.length).toBe(6);
+    expect(features).toContain('Board assignments');
+    expect(features.length).toBe(7);
   });
 
   // The rest of the landing copy is deliberately sport-neutral, so this line is the only

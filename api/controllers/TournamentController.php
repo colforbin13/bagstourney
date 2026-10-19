@@ -163,7 +163,7 @@ class TournamentController {
         // via update() once the row exists.
         if (formatRequiresPaidPlan($format) && !userHasPaidPlan($this->db, (int)$actor['id'])) {
             http_response_code(403);
-            echo json_encode(['error' => 'Double elimination is a paid-plan feature. Upgrade to use it.']);
+            echo json_encode(['error' => 'Double elimination is a Pro feature. Upgrade to use it.']);
             return;
         }
         if (seedingModeRequiresPaidPlan($seedingMode) && !userHasPaidPlan($this->db, (int)$actor['id'])) {
@@ -369,7 +369,7 @@ class TournamentController {
             // a super-admin-granted paid_override counts as well as the owner's account plan.
             if (formatRequiresPaidPlan($body['format']) && !tournamentHasPaidFeatures($this->db, $id)) {
                 http_response_code(403);
-                echo json_encode(['error' => 'Double elimination is a paid-plan feature. Upgrade to use it.']);
+                echo json_encode(['error' => 'Double elimination is a Pro feature. Upgrade to use it.']);
                 return;
             }
             $fields[] = 'format = ?';

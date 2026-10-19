@@ -72,7 +72,7 @@ interface TournamentGroup {
             <span class="step-num">Step 01</span>
             <h2 class="step-title">Get everyone in</h2>
             <p class="step-body">
-              Type your players in yourself, or share a link and QR code at the door and let them
+              Paste in your list of players, or share a link and QR code at the door and let them
               sign themselves up while you're still setting up.
             </p>
           </li>
@@ -81,7 +81,7 @@ interface TournamentGroup {
             <h2 class="step-title">Draw the teams</h2>
             <p class="step-body">
               Blind draw random pairs or enter teams directly, then let the seeding fall where it
-              may — or drag the ladder into the order you want.
+              may, drag the ladder into the order you want, or let pool play games earn the seeds.
             </p>
           </li>
           <li class="step">
@@ -103,6 +103,7 @@ interface TournamentGroup {
           <li>Live public bracket</li>
           <li>Email score updates</li>
           <li>Scorekeeper accounts</li>
+          <li>Board assignments</li>
         </ul>
         <a class="walkthrough-link" routerLink="/how-it-works">Read the full walkthrough →</a>
       </section>

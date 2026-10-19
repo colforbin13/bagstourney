@@ -25,7 +25,7 @@ interface SportGroup {
         <h1>If it's two-player teams, it runs here.</h1>
         <p class="lede">
           Bracketway doesn't know or care what game you're playing. It draws teams of two,
-          seeds them, builds a single-elimination bracket, and tracks a score per side. Any
+          seeds them, builds the bracket, and tracks a score per side. Any
           game that fits that shape fits here — these are the ones organizers actually run.
         </p>
       </header>
@@ -47,8 +47,8 @@ interface SportGroup {
         <p>
           The list isn't a set of modes you pick from — there's no sport field on a
           tournament, and nothing in the app behaves differently based on what you're
-          playing. If your game is played by two-person teams, head to head, one loss and
-          you're out, it already works. Name the tournament after it and go.
+          playing. If your game is played by two-person teams, head to head, it already
+          works. Name the tournament after it and go.
         </p>
         <p>
           The one real requirement is a <strong>score per team per match</strong>, whether

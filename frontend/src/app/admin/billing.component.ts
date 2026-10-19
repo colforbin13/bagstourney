@@ -53,7 +53,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
               <div class="plan-name">{{ status()!.plan === 'paid' ? 'Pro' : 'Free' }}</div>
               <div class="plan-detail">
                 Up to {{ status()!.plan === 'paid' ? status()!.paid_participant_cap : status()!.free_participant_cap }}
-                participants per tournament@if (status()!.plan === 'paid') {, plus double elimination}.
+                participants per tournament@if (status()!.plan === 'paid') {, plus double elimination, pool play and board assignments}.
               </div>
               @if (status()!.plan === 'paid' && status()!.plan_source === 'manual') {
                 <!-- A comped account has no subscription to manage, and offering a
@@ -90,7 +90,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
                 </div>
                 <div class="offer-detail">
                   Raises every tournament you own to {{ status()!.paid_participant_cap }} participants and unlocks
-                  double elimination.
+                  double elimination, pool play and board assignments.
                 </div>
                 <button class="btn btn-sm btn-primary" [disabled]="checkoutBusy()"
                   (click)="subscribe(opt.key === 'subscription_annual' ? 'annual' : 'monthly')">

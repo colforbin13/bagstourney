@@ -638,10 +638,10 @@ describe('TournamentManageComponent', () => {
 
       component.updateFormat('double');
       httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
-        .flush({ error: 'Double elimination is a paid-plan feature. Upgrade to use it.' },
+        .flush({ error: 'Double elimination is a Pro feature. Upgrade to use it.' },
                { status: 403, statusText: 'Forbidden' });
 
-      expect(component.formatError()).toBe('Double elimination is a paid-plan feature. Upgrade to use it.');
+      expect(component.formatError()).toBe('Double elimination is a Pro feature. Upgrade to use it.');
       expect(component.formatBusy()).toBe(false);
     });
 

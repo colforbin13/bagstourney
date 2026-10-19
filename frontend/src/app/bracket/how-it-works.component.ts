@@ -38,9 +38,9 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 01</span>
           <h2>Create the tournament</h2>
           <p>
-            A name is the only thing you have to decide. The three other choices all have
-            sensible defaults, but they're worth understanding, because two of them lock once
-            you draw teams.
+            A name is the only thing you have to decide. Everything else has a sensible
+            default, but it's worth understanding, because two of the choices lock once you
+            draw teams.
           </p>
           <dl class="choices">
             <dt>Public or private</dt>
@@ -55,6 +55,9 @@ import { AuthService } from '../shared/services/auth.service';
               teams. Direct entry means you type in each team yourself, partners already
               decided. <strong>The player sign-up link only works with blind draw</strong> —
               there's no pool of unpaired players for a walk-up to join otherwise.
+              Got a few strong players and a few beginners? Turn on the balanced (A/B) draw
+              under Advanced, mark your stronger players A, and every A is paired with a
+              random B, so the weakest players never end up together.
             </dd>
             <dt>Automatic, manual or pool play seeding</dt>
             <dd>
@@ -64,7 +67,7 @@ import { AuthService } from '../shared/services/auth.service';
               Pool play has every team play 2 to 5 games first, with no rematches, and seeds
               the bracket from the standings: win percentage, then point differential. Every
               team gets more games, and the seeds are earned.
-              <strong>Pool play is a <a routerLink="/pricing">paid-plan feature</a>.</strong>
+              <strong>Pool play is a <a routerLink="/pricing">Pro feature</a>.</strong>
             </dd>
             <dt>Single or double elimination</dt>
             <dd>
@@ -72,7 +75,7 @@ import { AuthService } from '../shared/services/auth.service';
               team a second chance: your first loss drops you into a losers bracket, and only
               a second knocks you out. It's kinder to a team that draws the eventual champion
               early, at the cost of roughly twice as many games.
-              <strong>Double elimination is a <a routerLink="/pricing">paid-plan feature</a></strong>, and unlike the other
+              <strong>Double elimination is a <a routerLink="/pricing">Pro feature</a></strong>, and unlike the other
               choices here it's locked once the bracket is generated — the bracket's whole
               shape depends on it.
             </dd>
@@ -83,7 +86,7 @@ import { AuthService } from '../shared/services/auth.service';
               and who's up next, so players know where to go without asking. Staff can move a
               game to a different board, and you can change the count mid-event. Not playing on
               boards? Call them courts, lanes, tables, pits or fields instead.
-              <strong>Board assignments are a <a routerLink="/pricing">paid-plan feature</a>.</strong>
+              <strong>Board assignments are a <a routerLink="/pricing">Pro feature</a>.</strong>
             </dd>
           </dl>
         </li>
@@ -92,9 +95,10 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 02</span>
           <h2>Get your players in</h2>
           <p>
-            Type them in one at a time, or open the tournament's sign-up link — there's a QR
-            code for it — and let people add themselves from their phones while you're still
-            setting up.
+            Paste in a whole list of names at once (straight from a notes app, a spreadsheet
+            column or a group text), type them in one at a time, or open the tournament's
+            sign-up link — there's a QR code for it — and let people add themselves from their
+            phones while you're still setting up.
           </p>
           <p>
             Self sign-ups land as <em>pending</em> and don't join the roster until you approve
@@ -107,9 +111,11 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 03</span>
           <h2>Draw the teams</h2>
           <p>
-            One button pairs every approved player at random into two-person teams. If you
-            chose automatic seeding, this also seeds them, builds the bracket, and starts play
-            in a single step. If you chose manual, you get the ladder to reorder first.
+            One button pairs every approved player at random into two-person teams (with the
+            balanced draw, each A gets a random B). If you chose automatic seeding, this also
+            seeds them, builds the bracket, and starts play in a single step. If you chose
+            manual, you get the ladder to reorder first. With pool play, the pool games start
+            right away and the bracket is built from the standings once they're done.
           </p>
           <p>
             Don't like the pairings? Redraw them as many times as you want, right up until you

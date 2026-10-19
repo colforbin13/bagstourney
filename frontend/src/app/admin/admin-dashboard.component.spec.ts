@@ -120,10 +120,10 @@ describe('AdminDashboardComponent', () => {
     component.create();
 
     httpMock.expectOne(`${environment.apiUrl}/tournaments`)
-      .flush({ error: 'Double elimination is a paid-plan feature. Upgrade to use it.' },
+      .flush({ error: 'Double elimination is a Pro feature. Upgrade to use it.' },
              { status: 403, statusText: 'Forbidden' });
 
-    expect(component.createError()).toBe('Double elimination is a paid-plan feature. Upgrade to use it.');
+    expect(component.createError()).toBe('Double elimination is a Pro feature. Upgrade to use it.');
     expect(component.creating()).toBe(false);
   });
 
@@ -209,8 +209,8 @@ describe('AdminDashboardComponent', () => {
     // to convert. Disabling is UX only — the server refuses the format regardless.
     expect(option).toBeTruthy();
     expect(option.disabled).toBe(true);
-    expect(option.textContent).toContain('paid plan');
-    expect(component.formatHint()).toContain('available on a paid plan');
+    expect(option.textContent).toContain('(Pro)');
+    expect(component.formatHint()).toContain('is a Pro feature');
   });
 
   it('should enable double elimination on a paid plan', () => {
@@ -220,8 +220,8 @@ describe('AdminDashboardComponent', () => {
 
     const option: HTMLOptionElement = fixture.nativeElement.querySelector('option[value="double"]');
     expect(option.disabled).toBe(false);
-    expect(option.textContent).not.toContain('paid plan');
-    expect(component.formatHint()).not.toContain('available on a paid plan');
+    expect(option.textContent).not.toContain('(Pro)');
+    expect(component.formatHint()).not.toContain('is a Pro feature');
   });
 
   it('should explain that the format locks once the bracket is generated', () => {

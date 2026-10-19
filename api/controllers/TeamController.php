@@ -468,7 +468,7 @@ class TeamController {
     private function requireFormatAllowed(int $tournamentId, string $format): void {
         if (formatRequiresPaidPlan($format) && !tournamentHasPaidFeatures($this->db, $tournamentId)) {
             throw new Exception(
-                'Double elimination is a paid-plan feature. Upgrade, or switch this tournament to single elimination.'
+                'Double elimination is a Pro feature. Upgrade, or switch this tournament to single elimination.'
             );
         }
     }

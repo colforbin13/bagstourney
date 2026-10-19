@@ -50,7 +50,7 @@ import { confirmService } from '../shared/services/confirm.service';
               <option value="automatic">Automatic seeding</option>
               <option value="manual">Manual seeding</option>
               <option value="pool_play" [disabled]="!isPaidPlan()">
-                Pool play{{ isPaidPlan() ? '' : ' (paid plan)' }}
+                Pool play{{ isPaidPlan() ? '' : ' (Pro)' }}
               </option>
             </select>
             <span class="field-hint">{{ seedingHint() }}</span>
@@ -73,7 +73,7 @@ import { confirmService } from '../shared/services/confirm.service';
             <select class="input" [(ngModel)]="newFormat">
               <option value="single">Single elimination</option>
               <option value="double" [disabled]="!isPaidPlan()">
-                Double elimination{{ isPaidPlan() ? '' : ' (paid plan)' }}
+                Double elimination{{ isPaidPlan() ? '' : ' (Pro)' }}
               </option>
             </select>
             <span class="field-hint">{{ formatHint() }}</span>
@@ -219,7 +219,7 @@ export class AdminDashboardComponent implements OnInit {
     }
     return this.isPaidPlan()
       ? 'Seeds assigned for you at the draw. Locked once teams are drawn.'
-      : 'Seeds assigned for you at the draw. Locked once teams are drawn. Pool play is available on a paid plan.';
+      : 'Seeds assigned for you at the draw. Locked once teams are drawn. Pool play is a Pro feature.';
   }
 
   formatHint(): string {
@@ -228,7 +228,7 @@ export class AdminDashboardComponent implements OnInit {
     }
     return this.isPaidPlan()
       ? 'One loss and you are out. Locked once the bracket is generated.'
-      : 'One loss and you are out. Double elimination is available on a paid plan.';
+      : 'One loss and you are out. Double elimination is a Pro feature.';
   }
 
   load() {
