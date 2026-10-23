@@ -83,6 +83,14 @@ export const routes: Routes = [
     },
   },
   {
+    path: 'scoreholio-alternative',
+    loadComponent: () => import('./bracket/scoreholio-comparison.component').then(m => m.ScoreholioComparisonComponent),
+    title: 'Bracketway vs Scoreholio: a simpler Scoreholio alternative',
+    data: {
+      description: 'An honest comparison of Bracketway and Scoreholio for cornhole and bags tournaments: free plans, prices, formats, leagues, and whether players need an app.',
+    },
+  },
+  {
     path: 'sports',
     loadComponent: () => import('./bracket/sports.component').then(m => m.SportsComponent),
     title: 'Sports and games',

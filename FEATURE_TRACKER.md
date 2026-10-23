@@ -698,6 +698,12 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Bracketway vs Scoreholio page** (2026-10-23) — `/scoreholio-alternative`, an even-handed
+  comparison for the "Scoreholio alternative" search: a side-by-side, when each is the better
+  pick, a not-affiliated line. Scoreholio facts checked October 2026 from their site and docs
+  (`CHECKED` in the component); re-check before editing. Notable: Scoreholio's free plan
+  includes double elimination and 32-team brackets, so the pitch is no-app simplicity and
+  one-off events, not price. Prerendered, in the sitemap; not in the footer. Frontend only.
 - **Cornhole fundraiser guide** (2026-10-23) — `/cornhole-fundraiser`, the first marketing
   guide page: planning timeline, format choices, entry fees and sponsors, equipment, sign-ups,
   running the day, then a sign-up CTA. Prerendered, in the sitemap, linked from the footer.
