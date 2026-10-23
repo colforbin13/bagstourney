@@ -22,9 +22,9 @@ RewriteRule ^bracket/[^/]+/?$ api/preview.php [QSA,L]
 # redirected away so each page has one URL, the one its canonical link names.
 # The list is checked against the prerendered routes at build time; the build fails if a
 # page is missing here or in sitemap.xml.
-RewriteRule ^(how-it-works|pricing|sports|blind-draw-generator|terms|refunds|privacy)/$ /$1 [R=301,L]
+RewriteRule ^(how-it-works|pricing|sports|blind-draw-generator|cornhole-fundraiser|terms|refunds|privacy)/$ /$1 [R=301,L]
 RewriteCond %{REQUEST_FILENAME}.html -f
-RewriteRule ^(how-it-works|pricing|sports|blind-draw-generator|terms|refunds|privacy)$ $1.html [L]
+RewriteRule ^(how-it-works|pricing|sports|blind-draw-generator|cornhole-fundraiser|terms|refunds|privacy)$ $1.html [L]
 
 # Every other URL gets the empty app shell and is drawn in the browser. That shell is
 # index.csr.html, not index.html: index.html is now the prerendered landing page, and

@@ -698,6 +698,10 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Cornhole fundraiser guide** (2026-10-23) — `/cornhole-fundraiser`, the first marketing
+  guide page: planning timeline, format choices, entry fees and sponsors, equipment, sign-ups,
+  running the day, then a sign-up CTA. Prerendered, in the sitemap, linked from the footer.
+  Timed for winter, when schools, churches and clubs plan spring fundraisers. Frontend only.
 - **Balanced (A/B) blind draw** (2026-10-18) — an opt-in "Advanced" option on the Team Entry
   card: the organizer taps players to mark them A, and the draw pairs every A with a random B
   so weak players can't end up together. Uneven groups still draw (extras pair within their

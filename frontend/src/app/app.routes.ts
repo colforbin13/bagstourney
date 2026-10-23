@@ -73,6 +73,15 @@ export const routes: Routes = [
       description: 'Paste in your players and get random two-player teams and a seeded bracket in one click. Free blind draw generator for cornhole, bags, darts and doubles. No account needed.',
     },
   },
+  // Guide pages (marketing handoff): prerendered how-tos for the searches organizers make.
+  {
+    path: 'cornhole-fundraiser',
+    loadComponent: () => import('./bracket/fundraiser-guide.component').then(m => m.FundraiserGuideComponent),
+    title: 'How to run a cornhole fundraiser tournament',
+    data: {
+      description: 'Plan a cornhole fundraiser from start to finish: a timeline, blind draw or partners, single or double elimination, entry fees, board sponsors, equipment and running the day.',
+    },
+  },
   {
     path: 'sports',
     loadComponent: () => import('./bracket/sports.component').then(m => m.SportsComponent),

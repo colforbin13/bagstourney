@@ -19,6 +19,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'pricing', renderMode: RenderMode.Prerender },
   { path: 'sports', renderMode: RenderMode.Prerender },
   { path: 'blind-draw-generator', renderMode: RenderMode.Prerender },
+  { path: 'cornhole-fundraiser', renderMode: RenderMode.Prerender },
   { path: 'terms', renderMode: RenderMode.Prerender },
   { path: 'refunds', renderMode: RenderMode.Prerender },
   { path: 'privacy', renderMode: RenderMode.Prerender },
