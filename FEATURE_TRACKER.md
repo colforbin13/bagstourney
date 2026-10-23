@@ -23,6 +23,13 @@ because nothing has been sold yet: the integration ships disabled until real Str
 prices and a live-mode webhook endpoint exist, and those are dashboard/business steps
 rather than code. Every other item below is genuinely unstarted.
 
+Items 19-23 were added 2026-10-23 from a comparison with Scoreholio, the best-known
+cornhole tournament app, in the order Matt approved. Scoreholio features judged not worth
+chasing (player stats and PPR, handicaps, Swiss and King of the Court formats, multi-week
+seasons, custom dashboards) were left out: they serve competitive leagues, Scoreholio's
+ground. "You're up next" alerts, start times (item 8) and entry-fee payments (items 10/11)
+were already here.
+
 ### 12. Freemium tiers with usage limits
 
 Gate some features/limits behind a free vs. paid tier, as a monetization lever for
@@ -449,6 +456,82 @@ lands. Placed ahead of items 10/11 since those are the much larger Stripe Connec
 marketplace build. Be aware this is a bigger engine change than anything shipped so far;
 if it needs to be split, the natural seam is single-elimination-preserving schema and
 gating first, then the losers-bracket construction, then the two-tree rendering.
+
+### 19. Odd player handling (ghost partner)
+
+Today a blind draw refuses an odd number of players (`TeamController::draw()`), so the
+organizer has to turn someone away or find a 'filler' at the door, the worst moment of the
+night. Scoreholio solves it with a "ghost": the odd player gets a placeholder partner.
+
+- Likely shape: an option at the draw when the count is odd, adding a ghost participant
+  who is paired like anyone else. Their team plays a person short (the real player throws
+  both turns, the common house rule), or the organizer swaps in a real player later.
+- Alternative: the organizer joins as the extra player. Cheaper, but doesn't help an
+  organizer who can't play.
+- Open questions: does a ghost team count toward the plan's player cap; how it's labelled on
+  the bracket; whether `BlindDraw::pair()` should avoid putting the ghost with an A player
+  in a balanced draw.
+
+Status: Planned — added 2026-10-23 from the Scoreholio comparison. Small.
+
+Priority note: first of the Scoreholio-derived items because it fixes a real failure at
+the venue for every blind draw, free tier included.
+
+### 20. Sponsor logos on the bracket and TV view (Pro)
+
+Board sponsors are how fundraisers raise money, and the fundraiser guide
+(`/cornhole-fundraiser`) tells organizers to sell them. Show sponsor logos on the public
+bracket and in TV mode, so a sponsor's sign is on the screen everyone watches.
+
+- Upload a few images per tournament (size and type limits; stored on disk or in the DB,
+  to decide), shown in a strip on the bracket and rotating in TV mode.
+- Scoreholio gives one logo free and unlimited on its top plan. A Pro feature here, with
+  maybe one logo free, fits our tiers.
+- "Powered by Bracketway" stays regardless (decided 2026-10-15).
+
+Status: Planned — added 2026-10-23. Small, apart from the first image upload in the app.
+
+### 21. Best-of-3 finals
+
+Scoreholio offers best-of 3/5/7 brackets. The common ask is narrower: play the final (or
+semifinals and final) as best of three.
+
+- A per-tournament setting for which rounds are best-of-3. A match then records games won
+  per side (and optionally each game's score), and the winner is first to two.
+- Touches the score-entry screen, the bracket display and `MatchController`'s completion
+  rule; the cascade only needs "who won", so it should be untouched.
+- Open question: in double elimination, does the grand final reset also become best-of-3.
+
+Status: Planned — added 2026-10-23. Small to medium.
+
+### 22. Rotating partners (Switcholio-style)
+
+Players get a new partner every round and are ranked individually, which is what weekly
+winter leagues and social nights run on. Scoreholio's version is "Switcholio". Also item 6 of
+the marketing plan ("rotating partners").
+
+- Needs per-player standings (wins, point differential) — Bracketway has only team
+  results today — and a round generator that avoids repeat partners and opponents.
+- Could reuse pool play's round generation (`api/lib/PoolPlay.php`) with players instead
+  of teams. Optional finish: the top players by standings go into a bracket.
+- This is the first real "league" building block, and the feature that gives bar and
+  brewery outreach something concrete to offer.
+
+Status: Planned — added 2026-10-23. Large.
+
+### 23. Sign-up cap with a waitlist
+
+Organizers cap a fundraiser at a number that fits their boards and time slot. Today a full
+tournament refuses new sign-ups; a waitlist would queue them instead, and promote the next
+one when someone drops out. Scoreholio has waitlists on its top plan.
+
+- Builds on self-registration's `pending` state (item 6): a capped tournament puts extra
+  sign-ups on a waitlist, shown to the organizer in order.
+- Open questions: is the cap the organizer's own number or only the plan cap; does the
+  waitlist promote automatically or wait for the organizer; notify the promoted player by
+  email if they gave one.
+
+Status: Planned — added 2026-10-23. Medium.
 
 ### 10. Payment provider integration for tournament registration fees
 
