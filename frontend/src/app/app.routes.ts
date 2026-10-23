@@ -178,6 +178,11 @@ export const routes: Routes = [
     loadComponent: () => import('./admin/audit-log.component').then(m => m.AuditLogComponent),
   },
   {
+    path: 'admin/traffic',
+    canActivate: [authGuard, superAdminGuard],
+    loadComponent: () => import('./admin/traffic.component').then(m => m.TrafficComponent),
+  },
+  {
     path: 'admin/tournament/:id',
     canActivate: [authGuard],
     loadComponent: () => import('./admin/tournament-manage.component').then(m => m.TournamentManageComponent),

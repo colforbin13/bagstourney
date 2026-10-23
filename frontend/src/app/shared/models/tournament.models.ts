@@ -21,6 +21,27 @@ export interface AuditLogResponse {
   page_size: number;
 }
 
+/** GET /analytics — the super-admin Traffic page (api/controllers/AnalyticsController.php). */
+export interface TrafficSummary {
+  days: number;
+  from: string;
+  to: string;
+  visits: number;
+  views: number;
+  previous_visits: number;
+  daily: { day: string; visits: number; views: number }[];
+  pages: { path: string; views: number; visits: number }[];
+  /** source '' is direct or unknown. */
+  sources: { source: string; visits: number }[];
+  activity: {
+    new_organizers: number;
+    tournaments_created: number;
+    players_added: number;
+    pro_subscribers: number;
+    upgraded_tournaments: number;
+  };
+}
+
 export interface TournamentCapabilities {
   role: 'owner' | 'manager' | 'scorekeeper' | null;
   is_super_admin: boolean;

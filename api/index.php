@@ -18,6 +18,7 @@ require_once __DIR__ . '/lib/NameList.php';
 require_once __DIR__ . '/lib/BlindDraw.php';
 require_once __DIR__ . '/lib/PoolPlay.php';
 require_once __DIR__ . '/lib/BoardQueue.php';
+require_once __DIR__ . '/lib/PageView.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/TournamentController.php';
 require_once __DIR__ . '/controllers/ParticipantController.php';
@@ -30,6 +31,7 @@ require_once __DIR__ . '/controllers/UserController.php';
 require_once __DIR__ . '/controllers/NotificationController.php';
 require_once __DIR__ . '/controllers/AuditLogController.php';
 require_once __DIR__ . '/controllers/BillingController.php';
+require_once __DIR__ . '/controllers/AnalyticsController.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -361,6 +363,19 @@ try {
         case 'audit-log':
             if ($method === 'GET' && !$id) {
                 (new AuditLogController(getDB()))->list($_GET);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Traffic ---
+        case 'analytics':
+            $ctrl = new AnalyticsController(getDB());
+            if ($action === 'pageview' && $method === 'POST') {
+                $ctrl->record($body);
+            } elseif ($action === null && $method === 'GET' && !$id) {
+                $ctrl->summary($_GET);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);

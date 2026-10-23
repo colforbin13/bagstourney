@@ -781,6 +781,12 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **Traffic page for super admins** (2026-10-23) — Admin → Traffic: visits per day, top
+  pages, where visits came from (referring site or a `?utm_source=` tag), and organizer
+  activity (signups, tournaments, players, Pro subscribers) from the real tables. Self-hosted
+  instead of Google Analytics: no cookies, no IPs, daily totals only, so the privacy policy
+  only needed one sentence. Bots, admin screens and signed-in super admins aren't counted.
+  Migration 022. [Full notes](FEATURE_ARCHIVE.md#traffic-page-for-super-admins)
 - **Bracketway vs Scoreholio page** (2026-10-23) — `/scoreholio-alternative`, an even-handed
   comparison for the "Scoreholio alternative" search: a side-by-side, when each is the better
   pick, a not-affiliated line. Scoreholio facts checked October 2026 from their site and docs

@@ -1,9 +1,10 @@
 // src/app/app.component.ts
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { NavComponent } from './shared/components/nav.component';
 import { ConfirmModalComponent } from './shared/components/confirm-modal.component';
 import { FooterComponent } from './shared/components/footer.component';
+import { TrafficService } from './shared/services/traffic.service';
 
 @Component({
   selector: 'app-root',
@@ -16,4 +17,8 @@ import { FooterComponent } from './shared/components/footer.component';
     <app-confirm-modal />
   `,
 })
-export class AppComponent {}
+export class AppComponent {
+  constructor() {
+    inject(TrafficService).start();
+  }
+}

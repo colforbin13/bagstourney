@@ -10,7 +10,7 @@ export const LEGAL = {
   brand: 'Bracketway',
   supportEmail: 'support@bracketway.com',
   governingState: 'Illinois',
-  effectiveDate: 'October 15, 2026',
+  effectiveDate: 'October 23, 2026',
   /** Refund windows, in days. Mirrored in the Refund policy and the Pricing FAQ. */
   refundDays: {
     tournamentUpgrade: 14,

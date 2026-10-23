@@ -218,8 +218,10 @@ export type LegalDoc = 'terms' | 'refunds' | 'privacy';
               </li>
             </ul>
             <p>
-              We don't use advertising or analytics trackers. Pages load fonts from Google Fonts,
-              which means Google sees your IP address when a page loads.
+              We don't use advertising trackers or third-party analytics. We count visits
+              ourselves: which page was opened, and the site or link that sent you there, kept
+              only as daily totals, with no cookies and no IP address. Pages load fonts from
+              Google Fonts, which means Google sees your IP address when a page loads.
             </p>
           </section>
 

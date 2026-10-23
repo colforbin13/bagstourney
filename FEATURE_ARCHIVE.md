@@ -4,6 +4,42 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Traffic page for super admins
+
+Matt asked (2026-10-23, after the AlternativeTo listing went live) how to see what traffic the
+site gets: Google Analytics, our own logs, or a dashboard under admin.
+
+**Why not Google Analytics.** The privacy policy promised "no advertising or analytics
+trackers"; GA would have meant rewriting that, a third-party script on every page, and a
+cookie notice for EU visitors. What Matt needs (is anyone coming, from where, to which page,
+and do they sign up) fits in one small table. Google Search Console, which Matt already uses,
+covers the one thing we can't see: the search terms.
+
+**What's counted.** `TrafficService` (frontend) sends a beacon on every `NavigationEnd`, in
+the browser only. The first page of a tab's session is a *visit* (in memory for in-app
+navigation, `sessionStorage` `bb_visit` across reloads) and carries `document.referrer` plus
+any `utm_source`. Nothing is sent for `/admin/*` (except sign-in and create-account) or
+while a super admin is signed in. `api/lib/PageView.php` decides the bucket: known public
+pages as themselves, id pages as `/bracket/:id` etc., anything else `/(other)`, so the public
+endpoint can't grow the table with made-up paths. User agents matching a bot pattern (which
+includes `HeadlessChrome`, so a Playwright check needs a normal UA) are dropped.
+`page_views` (migration 022) is one row per day/path/source with `visits` and `views`
+counters, written with `INSERT … ON DUPLICATE KEY UPDATE`. No IP, no user agent, no cookie.
+
+**The page.** `GET /analytics?days=7|30|90` (super admin) returns daily totals with empty
+days filled (`PageView::fillDays`), the previous period's visits for the up/down note, top 15
+pages and sources, and organizer activity counted from `users`, `tournaments` and
+`participants`. Dates come from MySQL's `CURDATE()` so the PHP timezone can't shift a day.
+
+**Known limits.** A visitor who blocks `sendBeacon` or JavaScript isn't counted. Anyone can
+post junk to the beacon; paths are bounded by the bucket list, sources only by length (60
+characters). Privacy policy wording and effective date updated (October 23, 2026).
+
+**Verified.** `tests/PageViewTest.php` (11 tests; every guard was broken in turn and a test
+failed each time). Frontend specs for the service and page. End to end against MariaDB with
+the production build: a visit from AlternativeTo, a QR-tagged visit plus reload (one visit,
+two views), and a super admin's own browsing (not counted) produced exactly the expected rows.
+
 ### Balanced (A/B) blind draw
 
 Prompted by a 2026-10-18 r/Cornhole thread ("Question about blind draw"): an organizer with 26

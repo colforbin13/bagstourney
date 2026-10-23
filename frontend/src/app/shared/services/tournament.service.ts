@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, BulkAddResult, PoolData, BoardsData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
+import { Tournament, Participant, BulkAddResult, PoolData, BoardsData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse, TrafficSummary } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -62,6 +62,10 @@ export class TournamentService {
     if (params.search) query['search'] = params.search;
     if (params.action) query['action'] = params.action;
     return this.http.get<AuditLogResponse>(`${this.api}/audit-log`, { params: query });
+  }
+
+  getTrafficSummary(days: number) {
+    return this.http.get<TrafficSummary>(`${this.api}/analytics`, { params: { days: String(days) } });
   }
 
   restoreTournament(id: number) {

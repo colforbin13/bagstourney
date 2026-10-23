@@ -41,6 +41,7 @@ import { AuthService } from '../services/auth.service';
                 <a routerLink="/admin/users" routerLinkActive="active" (click)="closeAdminMenu()">Users</a>
                 <a routerLink="/admin/deleted-tournaments" routerLinkActive="active" (click)="closeAdminMenu()">Deleted Tournaments</a>
                 <a routerLink="/admin/audit-log" routerLinkActive="active" (click)="closeAdminMenu()">Audit Log</a>
+                <a routerLink="/admin/traffic" routerLinkActive="active" (click)="closeAdminMenu()">Traffic</a>
               }
             </div>
           </div>

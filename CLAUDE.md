@@ -151,6 +151,17 @@ Private tournaments are described like public ones — knowing the link already 
 
 `og:image` is a static brand card at `frontend/src/assets/og-card.png`, generated once with GD from the favicon's geometry and Bebas Neue. Production needs neither GD nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
 
+### Traffic
+
+Admin → Traffic (super admin) is self-hosted analytics, chosen over Google Analytics so the
+privacy policy can keep promising no third-party trackers. `shared/services/traffic.service.ts`
+sends a beacon per navigation to the public `POST /analytics/pageview`; `api/lib/PageView.php`
+(tested in `tests/PageViewTest.php`) buckets the path to a fixed list, drops bots, and reduces
+the referrer or `?utm_source=` tag to a source; `AnalyticsController` keeps only daily
+counters in `page_views` (migration `022`). No cookies, IPs or user agents are stored.
+Adding a public route means adding it to `PageView::PAGES` (or it counts as `/(other)`) and a
+name in `traffic.component.ts`.
+
 ### Prerendering
 
 The public marketing pages (`/`, `/how-it-works`, `/pricing`, `/sports`, `/blind-draw-generator`, `/cornhole-fundraiser`, `/scoreholio-alternative`, `/terms`, `/refunds`, `/privacy`) are rendered to static HTML **at build time**, so search engines see their content, titles and descriptions. There is no Node server in production: `angular.json` sets `outputMode: "static"` with `src/main.server.ts` as the build-time entry, and `npm run build:prod` writes the pages alongside the usual bundle. Angular writes them as folders (`pricing/index.html`); `frontend/scripts/flatten-prerendered.mjs` then turns each into a flat file (`pricing.html`), because on Apache a folder makes mod_dir 301 `/pricing` to `/pricing/` before any rewrite runs (and `DirectorySlash Off` needs an `AllowOverride` the host may not grant). `deploy.ps1` ships them like any other file.
