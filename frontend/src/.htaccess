@@ -4,6 +4,27 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /
 
+# One address per page for search engines: https://bracketway.com, never www. or plain
+# http. Without these Google finds the same page under several hosts and reports
+# "Duplicate without user-selected canonical". Limited to the real host names so the site
+# still opens by LAN address. The http rule stands down when a proxy in front (Cloudflare,
+# a load balancer) already terminated https, which would otherwise redirect forever.
+RewriteCond %{HTTP_HOST} ^www\.bracketway\.com$ [NC]
+RewriteRule ^ https://bracketway.com%{REQUEST_URI} [R=301,L,NE]
+RewriteCond %{HTTP_HOST} ^bracketway\.com$ [NC]
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+RewriteCond %{HTTP:CF-Visitor} !https [NC]
+RewriteRule ^ https://bracketway.com%{REQUEST_URI} [R=301,L,NE]
+
+# The built files behind the clean addresses are reachable too (/pricing.html,
+# /index.html, /index.csr.html). Send a direct request for one to its clean address.
+# THE_REQUEST is what the browser asked for, so the internal rewrites below never loop here.
+RewriteCond %{THE_REQUEST} \s/+index(?:\.csr)?\.html[\s?] [NC]
+RewriteRule ^ / [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+(how-it-works|pricing|sports|blind-draw-generator|cornhole-fundraiser|scoreholio-alternative|terms|refunds|privacy)\.html[\s?] [NC]
+RewriteRule ^ /%1 [R=301,L]
+
 # Route API requests to the PHP front controller.
 RewriteCond %{REQUEST_URI} ^/api/
 RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]

@@ -1,5 +1,5 @@
 // src/app/bracket/bracket-view.component.ts
-import { Component, OnInit, AfterViewInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, DOCUMENT, signal, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +9,7 @@ import { Tournament, Match, BracketData } from '../shared/models/tournament.mode
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { BoardsPanelComponent } from '../shared/components/boards-panel.component';
 import { boardWord } from '../shared/board-labels';
+import { SITE_URL, setCanonicalLink } from '../shared/seo';
 import {
   roundLabel as labelForRound,
   teamParticipants as participantsFor,
@@ -404,6 +405,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private tournamentId!: number;
   private uuid: string | null = null;
+  private readonly document = inject(DOCUMENT);
 
   constructor(
     private route: ActivatedRoute,
@@ -508,7 +510,13 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loading.set(true);
     if (this.uuid) {
       this.svc.getTournamentByUuid(this.uuid).subscribe({
-        next: t => { this.tournament.set(t); this.tournamentId = t.id; },
+        next: t => {
+          this.tournament.set(t);
+          this.tournamentId = t.id;
+          // One address per bracket for search engines, whatever ?tv= or trailing slash this
+          // visit arrived with. Matches the canonical api/preview.php serves.
+          if (t.uuid) setCanonicalLink(this.document, `${SITE_URL}/bracket/${encodeURIComponent(t.uuid)}`);
+        },
         error: () => this.showError('Tournament not found.'),
       });
       this.svc.getBracketByUuid(this.uuid).subscribe({

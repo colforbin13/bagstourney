@@ -21,7 +21,7 @@ const OWNED_META = ['name="description"', 'property="og:title"', 'property="og:d
  * A route without a title gets the plain site name and loses the description and canonical,
  * so a tag from the previous page never lingers on one it doesn't describe. That includes
  * /bracket/..., whose tags api/preview.php writes into the served HTML for crawlers; the
- * browser has no use for them once the page has loaded.
+ * bracket page puts its own canonical back once it knows the tournament's public link.
  */
 @Injectable({ providedIn: 'root' })
 export class SeoTitleStrategy extends TitleStrategy {
@@ -51,18 +51,27 @@ export class SeoTitleStrategy extends TitleStrategy {
   }
 
   private setCanonical(url: string | null): void {
-    let link = this.document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (!url) {
-      link?.remove();
-      return;
-    }
-    if (!link) {
-      link = this.document.createElement('link');
-      link.setAttribute('rel', 'canonical');
-      this.document.head.appendChild(link);
-    }
-    link.setAttribute('href', url);
+    setCanonicalLink(this.document, url);
   }
+}
+
+/**
+ * Points the page's <link rel="canonical"> at `url`, adding the link if needed, or removes it
+ * for null. Exported for pages that only learn their own address after loading, such as a
+ * bracket reached by any of several URLs.
+ */
+export function setCanonicalLink(document: Document, url: string | null): void {
+  let link = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (!url) {
+    link?.remove();
+    return;
+  }
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', 'canonical');
+    document.head.appendChild(link);
+  }
+  link.setAttribute('href', url);
 }
 
 /** Route data merges down the tree; the deepest activated route has the final say. */

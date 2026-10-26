@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { TitleStrategy, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { SeoTitleStrategy, canonicalUrl } from './seo';
+import { SeoTitleStrategy, canonicalUrl, setCanonicalLink } from './seo';
 
 @Component({ standalone: true, template: '' })
 class BlankComponent {}
@@ -71,5 +71,25 @@ describe('canonicalUrl', () => {
     expect(canonicalUrl('')).toBe('https://bracketway.com/');
     expect(canonicalUrl('/how-it-works#steps')).toBe('https://bracketway.com/how-it-works');
     expect(canonicalUrl('/pricing?ref=abc')).toBe('https://bracketway.com/pricing');
+  });
+});
+
+describe('setCanonicalLink', () => {
+  afterEach(() => setCanonicalLink(document, null));
+
+  it('should keep a single canonical link and update it in place', () => {
+    setCanonicalLink(document, 'https://bracketway.com/bracket/a');
+    setCanonicalLink(document, 'https://bracketway.com/bracket/b');
+
+    const links = document.head.querySelectorAll('link[rel="canonical"]');
+    expect(links.length).toBe(1);
+    expect(links[0].getAttribute('href')).toBe('https://bracketway.com/bracket/b');
+  });
+
+  it('should remove the link for null', () => {
+    setCanonicalLink(document, 'https://bracketway.com/');
+    setCanonicalLink(document, null);
+
+    expect(document.head.querySelector('link[rel="canonical"]')).toBeNull();
   });
 });

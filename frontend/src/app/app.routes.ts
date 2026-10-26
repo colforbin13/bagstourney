@@ -22,7 +22,10 @@ export const routes: Routes = [
     path: 'tournaments',
     loadComponent: () => import('./bracket/tournament-list.component').then(m => m.TournamentListComponent),
     title: 'Tournaments',
-    data: { landing: false },
+    data: {
+      landing: false,
+      description: 'Live and recent cornhole and bags tournaments run on Bracketway: brackets, scores and champions.',
+    },
   },
   // Public on purpose: it's most useful to someone deciding whether to sign up at all.
   {

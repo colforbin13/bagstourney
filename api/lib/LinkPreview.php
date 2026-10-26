@@ -132,10 +132,17 @@ final class LinkPreview
      *
      * Returns $html unchanged if there is no </head> to insert before, so a malformed or
      * unexpected shell degrades to today's behaviour rather than to a broken page.
+     *
+     * $canonicalUrl, when given, also goes in as <link rel="canonical">. Without it a search
+     * engine sees every bracket as the same app shell under many addresses (?tv=1, a trailing
+     * slash) and reports them as duplicates with no canonical chosen.
      */
-    public static function injectInto(string $html, array $tags): string
+    public static function injectInto(string $html, array $tags, ?string $canonicalUrl = null): string
     {
         $meta = self::render($tags);
+        if ($canonicalUrl !== null && $canonicalUrl !== '') {
+            $meta .= '<link rel="canonical" href="' . htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') . '" />' . "\n";
+        }
         if ($meta === '') {
             return $html;
         }

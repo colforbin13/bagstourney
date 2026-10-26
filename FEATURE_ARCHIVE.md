@@ -153,6 +153,17 @@ client navigation updates title and canonical; no console errors beyond fonts th
 blocks. `ng serve` still works. Not verified against real Apache: the rewrite rules were
 checked by reading only, so check `/pricing`, `/pricing/` and `/admin` after the first deploy.
 
+**Canonical cleanup (2026-10-26).** Search Console reported "Duplicate without user-selected
+canonical" and "Google chose different canonical than user". The live site answered
+`https://www.bracketway.com/...` with no redirect, and `/pricing.html`, `/index.html` and
+`/index.csr.html` were reachable beside their clean addresses. `.htaccess` now 301s www to the
+bare host, http to https (only for the real host names, and not when a proxy header says
+https already), and the built `.html` files to their clean URLs. Bracket pages had no canonical
+at all, so `?tv=1` and trailing-slash variants looked like duplicates: `preview.php` now serves
+`<link rel="canonical">` to the uuid URL and the bracket page sets the same in the browser.
+`/tournaments` got a description, which gives it a canonical. Rewrites verified on a local
+Apache 2.4 against the production build.
+
 **Fixed after the first deploy (2026-10-17).** That unverified rewrite was wrong. On the live
 site `/pricing` looped forever: Apache's mod_dir redirected the folder `/pricing` to
 `/pricing/` before mod_rewrite ran, and the rule removing the trailing slash sent it back.

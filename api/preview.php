@@ -102,7 +102,7 @@ try {
     $pageUrl = $base . '/bracket/' . rawurlencode($tournament['uuid']);
     $imageUrl = $base . '/assets/og-card.png';
 
-    serveShell(LinkPreview::injectInto($html, LinkPreview::tags($tournament, $pageUrl, $imageUrl)));
+    serveShell(LinkPreview::injectInto($html, LinkPreview::tags($tournament, $pageUrl, $imageUrl), $pageUrl));
 } catch (Throwable $e) {
     error_log('preview.php: ' . $e->getMessage());
     serveShell($html);

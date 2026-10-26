@@ -201,4 +201,20 @@ final class LinkPreviewTest extends TestCase
         $this->assertSame(1, substr_count($twice, '</head>'));
         $this->assertSame(1, substr_count($twice, '<title>'));
     }
+
+    public function testAddsTheCanonicalLinkWhenGiven(): void
+    {
+        $tags = LinkPreview::tags($this->tournament(), self::URL, self::IMAGE);
+        $out = LinkPreview::injectInto($this->shell(), $tags, self::URL);
+
+        $this->assertStringContainsString('<link rel="canonical" href="' . self::URL . '" />', $out);
+        $this->assertLessThan(strpos($out, '</head>'), strpos($out, 'rel="canonical"'));
+    }
+
+    public function testLeavesTheCanonicalOutWhenNotGiven(): void
+    {
+        $out = LinkPreview::injectInto($this->shell(), LinkPreview::tags($this->tournament(), self::URL, self::IMAGE));
+
+        $this->assertStringNotContainsString('rel="canonical"', $out);
+    }
 }
