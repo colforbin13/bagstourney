@@ -1,11 +1,18 @@
 // src/app/admin/tournament-manage.component.ts
 import { Component, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { TournamentService } from '../shared/services/tournament.service';
-import { Tournament, Participant, Team, TournamentMember, UserSearchResult } from '../shared/models/tournament.models';
+import { AuthService } from '../shared/services/auth.service';
+import { BillingService } from '../shared/services/billing.service';
+import { championName } from '../shared/bracket-labels';
+import { parseNameList } from '../shared/name-list';
+import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus, PoolData } from '../shared/models/tournament.models';
+import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
+import { BOARD_WORDS, BoardLabel, boardWord } from '../shared/board-labels';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
@@ -18,7 +25,7 @@ interface SetupStep {
 @Component({
   selector: 'app-tournament-manage',
   standalone: true,
-  imports: [RouterLink, FormsModule, DragDropModule],
+  imports: [RouterLink, FormsModule, DragDropModule, NgTemplateOutlet, PoolStandingsComponent],
   template: `
     <div class="page">
     @if (loadError()) {
@@ -40,18 +47,34 @@ interface SetupStep {
           <div class="tm-badges">
             <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
             <span class="badge badge-visibility-{{ tournament()!.visibility }}">{{ tournament()!.visibility }}</span>
+            @if (tournament()!.format === 'double') {
+              <span class="badge badge-visibility-private">double elimination</span>
+            }
             @if (tournament()!.seeding_mode === 'manual') {
               <span class="badge badge-visibility-private">manual seeding</span>
             }
             @if (participantCap() !== null) {
               <span class="badge" [class.badge-cap-warning]="participantCount()! >= participantCap()!"
-                title="Freemium plan limit — plumbing ahead of real billing">
+                title="Participant limit for this tournament's plan">
                 {{ participantCount() }}/{{ participantCap() }} participants
               </span>
             }
+            @if (canBuyUnlock()) {
+              <!-- FEATURE_TRACKER item 13: a one-time purchase that upgrades this one
+                   tournament, with no subscription. Owners only — this spends money — and
+                   hidden entirely when the installation has no Stripe keys. -->
+              <button class="btn btn-sm btn-primary" [disabled]="unlockBusy()" (click)="buyTournamentUnlock()"
+                title="Upgrade just this tournament with a one-time payment">
+                @if (unlockBusy()) {
+                  <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
+                } @else {
+                  Upgrade this tournament
+                }
+              </button>
+            }
             @if (isSuperAdmin()) {
               <button class="btn btn-sm" [disabled]="paidOverrideBusy()" (click)="togglePaidOverride()"
-                title="Manual plan override for this tournament — no billing exists yet">
+                title="Grant this tournament the paid tier by hand, without a payment">
                 @if (paidOverrideBusy()) {
                   <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
                 } @else {
@@ -165,6 +188,55 @@ interface SetupStep {
         </div>
       }
 
+      <ng-template #formatCard>
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">Format</div>
+            <select class="input" [ngModel]="tournament()!.format || 'single'"
+              (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
+              <option value="single">Single elimination — one loss and a team is out</option>
+              <option value="double" [disabled]="!canUseDoubleElimination()">
+                Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (Pro)' }}
+              </option>
+            </select>
+            <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
+            @if (formatError()) { <div class="form-error">{{ formatError() }}</div> }
+          </div>
+      </ng-template>
+
+      <!-- Board assignments (FEATURE_TRACKER item 8). Changeable during setup and while the
+           tournament is live: a board breaks, or another one frees up mid-event. -->
+      <ng-template #boardsCard>
+          <div class="card" style="margin-bottom:24px">
+            <div class="section-label">{{ word().many }}</div>
+            <div class="row" style="align-items:center;flex-wrap:wrap;gap:8px">
+              <select class="input" style="max-width:240px" [ngModel]="tournament()!.boards ?? 0"
+                (ngModelChange)="updateBoards($event)"
+                [disabled]="boardsBusy() || (!canUsePaidFeatures() && !tournament()!.boards)"
+                [attr.aria-label]="'Number of ' + word().many.toLowerCase()">
+                <option [ngValue]="0">Off — no {{ word().one.toLowerCase() }} assignments</option>
+                @for (n of boardChoices; track n) {
+                  <option [ngValue]="n">{{ n }} {{ (n === 1 ? word().one : word().many).toLowerCase() }}</option>
+                }
+              </select>
+              <!-- The word only: board for bags, court for pickleball. Free on any plan. -->
+              <select class="input" style="max-width:180px" [ngModel]="word().value"
+                (ngModelChange)="updateBoardLabel($event)" [disabled]="boardsBusy()"
+                aria-label="What to call them">
+                @for (w of boardWords; track w.value) {
+                  <option [ngValue]="w.value">Call them {{ w.many.toLowerCase() }}</option>
+                }
+              </select>
+            </div>
+            <div class="field-hint" style="margin-top:6px">
+              Each game goes to the next free {{ word().one.toLowerCase() }} automatically. The bracket and TV
+              view show who's on which {{ word().one.toLowerCase() }} and who's up next, and staff can move a
+              game from Enter Scores.
+              @if (!canUsePaidFeatures()) { {{ word().one }} assignments are a <a routerLink="/pricing">Pro feature</a>. }
+            </div>
+            @if (boardsError()) { <div class="form-error">{{ boardsError() }}</div> }
+          </div>
+      </ng-template>
+
       <!-- ── SETUP PHASE ── -->
       @if (tournament()?.status === 'setup') {
         <!-- Where-am-I checklist. The individual controls below already explain themselves
@@ -193,9 +265,24 @@ interface SetupStep {
             <div class="section-label">Team Entry</div>
             <select class="input" [ngModel]="tournament()!.team_entry_mode"
               (ngModelChange)="updateTeamEntryMode($event)" [disabled]="teamEntryModeBusy()">
-              <option value="auto_draft">Auto-draft — add participants, randomly pair them into teams</option>
+              <option value="auto_draft">Blind draw — add players, randomly pair them into teams</option>
               <option value="direct">Direct entry — create each team by typing both member names</option>
             </select>
+            @if (!isDirectEntry()) {
+              <!-- Kept behind a disclosure so the plain blind draw stays the one obvious path. -->
+              <details class="advanced" [open]="isBalancedDraw()">
+                <summary>Advanced</summary>
+                <label class="check">
+                  <input type="checkbox" [checked]="isBalancedDraw()" [disabled]="drawModeBusy()"
+                    (change)="updateDrawMode($any($event.target).checked ? 'balanced' : 'random')" />
+                  Balanced draw (A/B)
+                </label>
+                <div class="field-hint">
+                  Mark your stronger players A. Every A is paired with a random B, so the weakest
+                  players never end up on the same team.
+                </div>
+              </details>
+            }
           </div>
           <div class="card" style="margin-bottom:24px">
             <div class="section-label">Seeding</div>
@@ -203,8 +290,30 @@ interface SetupStep {
               (ngModelChange)="updateSeedingMode($event)" [disabled]="seedingModeBusy()">
               <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
               <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
+              <option value="pool_play" [disabled]="!canUsePaidFeatures()">
+                Pool play — teams play pool games first, and the standings set the seeds{{ canUsePaidFeatures() ? '' : ' (Pro)' }}
+              </option>
             </select>
+            @if (isPoolPlay()) {
+              <div class="row" style="align-items:center;margin-top:10px">
+                <select class="input" style="max-width:240px" [ngModel]="tournament()!.pool_games ?? 3"
+                  (ngModelChange)="updatePoolGames($event)" [disabled]="seedingModeBusy()" aria-label="Pool games per team">
+                  @for (n of poolGameChoices; track n) {
+                    <option [ngValue]="n">{{ n }} pool games per team</option>
+                  }
+                </select>
+              </div>
+              <div class="field-hint" style="margin-top:6px">Every team plays this many games before the bracket, with no rematches.</div>
+            }
+            @if (seedingError()) { <div class="form-error">{{ seedingError() }}</div> }
           </div>
+        }
+        <!-- Format sits outside the teams().length === 0 guard above on purpose: it only
+             locks once the bracket is generated, not once teams are drawn, so a
+             manual-seeding organizer can still change it while arranging the ladder. -->
+        @if (canManageSetup() && tournament()!.status === 'setup') {
+          <ng-container *ngTemplateOutlet="formatCard" />
+          <ng-container *ngTemplateOutlet="boardsCard" />
         }
 
         @if (isDirectEntry()) {
@@ -228,18 +337,54 @@ interface SetupStep {
             </div>
           }
         } @else {
-          <!-- Add participant (auto-draft) -->
+          <!-- Add participants (auto-draft): paste a whole list, or one at a time -->
           @if (canManageSetup() && teams().length === 0) {
             <div class="card" style="margin-bottom:24px">
-              <div class="section-label">Add Participant</div>
-              <div class="row">
-                <input class="input" type="text" [(ngModel)]="newParticipant"
-                  placeholder="Full name" (keyup.enter)="addParticipant()" />
-                <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
-                  @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
-                  Add
-                </button>
-              </div>
+              @if (pasteMode()) {
+                <div class="section-label">Add Players</div>
+                <textarea class="input paste-box" rows="8" [ngModel]="pasteText()" (ngModelChange)="pasteText.set($event)"
+                  aria-label="Player names, one per line"
+                  placeholder="Paste or type names, one per line.&#10;Ann Smith&#10;Bob Jones&#10;Cara Lee"></textarea>
+                <div class="paste-footer">
+                  <div class="paste-summary" aria-live="polite">
+                    @if (pastePreview().names.length > 0) {
+                      {{ pastePreview().names.length }} new player{{ pastePreview().names.length === 1 ? '' : 's' }}
+                      @if (pastePreview().duplicates.length > 0) {
+                        · {{ pastePreview().duplicates.length }} already listed, will be skipped
+                      }
+                      @if (pasteRosterAfter() >= 4 && pasteRosterAfter() % 2 === 0) {
+                        · {{ pasteRosterAfter() / 2 }} teams
+                      } @else if (pasteRosterAfter() % 2 !== 0) {
+                        <span class="warn-inline">· {{ pasteRosterAfter() }} total, odd number</span>
+                      }
+                    } @else if (pastePreview().duplicates.length > 0) {
+                      Everyone on that list is already in this tournament.
+                    } @else {
+                      One name per line, or a single line separated by commas.
+                    }
+                  </div>
+                  <div class="row">
+                    <button type="button" class="link-btn" (click)="pasteMode.set(false)">Add one at a time</button>
+                    <button class="btn btn-primary" [disabled]="adding() || pastePreview().names.length === 0" (click)="addPastedParticipants()">
+                      @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                      Add {{ pastePreview().names.length || '' }} player{{ pastePreview().names.length === 1 ? '' : 's' }}
+                    </button>
+                  </div>
+                </div>
+              } @else {
+                <div class="section-label">Add Participant</div>
+                <div class="row">
+                  <input class="input" type="text" [(ngModel)]="newParticipant"
+                    placeholder="Full name" (keyup.enter)="addParticipant()" />
+                  <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
+                    @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
+                    Add
+                  </button>
+                </div>
+                <div style="margin-top:8px;font-size:.8rem">
+                  <button type="button" class="link-btn" (click)="pasteMode.set(true)">Paste a list of names</button>
+                </div>
+              }
               @if (addError()) { <div class="form-error">{{ addError() }}</div> }
             </div>
           }
@@ -258,7 +403,19 @@ interface SetupStep {
             @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
               <span class="warn">— Need an even number</span>
             }
+            @if (isBalancedDraw() && approvedParticipants().length > 0) {
+              <span class="group-count">{{ groupCounts().a }} A · {{ groupCounts().b }} B</span>
+            }
           </div>
+          @if (isBalancedDraw() && canManageSetup() && approvedParticipants().length > 0) {
+            <div class="field-hint" style="margin:-4px 0 10px">
+              Tap a player's letter to switch them between A and B.
+              @if (groupCounts().a !== groupCounts().b) {
+                The groups are uneven, so {{ groupCounts().extra }} {{ groupCounts().a > groupCounts().b ? 'A' : 'B' }}
+                players will be paired with each other.
+              }
+            </div>
+          }
 
           @if (participants().length === 0) {
             <div class="empty" style="padding:24px 0">
@@ -303,6 +460,13 @@ interface SetupStep {
                     </span>
                     @if (canManageSetup()) {
                       <div style="display:flex;gap:6px">
+                        @if (isBalancedDraw()) {
+                          <button class="btn btn-sm group-toggle" [class.is-a]="p.draw_group === 'A'"
+                            [disabled]="groupingParticipantId() === p.id" (click)="toggleDrawGroup(p)"
+                            [attr.aria-label]="p.name + ' is in group ' + (p.draw_group ?? 'B') + '. Switch group.'">
+                            {{ p.draw_group ?? 'B' }}
+                          </button>
+                        }
                         <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
                         @if (teams().length === 0) {
                           <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
@@ -324,9 +488,11 @@ interface SetupStep {
                 <div style="font-size:.8rem;color:var(--text-dim);">
                   {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
                   @if (isManualSeeding()) {
-                    This will randomly pair players into teams. You'll set the final seed order before generating the bracket.
+                    This will {{ pairingPhrase() }}. You'll set the final seed order before generating the bracket.
+                  } @else if (isPoolPlay()) {
+                    This will {{ pairingPhrase() }} and start pool play. The standings set the bracket seeds.
                   } @else {
-                    This will randomly pair players, seed teams, and generate the bracket.
+                    This will {{ pairingPhrase() }}, seed them, and generate the bracket.
                   }
                 </div>
               </div>
@@ -335,7 +501,7 @@ interface SetupStep {
                   <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
                   Drawing…
                 } @else {
-                  {{ isManualSeeding() ? 'Draw Teams' : 'Draw Teams & Start' }}
+                  {{ isManualSeeding() ? 'Draw Teams' : isPoolPlay() ? 'Draw Teams & Start Pool' : 'Draw Teams & Start' }}
                 }
               </button>
             </div>
@@ -387,14 +553,25 @@ interface SetupStep {
                 }
               </button>
             }
-            <button class="btn btn-primary" [disabled]="generatingBracket() || teams().length < 2" (click)="confirmGenerateBracket()">
-              @if (generatingBracket()) {
-                <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
-                Generating…
-              } @else {
-                Generate Bracket
-              }
-            </button>
+            @if (isPoolPlay()) {
+              <button class="btn btn-primary" [disabled]="startingPool() || teams().length < 2" (click)="confirmStartPool()">
+                @if (startingPool()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Starting…
+                } @else {
+                  Start Pool Play
+                }
+              </button>
+            } @else {
+              <button class="btn btn-primary" [disabled]="generatingBracket() || teams().length < 2" (click)="confirmGenerateBracket()">
+                @if (generatingBracket()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Generating…
+                } @else {
+                  Generate Bracket
+                }
+              </button>
+            }
           </div>
           @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
           @if (generateBracketError()) { <div class="form-error" style="margin-top:12px">{{ generateBracketError() }}</div> }
@@ -403,6 +580,58 @@ interface SetupStep {
 
       <!-- ── ACTIVE / COMPLETE PHASE ── -->
       @if (tournament()?.status !== 'setup') {
+        @if (tournament()?.status === 'active' && canManageSetup()) {
+          <ng-container *ngTemplateOutlet="boardsCard" />
+        }
+        <!-- Pool play (FEATURE_TRACKER item 18): standings while the pool runs, then the
+             seed-and-generate step once every pool game is in. -->
+        @if (pool(); as p) {
+          @if (p.started) {
+            <div class="card" style="margin-bottom:24px">
+              <app-pool-standings [pool]="p" />
+              @if (!p.locked && !p.complete && canScore()) {
+                <div style="margin-top:12px">
+                  <a class="btn btn-sm btn-primary" [routerLink]="['/admin/tournament', tournamentId, 'score']">Enter pool scores</a>
+                </div>
+              }
+            </div>
+          }
+          @if (p.complete && !p.locked && canManageSetup()) {
+            <div class="card pool-ready" style="margin-bottom:24px">
+              <div class="section-label">Pool play finished</div>
+              <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px">
+                Seeds follow the standings. Drag to adjust if you need to, then generate the bracket.
+                Correcting a pool score afterwards resets the order to the standings.
+              </div>
+              <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
+                @for (team of teams(); track team.id) {
+                  <div class="team-seed-item" cdkDrag>
+                    <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
+                    <span class="seed">#{{ team.seed }}</span>
+                    <div class="team-info">
+                      <div class="team-name">{{ team.name }}</div>
+                      <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+            <ng-container *ngTemplateOutlet="formatCard" />
+            <div class="draw-section" style="margin-bottom:24px">
+              <div style="font-size:.85rem;color:var(--text-dim)">{{ teams().length }} teams, seeded from the pool.</div>
+              <button class="btn btn-primary" [disabled]="generatingBracket()" (click)="confirmGenerateBracket()">
+                @if (generatingBracket()) {
+                  <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+                  Generating…
+                } @else {
+                  Generate Bracket
+                }
+              </button>
+            </div>
+            @if (generateBracketError()) { <div class="form-error" style="margin:-12px 0 24px">{{ generateBracketError() }}</div> }
+          }
+        }
+
         <div class="section-label" style="margin-bottom:10px">Participants</div>
         @if (participants().length === 0) {
           <div class="empty">No participants.</div>
@@ -566,6 +795,12 @@ interface SetupStep {
       text-decoration: underline;
       cursor: pointer;
     }
+    .advanced { margin-top: 12px; font-size: .85rem; }
+    .advanced summary { cursor: pointer; color: var(--text-dim); font-size: .8rem; }
+    .advanced .check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
+    .group-count { font-family: var(--mono); color: var(--muted); letter-spacing: .04em; }
+    .group-toggle { min-width: 32px; font-family: var(--mono); font-weight: 600; }
+    .group-toggle.is-a { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
     .count {
       background: var(--border);
       color: var(--text-dim);
@@ -575,6 +810,11 @@ interface SetupStep {
     }
     .warn { color: var(--danger); font-size: .65rem; }
     .row { display: flex; gap: 8px; }
+    .paste-box { resize: vertical; min-height: 140px; line-height: 1.4; }
+    .paste-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+    .paste-footer .row { align-items: center; gap: 14px; margin-left: auto; }
+    .paste-summary { font-size: .8rem; color: var(--text-dim); }
+    .warn-inline { color: var(--danger); }
     .form-error { font-size: .8rem; color: var(--danger); margin-top: 8px; }
 
     /* Toolbar row */
@@ -800,12 +1040,46 @@ export class TournamentManageComponent implements OnInit {
   participantCap = computed(() => this.tournament()?.capabilities?.participant_cap ?? null);
   participantCount = computed(() => this.tournament()?.capabilities?.participant_count ?? null);
   paidOverrideBusy = signal(false);
+  // Stripe billing (FEATURE_TRACKER item 13). Null until /billing/status answers, and left
+  // null on error — every check below treats that as "nothing to sell", so a billing
+  // outage costs the organizer an upgrade button rather than the whole manage screen.
+  billingStatus = signal<BillingStatus | null>(null);
+  unlockBusy = signal(false);
+  // Owner (or super admin) only, since this spends money; hidden once the tournament is
+  // already upgraded, however that happened, and whenever the install cannot sell.
+  canBuyUnlock = computed(() =>
+    !!this.billingStatus()?.billing_enabled &&
+    !!this.billingStatus()?.offers.tournament_unlock &&
+    (this.tournament()?.capabilities?.can_manage_staff ?? false) &&
+    !this.tournament()?.paid_override
+  );
   deletingTournament = signal(false);
   actionsMenuOpen = signal(false);
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
   isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
+  isPoolPlay = computed(() => this.tournament()?.seeding_mode === 'pool_play');
+  // Pool play (FEATURE_TRACKER item 18). Loaded with the bracket once the tournament is live;
+  // null for every other seeding mode.
+  pool = signal<PoolData | null>(null);
+  startingPool = signal(false);
+  seedingError = signal('');
+  readonly poolGameChoices = [2, 3, 4, 5];
+  // Mirrors BoardQueue::MAX_BOARDS in the API.
+  readonly boardWords = BOARD_WORDS;
+  word = computed(() => boardWord(this.tournament()?.board_label));
+  readonly boardChoices = Array.from({ length: 24 }, (_, i) => i + 1);
   isDirectEntry = computed(() => this.tournament()?.team_entry_mode === 'direct');
+  // Balanced (A/B) draw: api/lib/BlindDraw.php. Off unless the organizer opens Advanced.
+  isBalancedDraw = computed(() => this.tournament()?.draw_mode === 'balanced');
+  drawModeBusy = signal(false);
+  pairingPhrase = computed(() => this.isBalancedDraw() ? 'pair each A player with a random B' : 'randomly pair players into teams');
+  groupingParticipantId = signal<number | null>(null);
+  groupCounts = computed(() => {
+    const a = this.approvedParticipants().filter(p => p.draw_group === 'A').length;
+    const b = this.approvedParticipants().length - a;
+    return { a, b, extra: Math.abs(a - b) };
+  });
 
   // The setup sequence is a different length depending on the two modes: auto-draft with
   // automatic seeding is two steps (the draw seeds and starts the tournament in one go),
@@ -817,6 +1091,7 @@ export class TournamentManageComponent implements OnInit {
 
     const direct = this.isDirectEntry();
     const manual = this.isManualSeeding();
+    const poolPlay = this.isPoolPlay();
     const teamsDrawn = this.teams().length > 0;
     const pending = this.pendingParticipants().length;
 
@@ -833,19 +1108,34 @@ export class TournamentManageComponent implements OnInit {
         label: 'Add your players',
         detail: pending > 0
           ? `${pending} self sign-up${pending === 1 ? '' : 's'} waiting on your approval below.`
-          : 'Add them by name, or share the sign-up link. You need an even number, four or more.',
+          : 'Paste a list of names, or share the sign-up link. You need an even number, four or more.',
         done: teamsDrawn,
       });
       steps.push({
         label: 'Draw the teams',
         detail: manual
           ? 'Randomly pairs your players into teams. You set the seed order afterwards.'
-          : 'Randomly pairs and seeds your players, builds the bracket, and starts play — all at once.',
+          : poolPlay
+            ? 'Randomly pairs your players into teams and starts pool play.'
+            : 'Randomly pairs and seeds your players, builds the bracket, and starts play — all at once.',
         done: teamsDrawn,
       });
     }
 
-    if (direct || manual) {
+    if (poolPlay) {
+      if (direct) {
+        steps.push({
+          label: 'Start pool play',
+          detail: `Schedules ${this.tournament()?.pool_games ?? 3} pool games per team and puts the tournament live.`,
+          done: false,
+        });
+      }
+      steps.push({
+        label: 'Play the pool, then generate the bracket',
+        detail: 'Enter pool scores as games finish. The standings set the seeds.',
+        done: false,
+      });
+    } else if (direct || manual) {
       steps.push({
         label: manual ? 'Set the seed order, then generate' : 'Generate the bracket',
         detail: manual
@@ -866,6 +1156,10 @@ export class TournamentManageComponent implements OnInit {
   visibilityBusy = signal(false);
   seedingModeBusy = signal(false);
   teamEntryModeBusy = signal(false);
+  boardsBusy = signal(false);
+  boardsError = signal('');
+  formatBusy = signal(false);
+  formatError = signal('');
 
   loading = signal(true);
   loadError = signal('');
@@ -878,6 +1172,14 @@ export class TournamentManageComponent implements OnInit {
   toast = signal('');
 
   newParticipant = '';
+  // Fast blind-draw setup. Paste mode is the default while the roster is empty (set in
+  // load()), since pasting a sign-up sheet is the quickest way from nothing to a draw;
+  // organizers adding a straggler to an existing roster get the single-name box.
+  pasteMode = signal(false);
+  private pasteModeChosen = false;
+  pasteText = signal('');
+  pastePreview = computed(() => parseNameList(this.pasteText(), this.participants().map(p => p.name)));
+  pasteRosterAfter = computed(() => this.approvedParticipants().length + this.pastePreview().names.length);
   tournamentId!: number;
 
   // Direct team entry
@@ -915,11 +1217,71 @@ export class TournamentManageComponent implements OnInit {
   qrKind = signal<'registration' | 'bracket' | null>(null);
   @ViewChild('qrCanvas') qrCanvasRef?: ElementRef<HTMLCanvasElement>;
 
-  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router) {}
+  constructor(private route: ActivatedRoute, private svc: TournamentService, private router: Router, private auth: AuthService, private billing: BillingService) {}
 
   ngOnInit() {
     this.tournamentId = +this.route.snapshot.paramMap.get('id')!;
     this.load();
+    this.loadBillingStatus();
+
+    // Returning from Stripe Checkout. The redirect and Stripe's webhook race each other, so
+    // reconcile explicitly rather than assuming the webhook already landed — otherwise an
+    // organizer who has just paid comes back to an unchanged page.
+    const sessionId = this.route.snapshot.queryParamMap.get('session_id');
+    if (sessionId) {
+      this.confirmCheckoutReturn(sessionId);
+    } else if (this.route.snapshot.queryParamMap.get('checkout') === 'cancelled') {
+      this.showToast('Checkout cancelled — nothing was charged.');
+      this.clearCheckoutQueryParams();
+    }
+  }
+
+  private loadBillingStatus() {
+    this.billing.getStatus().subscribe({
+      // Left null on failure, which reads as "nothing to sell" everywhere it is checked.
+      next: s => this.billingStatus.set(s),
+      error: () => this.billingStatus.set(null),
+    });
+  }
+
+  private confirmCheckoutReturn(sessionId: string) {
+    this.billing.confirm(sessionId).subscribe({
+      next: result => {
+        this.showToast(
+          result.status === 'paid'
+            ? 'Payment received — this tournament is upgraded.'
+            : "Payment is still processing. The upgrade will apply as soon as it clears.",
+        );
+        this.clearCheckoutQueryParams();
+        // Reload so the participant cap badge reflects the new ceiling immediately.
+        this.load();
+      },
+      error: () => {
+        // The webhook remains the source of truth, so a failed reconcile is not a failed
+        // payment; say the honest thing rather than implying the money went nowhere.
+        this.showToast('Payment is still processing. Refresh in a moment.');
+        this.clearCheckoutQueryParams();
+        this.load();
+      },
+    });
+  }
+
+  /** Drops ?session_id= so a refresh doesn't re-reconcile an already-spent session. */
+  private clearCheckoutQueryParams() {
+    this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+  }
+
+  // FEATURE_TRACKER item 13: the one-time per-tournament unlock. Sends the browser to
+  // Stripe's hosted checkout; no card details ever touch this app.
+  buyTournamentUnlock() {
+    this.unlockBusy.set(true);
+    this.billing.startTournamentUnlockCheckout(this.tournamentId).subscribe({
+      next: session => this.billing.redirectTo(session.url),
+      error: err => {
+        this.unlockBusy.set(false);
+        this.showToast(err?.error?.error ?? 'Could not start checkout. Please try again.');
+      },
+    });
   }
 
   load() {
@@ -927,18 +1289,25 @@ export class TournamentManageComponent implements OnInit {
       next: t => {
         this.tournament.set(t);
         // Always load participants so names can be edited at any time
-        this.svc.getParticipants(this.tournamentId).subscribe(p => this.participants.set(p));
+        this.svc.getParticipants(this.tournamentId).subscribe(p => {
+          this.participants.set(p);
+          if (!this.pasteModeChosen) {
+            this.pasteModeChosen = true;
+            this.pasteMode.set(p.length === 0);
+          }
+        });
 
         // Always load teams too — manual seeding leaves a tournament in 'setup' with
         // teams already formed while awaiting bracket generation, so this can no longer
         // be gated on status !== 'setup'.
         this.svc.getTeams(this.tournamentId).subscribe(teams => this.teams.set(teams));
-        if (t.status === 'complete') {
+        if (t.status === 'complete' || (t.status === 'active' && t.seeding_mode === 'pool_play')) {
           this.svc.getBracket(this.tournamentId).subscribe(data => {
-            const rounds = Object.entries(data.rounds).map(([n, m]) => ({ n: +n, m })).sort((a, b) => b.n - a.n);
-            const final = rounds[0]?.m[0] as any;
-            this.champion.set(final?.winner_name ?? null);
+            this.pool.set(data.pool ?? null);
+            if (t.status === 'complete') this.champion.set(championName(data));
           });
+        } else {
+          this.pool.set(null);
         }
 
         // Only ask for the member list when the tournament response says we're allowed
@@ -975,8 +1344,9 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  // FEATURE_TRACKER item 13 plumbing: no billing exists yet, so this is a manual
-  // stand-in for what a one-time Stripe purchase will flip automatically once it ships.
+  // The super admin's manual lever, kept alongside Stripe rather than replaced by it: it
+  // comps an account, and covers an install with no payment keys at all. A grant made here
+  // is recorded as 'manual', so a later Stripe refund can never revoke it.
   togglePaidOverride() {
     const t = this.tournament();
     if (!t) return;
@@ -1018,17 +1388,149 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
-  updateSeedingMode(mode: 'automatic' | 'manual') {
+  updateSeedingMode(mode: 'automatic' | 'manual' | 'pool_play') {
     if (this.tournament()?.seeding_mode === mode) return;
+    this.saveSeeding({ seeding_mode: mode });
+  }
+
+  updatePoolGames(games: number) {
+    if ((this.tournament()?.pool_games ?? 3) === games) return;
+    this.saveSeeding({ pool_games: games });
+  }
+
+  private saveSeeding(change: Partial<Tournament>) {
     this.seedingModeBusy.set(true);
-    this.svc.updateTournament(this.tournamentId, { seeding_mode: mode }).subscribe({
+    this.seedingError.set('');
+    this.svc.updateTournament(this.tournamentId, change).subscribe({
       next: updated => {
         this.tournament.set(updated);
         this.seedingModeBusy.set(false);
       },
-      error: () => {
+      error: err => {
         this.seedingModeBusy.set(false);
-        this.showToast('Failed to update seeding mode.');
+        // A plan gate explains itself better than a generic failure. Re-set the tournament
+        // so the select snaps back to what the server actually holds.
+        this.seedingError.set(err?.error?.error ?? 'Failed to update seeding.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  async confirmStartPool() {
+    const games = this.tournament()?.pool_games ?? 3;
+    const ok = await confirmService.confirm(`Start pool play? Every team plays ${games} pool games, and teams are locked in.`);
+    if (!ok) return;
+    this.startingPool.set(true);
+    this.generateBracketError.set('');
+    this.svc.startPool(this.tournamentId).subscribe({
+      next: () => {
+        this.startingPool.set(false);
+        this.showToast('Pool play started!');
+        this.load();
+      },
+      error: err => {
+        this.startingPool.set(false);
+        this.generateBracketError.set(err?.error?.error ?? 'Failed to start pool play.');
+      },
+    });
+  }
+
+  // Unlike the account-plan check on the create form, a tournament can also be unlocked by
+  // a super-admin-granted paid_override, so this asks the tournament rather than the user.
+  // Pool play and double elimination share one gate: either paid lever (item 12 or 13).
+  canUsePaidFeatures(): boolean {
+    return this.canUseDoubleElimination();
+  }
+
+  canUseDoubleElimination(): boolean {
+    return this.auth.isPaidPlan() || !!this.tournament()?.paid_override;
+  }
+
+  updateFormat(format: 'single' | 'double') {
+    if ((this.tournament()?.format || 'single') === format) return;
+    this.formatBusy.set(true);
+    this.formatError.set('');
+    this.svc.updateTournament(this.tournamentId, { format }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.formatBusy.set(false);
+      },
+      error: err => {
+        this.formatBusy.set(false);
+        this.formatError.set(err?.error?.error || 'Failed to update tournament format.');
+      },
+    });
+  }
+
+  updateBoards(boards: number) {
+    if ((this.tournament()?.boards ?? 0) === boards) return;
+    this.boardsBusy.set(true);
+    this.boardsError.set('');
+    this.svc.updateTournament(this.tournamentId, { boards }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.boardsBusy.set(false);
+        const w = this.word();
+        this.showToast(boards
+          ? `Using ${boards} ${(boards === 1 ? w.one : w.many).toLowerCase()}.`
+          : `${w.one} assignments off.`);
+      },
+      error: err => {
+        this.boardsBusy.set(false);
+        this.boardsError.set(err?.error?.error || 'Failed to update boards.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  updateBoardLabel(label: BoardLabel) {
+    if (this.word().value === label) return;
+    this.boardsBusy.set(true);
+    this.boardsError.set('');
+    this.svc.updateTournament(this.tournamentId, { board_label: label }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.boardsBusy.set(false);
+      },
+      error: err => {
+        this.boardsBusy.set(false);
+        this.boardsError.set(err?.error?.error || 'Failed to update.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  updateDrawMode(mode: 'random' | 'balanced') {
+    if ((this.tournament()?.draw_mode ?? 'random') === mode) return;
+    this.drawModeBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { draw_mode: mode }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.drawModeBusy.set(false);
+      },
+      error: err => {
+        this.drawModeBusy.set(false);
+        this.showToast(err?.error?.error || 'Failed to update the draw.');
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t }); // re-sync the checkbox
+      },
+    });
+  }
+
+  toggleDrawGroup(p: Participant) {
+    const group = p.draw_group === 'A' ? 'B' : 'A';
+    this.groupingParticipantId.set(p.id);
+    this.svc.setParticipantDrawGroup(p.id, group).subscribe({
+      next: () => {
+        this.participants.update(list => list.map(x => x.id === p.id ? { ...x, draw_group: group } : x));
+        this.groupingParticipantId.set(null);
+      },
+      error: err => {
+        this.groupingParticipantId.set(null);
+        this.showToast(err?.error?.error || 'Failed to change the group.');
       },
     });
   }
@@ -1273,6 +1775,28 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
+  addPastedParticipants() {
+    if (this.pastePreview().names.length === 0) return;
+    this.adding.set(true);
+    this.addError.set('');
+    this.svc.addParticipantsBulk(this.tournamentId, this.pasteText()).subscribe({
+      next: r => {
+        this.adding.set(false);
+        this.pasteText.set('');
+        const skipped = r.skipped_duplicates.length + r.skipped_too_long;
+        this.showToast(`Added ${r.added.length} player${r.added.length === 1 ? '' : 's'}.`
+          + (skipped ? ` Skipped ${skipped} already listed or too long.` : ''));
+        // Reload rather than splice in: the participant/cap badge in the header comes from
+        // the tournament's capabilities, which only the server can recount.
+        this.load();
+      },
+      error: err => {
+        this.adding.set(false);
+        this.addError.set(err?.error?.error ?? 'Failed to add players.');
+      },
+    });
+  }
+
   // Direct team entry
   addTeam() {
     const teamName = this.newTeamName.trim();
@@ -1422,7 +1946,9 @@ export class TournamentManageComponent implements OnInit {
       ? 'Redraw teams? This will re-shuffle pairings and reset any seed order you\'ve set.'
       : this.isManualSeeding()
         ? 'Draw teams? You\'ll be able to set the final seed order before generating the bracket.'
-        : 'Draw teams and start the tournament? This cannot be undone.';
+        : this.isPoolPlay()
+          ? `Draw teams and start pool play? Every team plays ${this.tournament()?.pool_games ?? 3} pool games. This cannot be undone.`
+          : 'Draw teams and start the tournament? This cannot be undone.';
     const ok = await confirmService.confirm(prompt);
     if (!ok) return;
     this.drawing.set(true);
@@ -1430,7 +1956,8 @@ export class TournamentManageComponent implements OnInit {
     this.svc.drawTeams(this.tournamentId).subscribe({
       next: () => {
         this.drawing.set(false);
-        this.showToast(this.isManualSeeding() ? 'Teams drawn — set your seed order below.' : 'Teams drawn! Bracket generated.');
+        this.showToast(this.isManualSeeding() ? 'Teams drawn — set your seed order below.'
+          : this.isPoolPlay() ? 'Teams drawn! Pool play has started.' : 'Teams drawn! Bracket generated.');
         this.load();
       },
       error: err => {

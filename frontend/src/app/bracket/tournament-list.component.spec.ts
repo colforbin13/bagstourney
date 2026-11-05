@@ -100,7 +100,18 @@ describe('TournamentListComponent', () => {
 
     expect(features).toContain('Bracket on the TV');
     expect(features).toContain('Printable QR signs');
-    expect(features.length).toBe(6);
+    expect(features).toContain('Board assignments');
+    expect(features.length).toBe(7);
+  });
+
+  // The rest of the landing copy is deliberately sport-neutral, so this line is the only
+  // thing telling a visitor their game is covered — it must not quietly disappear.
+  it('should name example sports in the hero and link to the full list', () => {
+    setup([makeTournament()]);
+    const sports: HTMLElement = fixture.nativeElement.querySelector('.hero-sports');
+    expect(sports).toBeTruthy();
+    expect(sports.textContent).toContain('KanJam');
+    expect(sports.querySelector('a')!.getAttribute('href')).toBe('/sports');
   });
 
   it('should point the hero actions at register/sign-in for an anonymous visitor', () => {
@@ -140,6 +151,16 @@ describe('TournamentListComponent', () => {
     expect(line).toContain('Round 2 of 3');
     expect(line).toContain('3 of 7 matches');
     expect(line).toContain('Started today');
+  });
+
+  it('should show pool progress for a live tournament still in its pool', () => {
+    setup([makeTournament({ stats: makeStats({ total_rounds: 0, current_round: null, match_count: 0, matches_played: 0, pool_rounds: 3, pool_current_round: 2 }) })]);
+    expect(component.meta(component.tournaments()[0])).toContain('Pool round 2 of 3');
+  });
+
+  it('should say the pool is finished while waiting on the bracket', () => {
+    setup([makeTournament({ stats: makeStats({ total_rounds: 0, current_round: null, match_count: 0, matches_played: 0, pool_rounds: 3, pool_current_round: null }) })]);
+    expect(component.meta(component.tournaments()[0])).toContain('Pool play finished');
   });
 
   it('should leave round and match progress out of a completed tournament meta line', () => {

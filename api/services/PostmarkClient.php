@@ -5,15 +5,11 @@
 // just curl, matching the rest of this codebase's no-external-library approach.
 
 class PostmarkClient {
-    private $apiToken;
-    private $fromEmail;
-    private $messageStream;
-
-    public function __construct(string $apiToken, string $fromEmail, string $messageStream) {
-        $this->apiToken = $apiToken;
-        $this->fromEmail = $fromEmail;
-        $this->messageStream = $messageStream;
-    }
+    public function __construct(
+        private readonly string $apiToken,
+        private readonly string $fromEmail,
+        private readonly string $messageStream,
+    ) {}
 
     public function isConfigured(): bool {
         return $this->apiToken !== '' && $this->fromEmail !== '';

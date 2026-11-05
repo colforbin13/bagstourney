@@ -109,21 +109,6 @@ import { TournamentService } from '../shared/services/tournament.service';
       background: rgba(var(--danger-rgb), 0.1);
       border-radius: 4px;
     }
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 24px;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      background: var(--marker);
-      color: var(--marker-ink);
-      animation: slideIn 0.3s ease-out;
-    }
-    @keyframes slideIn {
-      from { transform: translateX(-100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
   `]
 })
 export class ChangePasswordComponent {

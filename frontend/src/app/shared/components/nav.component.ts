@@ -41,6 +41,7 @@ import { AuthService } from '../services/auth.service';
                 <a routerLink="/admin/users" routerLinkActive="active" (click)="closeAdminMenu()">Users</a>
                 <a routerLink="/admin/deleted-tournaments" routerLinkActive="active" (click)="closeAdminMenu()">Deleted Tournaments</a>
                 <a routerLink="/admin/audit-log" routerLinkActive="active" (click)="closeAdminMenu()">Audit Log</a>
+                <a routerLink="/admin/traffic" routerLinkActive="active" (click)="closeAdminMenu()">Traffic</a>
               }
             </div>
           </div>
@@ -54,10 +55,14 @@ import { AuthService } from '../services/auth.service';
             }
             <div class="nav-dropdown-menu">
               <a routerLink="/admin/profile" routerLinkActive="active" (click)="closeProfileMenu()">Profile</a>
+              <!-- Under the account menu rather than the super-admin one: an organizer's
+                   own plan is theirs to manage. -->
+              <a routerLink="/admin/billing" routerLinkActive="active" (click)="closeProfileMenu()">Billing</a>
               <button type="button" class="nav-dropdown-item" (click)="auth.logout(); closeProfileMenu()">Sign out</button>
             </div>
           </div>
         } @else {
+          <a routerLink="/pricing" routerLinkActive="active">Pricing</a>
           <a routerLink="/admin/login" routerLinkActive="active">Sign in</a>
           <a routerLink="/admin/register" routerLinkActive="active">Create account</a>
         }

@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse } from '../models/tournament.models';
+import { Tournament, Participant, BulkAddResult, PoolData, BoardsData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse, TrafficSummary } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -26,13 +26,17 @@ export class TournamentService {
   createTournament(
     name: string,
     visibility?: 'public' | 'private',
-    seedingMode?: 'automatic' | 'manual',
+    seedingMode?: 'automatic' | 'manual' | 'pool_play',
     teamEntryMode?: 'auto_draft' | 'direct',
+    format?: 'single' | 'double',
+    poolGames?: number,
   ) {
-    const body: Record<string, string> = { name };
+    const body: Record<string, string | number> = { name };
     if (visibility) body['visibility'] = visibility;
     if (seedingMode) body['seeding_mode'] = seedingMode;
     if (teamEntryMode) body['team_entry_mode'] = teamEntryMode;
+    if (format) body['format'] = format;
+    if (seedingMode === 'pool_play' && poolGames) body['pool_games'] = poolGames;
     return this.http.post<Tournament>(`${this.api}/tournaments`, body);
   }
 
@@ -58,6 +62,10 @@ export class TournamentService {
     if (params.search) query['search'] = params.search;
     if (params.action) query['action'] = params.action;
     return this.http.get<AuditLogResponse>(`${this.api}/audit-log`, { params: query });
+  }
+
+  getTrafficSummary(days: number) {
+    return this.http.get<TrafficSummary>(`${this.api}/analytics`, { params: { days: String(days) } });
   }
 
   restoreTournament(id: number) {
@@ -133,12 +141,21 @@ export class TournamentService {
     return this.http.post<Participant>(`${this.api}/participants`, { tournament_id: tournamentId, name });
   }
 
+  // Fast blind-draw setup: the server splits and cleans the pasted text (api/lib/NameList.php).
+  addParticipantsBulk(tournamentId: number, text: string) {
+    return this.http.post<BulkAddResult>(`${this.api}/participants/bulk`, { tournament_id: tournamentId, text });
+  }
+
   deleteParticipant(id: number) {
     return this.http.delete(`${this.api}/participants/${id}`);
   }
 
   updateParticipant(id: number, name: string) {
     return this.http.put<Participant>(`${this.api}/participants/${id}`, { name });
+  }
+
+  setParticipantDrawGroup(id: number, draw_group: 'A' | 'B') {
+    return this.http.put<Participant>(`${this.api}/participants/${id}`, { draw_group });
   }
 
   setParticipantNotificationEmail(participantId: number, email: string) {
@@ -215,6 +232,22 @@ export class TournamentService {
 
   generateBracket(tournamentId: number) {
     return this.http.post<Team[]>(`${this.api}/teams/generate-bracket`, { tournament_id: tournamentId });
+  }
+
+  // Pool play (FEATURE_TRACKER item 18). Reading the pool needs no call of its own: it
+  // rides along on getBracket()/getBracketByUuid().
+  startPool(tournamentId: number) {
+    return this.http.post<PoolData>(`${this.api}/pool/start`, { tournament_id: tournamentId });
+  }
+
+  updatePoolScore(poolMatchId: number, team1Score: number, team2Score: number) {
+    return this.http.put<PoolData>(`${this.api}/pool/${poolMatchId}`, { team1_score: team1Score, team2_score: team2Score });
+  }
+
+  // Board assignments (FEATURE_TRACKER item 8): move a live or waiting game to a board.
+  // The board count itself is a tournament setting (updateTournament({ boards })).
+  moveToBoard(tournamentId: number, kind: 'match' | 'pool', id: number, board: number) {
+    return this.http.put<BoardsData>(`${this.api}/boards/${tournamentId}`, { kind, id, board });
   }
 
   // Bracket / Matches

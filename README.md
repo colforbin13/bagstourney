@@ -1,11 +1,13 @@
 # Bracketway
 
-A mobile-first, single-elimination tournament bracket manager, built for backyard and
-club-level bag toss (cornhole) events.
+A mobile-first tournament bracket manager — single or double elimination — for events played by
+two-person teams — bags (cornhole), KanJam, pickleball doubles, darts, partner card games,
+and anything else with the same shape. Nothing in the app is sport-specific; the frontend
+lists representative games at `/sports` purely as copy.
 
 Technology
 - Frontend: Angular 21 (TypeScript, SCSS) — Node 20+ and TypeScript 5.9+ recommended
-- Backend: PHP 7.x (PDO) + MySQL 5.7+ (`utf8mb4`)
+- Backend: PHP 8.1+ (PDO) + MySQL 5.7+ (`utf8mb4`)
 - Deployment: Apache (recommended) or PHP built-in server for development
 
 Overview
@@ -159,7 +161,7 @@ Contributing
 
 Notes
 - Ensure PHP has `pdo_mysql` enabled. Use HTTPS and a strong `JWT_SECRET` in production.
-- Keep backend code PHP 7 compatible — the production host runs PHP 7.x.
+- Keep backend code on PHP 8.1+ syntax — the production host runs PHP 8.5.
 
 License
 - MIT License — see the included LICENSE file in the repository.

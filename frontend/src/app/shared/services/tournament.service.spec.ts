@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TournamentService } from './tournament.service';
 import { environment } from '../../../environments/environment';
+import { emptyBracket } from '../testing/bracket-fixtures';
 import { UserAccount, Tournament } from '../models/tournament.models';
 
 describe('TournamentService', () => {
@@ -176,6 +177,25 @@ describe('TournamentService', () => {
       req.flush(mockTournament);
     });
 
+    it('should include format in the request body when given', () => {
+      service.createTournament('New Tournament', 'public', 'automatic', 'auto_draft', 'double').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+      expect(req.request.body).toEqual({
+        name: 'New Tournament', visibility: 'public', seeding_mode: 'automatic',
+        team_entry_mode: 'auto_draft', format: 'double',
+      });
+      req.flush(mockTournament);
+    });
+
+    it('should omit format when not given', () => {
+      service.createTournament('New Tournament').subscribe();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments`);
+      expect(req.request.body['format']).toBeUndefined();
+      req.flush(mockTournament);
+    });
+
     it('should include seeding_mode in the request body when given', () => {
       service.createTournament('New Tournament', 'public', 'manual').subscribe();
 
@@ -275,7 +295,7 @@ describe('TournamentService', () => {
 
   describe('getBracketByUuid', () => {
     it('should fetch bracket data by tournament uuid', () => {
-      const mockBracket = { rounds: {} };
+      const mockBracket = emptyBracket();
 
       service.getBracketByUuid('test-uuid-1234').subscribe(bracket => {
         expect(bracket).toEqual(mockBracket);

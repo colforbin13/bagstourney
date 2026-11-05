@@ -30,6 +30,20 @@ From the repo root, in the background:
 php -d extension=pdo_mysql -d date.timezone=UTC -S localhost:8080 -t api
 ```
 
+To exercise Stripe billing locally the API needs three more things, none of which
+are on by default here: the `curl`, `openssl` and `mbstring` extensions (the webhook
+handler calls `mb_substr` and 500s without it), a CA bundle (without
+one every Stripe call fails with "unable to get local issuer certificate"), and
+`BB_APP_PUBLIC_URL` pointed at the local frontend — otherwise Checkout returns the
+browser to production, which has no session and shows the login page:
+
+```bash
+BB_APP_PUBLIC_URL=http://localhost:4200 php -d extension=pdo_mysql -d extension=curl \
+  -d extension=openssl -d extension=mbstring \
+  -d "curl.cainfo=C:\Program Files\Git\mingw64\etc\ssl\certs\ca-bundle.crt" \
+  -d date.timezone=UTC -S localhost:8080 -t api
+```
+
 Smoke-test it before moving on:
 
 ```bash

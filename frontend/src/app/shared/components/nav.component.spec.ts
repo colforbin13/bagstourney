@@ -103,11 +103,32 @@ describe('NavComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Audit Log');
   });
 
+  it('should show the Traffic link to a super admin only', () => {
+    setup(true, true);
+    expect(fixture.nativeElement.textContent).toContain('Traffic');
+  });
+
+  it('should not show the Traffic link for a non-super-admin', () => {
+    setup(true, false);
+    expect(fixture.nativeElement.textContent).not.toContain('Traffic');
+  });
+
   it('should show sign in / create account links when logged out', () => {
     setup(false);
     const text = fixture.nativeElement.textContent;
     expect(text).toContain('Sign in');
     expect(text).toContain('Create account');
     expect(text).not.toContain('Sign out');
+  });
+
+  it('should link to Pricing for a logged-out visitor only', () => {
+    setup(false);
+    const hrefs = () => Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.nav-links a'))
+      .map(a => a.getAttribute('href'));
+    expect(hrefs()).toContain('/pricing');
+
+    TestBed.resetTestingModule();
+    setup(true);
+    expect(hrefs()).not.toContain('/pricing');
   });
 });

@@ -52,11 +52,46 @@ describe('HowItWorksComponent', () => {
     expect(text).toContain('save as a PDF');
   });
 
-  it('should explain all three creation choices', () => {
+  it('should explain every creation choice', () => {
     setup();
     const terms: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.choices dt'))
       .map(dt => dt.textContent!.trim());
-    expect(terms).toEqual(['Public or private', 'Auto-draft or direct entry', 'Automatic or manual seeding']);
+    expect(terms).toEqual([
+      'Public or private',
+      'Blind draw or direct entry',
+      'Automatic, manual or pool play seeding',
+      'Single or double elimination',
+      'Board assignments',
+    ]);
+  });
+
+  it('should explain pool play and that it is paid', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('seeds the bracket from the standings');
+    expect(text).toContain('Pool play is a Pro feature');
+  });
+
+  it('should explain board assignments and that they are paid', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('next free');
+    expect(text).toContain('Board assignments are a Pro feature');
+  });
+
+  it('should say double elimination is paid and locks at bracket generation', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('Double elimination is a Pro feature');
+    expect(text).toContain("locked once the bracket is generated");
+  });
+
+  it('should explain how a double-elimination bracket actually runs', () => {
+    setup();
+    const text: string = fixture.nativeElement.textContent;
+    expect(text).toContain('winners bracket');
+    expect(text).toContain('losers bracket');
+    expect(text).toContain('grand final');
   });
 
   it('should explain byes, which are otherwise unexplained anywhere in the app', () => {
@@ -66,9 +101,15 @@ describe('HowItWorksComponent', () => {
     expect(text).toContain('advance automatically');
   });
 
-  it('should call out that the sign-up link needs auto-draft', () => {
+  it('should call out that the sign-up link needs blind draw', () => {
     setup();
-    expect(fixture.nativeElement.textContent).toContain('sign-up link only works with auto-draft');
+    expect(fixture.nativeElement.textContent).toContain('sign-up link only works with blind draw');
+  });
+
+  it('should send a reader wondering about their own game to the sports list', () => {
+    setup();
+    const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.lede a');
+    expect(link.getAttribute('href')).toBe('/sports');
   });
 
   it('should close with sign-up actions for an anonymous reader', () => {
@@ -83,5 +124,27 @@ describe('HowItWorksComponent', () => {
     const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
       .map(a => a.getAttribute('href'));
     expect(hrefs).toEqual(['/admin', '/tournaments']);
+  });
+
+  it('should offer the tour above the walkthrough without downloading it unasked', () => {
+    setup();
+    const video: HTMLVideoElement = fixture.nativeElement.querySelector('.tour video');
+    expect(video.getAttribute('src')).toBe('assets/bracketway-tour.mp4');
+    expect(video.getAttribute('poster')).toBe('assets/bracketway-tour.jpg');
+    // The video carries its own audio, so it is played on purpose, never autoplayed —
+    // and preload="none" keeps an unplayed visit down to the poster.
+    expect(video.getAttribute('preload')).toBe('none');
+    expect(video.hasAttribute('controls')).toBeTrue();
+    expect(video.hasAttribute('autoplay')).toBeFalse();
+  });
+
+  it('should keep the walkthrough readable with the video blocked', () => {
+    setup();
+    const tour: HTMLElement = fixture.nativeElement.querySelector('.tour');
+    const walkthrough: HTMLElement = fixture.nativeElement.querySelector('.walkthrough');
+    // The tour is a summary of the chapters, not a replacement for them: it sits above the
+    // walkthrough, and nothing below it depends on anyone pressing play.
+    expect(tour.compareDocumentPosition(walkthrough) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tour.querySelector('figcaption')!.textContent!.trim().length).toBeGreaterThan(0);
   });
 });

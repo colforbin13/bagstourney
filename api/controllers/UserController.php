@@ -2,11 +2,7 @@
 // Super-admin account management. Tournament roles remain in tournament_members.
 
 class UserController {
-    private $db;
-
-    public function __construct(PDO $db) {
-        $this->db = $db;
-    }
+    public function __construct(private readonly PDO $db) {}
 
     public function list(): void {
         requireSuperAdmin($this->db);
@@ -135,6 +131,14 @@ class UserController {
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
             return;
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
 
         $stmt = $this->db->prepare('SELECT id, username, email, role, status, plan, created_at FROM users WHERE id = ?');

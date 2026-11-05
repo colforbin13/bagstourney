@@ -6,8 +6,6 @@
 // readable except by querying the database directly.
 
 class AuditLogController {
-    private $db;
-
     const DEFAULT_PAGE_SIZE = 50;
     const MAX_PAGE_SIZE = 200;
 
@@ -19,9 +17,7 @@ class AuditLogController {
         'tournament' => 't.name',
     ];
 
-    public function __construct(PDO $db) {
-        $this->db = $db;
-    }
+    public function __construct(private readonly PDO $db) {}
 
     public function list(array $query): void {
         requireSuperAdmin($this->db);

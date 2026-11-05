@@ -4,11 +4,52 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /
 
+# One address per page for search engines: https://bracketway.com, never www. or plain
+# http. Without these Google finds the same page under several hosts and reports
+# "Duplicate without user-selected canonical". Limited to the real host names so the site
+# still opens by LAN address. The http rule stands down when a proxy in front (Cloudflare,
+# a load balancer) already terminated https, which would otherwise redirect forever.
+RewriteCond %{HTTP_HOST} ^www\.bracketway\.com$ [NC]
+RewriteRule ^ https://bracketway.com%{REQUEST_URI} [R=301,L,NE]
+RewriteCond %{HTTP_HOST} ^bracketway\.com$ [NC]
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+RewriteCond %{HTTP:CF-Visitor} !https [NC]
+RewriteRule ^ https://bracketway.com%{REQUEST_URI} [R=301,L,NE]
+
+# The built files behind the clean addresses are reachable too (/pricing.html,
+# /index.html, /index.csr.html). Send a direct request for one to its clean address.
+# THE_REQUEST is what the browser asked for, so the internal rewrites below never loop here.
+RewriteCond %{THE_REQUEST} \s/+index(?:\.csr)?\.html[\s?] [NC]
+RewriteRule ^ / [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+(how-it-works|pricing|sports|blind-draw-generator|cornhole-fundraiser|scoreholio-alternative|terms|refunds|privacy)\.html[\s?] [NC]
+RewriteRule ^ /%1 [R=301,L]
+
 # Route API requests to the PHP front controller.
 RewriteCond %{REQUEST_URI} ^/api/
 RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
 
-# For all other URLs, serve index.html for Angular routing.
+# Shared bracket links get the SPA shell with per-tournament Open Graph tags injected, so
+# iMessage/Slack/WhatsApp preview the tournament instead of an unlabelled app. Those
+# crawlers don't run JavaScript, so the tags have to be present in the served HTML.
+# Browsers are served the same shell they always were, plus the extra <meta> tags; the
+# script falls back to the shell untouched on any error.
+RewriteRule ^bracket/[^/]+/?$ api/preview.php [QSA,L]
+
+# Public pages the build prerendered (frontend/src/app/app.routes.server.ts) are plain
+# files: /pricing is pricing.html (scripts/flatten-prerendered.mjs moves them out of the
+# folders Angular writes, because a folder makes Apache 301 /pricing to /pricing/). Serve
+# that file, so search engines get the page's real content and title. A trailing slash is
+# redirected away so each page has one URL, the one its canonical link names.
+# The list is checked against the prerendered routes at build time; the build fails if a
+# page is missing here or in sitemap.xml.
+RewriteRule ^(how-it-works|pricing|sports|blind-draw-generator|cornhole-fundraiser|scoreholio-alternative|terms|refunds|privacy)/$ /$1 [R=301,L]
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(how-it-works|pricing|sports|blind-draw-generator|cornhole-fundraiser|scoreholio-alternative|terms|refunds|privacy)$ $1.html [L]
+
+# Every other URL gets the empty app shell and is drawn in the browser. That shell is
+# index.csr.html, not index.html: index.html is now the prerendered landing page, and
+# serving it for /admin would flash the landing page before the real screen appeared.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [QSA,L]
+RewriteRule ^ index.csr.html [QSA,L]

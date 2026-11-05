@@ -21,6 +21,27 @@ export interface AuditLogResponse {
   page_size: number;
 }
 
+/** GET /analytics — the super-admin Traffic page (api/controllers/AnalyticsController.php). */
+export interface TrafficSummary {
+  days: number;
+  from: string;
+  to: string;
+  visits: number;
+  views: number;
+  previous_visits: number;
+  daily: { day: string; visits: number; views: number }[];
+  pages: { path: string; views: number; visits: number }[];
+  /** source '' is direct or unknown. */
+  sources: { source: string; visits: number }[];
+  activity: {
+    new_organizers: number;
+    tournaments_created: number;
+    players_added: number;
+    pro_subscribers: number;
+    upgraded_tournaments: number;
+  };
+}
+
 export interface TournamentCapabilities {
   role: 'owner' | 'manager' | 'scorekeeper' | null;
   is_super_admin: boolean;
@@ -48,6 +69,9 @@ export interface TournamentStats {
   // before a bracket exists).
   current_round: number | null;
   champion_name: string | null;
+  // Pool play: pool rounds scheduled (0 if none) and the first with a game still to play.
+  pool_rounds?: number;
+  pool_current_round?: number | null;
 }
 
 export interface Tournament {
@@ -56,8 +80,18 @@ export interface Tournament {
   name: string;
   status: 'setup' | 'active' | 'complete';
   visibility: 'public' | 'private';
-  seeding_mode: 'automatic' | 'manual';
+  seeding_mode: 'automatic' | 'manual' | 'pool_play';
+  // Pool games per team (FEATURE_TRACKER item 18). Only meaningful in pool_play mode.
+  pool_games?: number;
+  // Board assignments (FEATURE_TRACKER item 8). 0 or absent = off. Pro to turn on.
+  boards?: number;
+  board_label?: string;
   team_entry_mode: 'auto_draft' | 'direct';
+  // Balanced (A/B) draw, migration 021. Optional so responses predating it still parse.
+  draw_mode?: 'random' | 'balanced';
+  // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
+  // bracket is generated. Optional so responses predating migration 016 still parse.
+  format?: 'single' | 'double';
   created_at: string;
   // FEATURE_TRACKER item 13 plumbing: a per-tournament plan unlock, settable only by a
   // super admin (see TournamentController::update()) until real billing exists.
@@ -105,11 +139,20 @@ export interface Participant {
   tournament_id: number;
   name: string;
   registration_status?: 'approved' | 'pending';
+  // Group for the balanced draw (migration 021). Everyone is B until tagged A.
+  draw_group?: 'A' | 'B';
   email?: string | null;
   notification_lifecycle?: 'none' | 'pending' | 'confirmed' | 'suppressed';
   notify_match_completed?: boolean;
   notify_round_completed?: boolean;
   notify_tournament_finalized?: boolean;
+}
+
+// POST /participants/bulk
+export interface BulkAddResult {
+  added: Participant[];
+  skipped_duplicates: string[];
+  skipped_too_long: number;
 }
 
 export interface NotificationPreferences {
@@ -145,7 +188,15 @@ export interface Match {
   winner_id: number | null;
   next_match_id: number | null;
   next_match_slot: 1 | 2 | null;
+  // FEATURE_TRACKER item 16. Optional so responses predating migration 016 still parse;
+  // absent means a single-elimination match, i.e. bracket_side 'winners' with no loser edge.
+  loser_match_id?: number | null;
+  loser_match_slot?: 1 | 2 | null;
+  bracket_side?: 'winners' | 'losers' | 'grand_final';
+  is_reset?: 0 | 1;
   status: 'pending' | 'ready' | 'complete' | 'bye';
+  /** The board this game is being played on, while it is being played (item 8). */
+  board_number?: number | null;
   team1_name: string | null;
   team2_name: string | null;
   winner_name: string | null;
@@ -155,6 +206,145 @@ export interface Match {
   team2_participant2_name: string | null;
 }
 
+export interface BracketRound {
+  /** Structural round number within the side. Can start above 1 in a losers bracket whose
+   *  first round collapsed away, so render by position rather than by this value. */
+  round: number;
+  matches: Match[];
+}
+
+export interface BracketSide {
+  side: 'winners' | 'losers' | 'grand_final';
+  rounds: BracketRound[];
+}
+
 export interface BracketData {
-  rounds: { [round: number]: Match[] };
+  format: 'single' | 'double';
+  /** Ordered winners → losers → grand final. Single elimination has only `winners`. */
+  sides: BracketSide[];
+  /** Legacy grouping, present only for single elimination. Kept so a client cached before
+   *  the two-tree response existed still renders; new code should read `sides`. */
+  rounds?: { [round: number]: Match[] };
+  /** Pool play (FEATURE_TRACKER item 18). Null, or absent from an older API, unless the
+   *  tournament uses pool play. */
+  pool?: PoolData | null;
+  /** Board assignments (item 8). Null, or absent from an older API, when boards are off. */
+  boards?: BoardsData | null;
+}
+
+/** Keys name a game across both tables: 'b' + match id, or 'p' + pool match id. */
+export interface BoardsData {
+  count: number;
+  /** What the tournament calls them: 'board', 'court', 'lane'... See shared/board-labels.ts. */
+  label?: string;
+  /** Games on a board, ordered by board. */
+  playing: { board: number; key: string }[];
+  /** Waiting games in the order they will get a board. */
+  up_next: string[];
+}
+
+export interface PoolMatch {
+  id: number;
+  round: number;
+  match_number: number;
+  team1_id: number;
+  team2_id: number;
+  team1_name: string;
+  team2_name: string;
+  team1_score: number | null;
+  team2_score: number | null;
+  winner_id: number | null;
+  status: 'ready' | 'complete';
+  board_number?: number | null;
+}
+
+export interface PoolStanding {
+  team_id: number;
+  team_name: string;
+  participant1_name: string | null;
+  participant2_name: string | null;
+  rank: number;
+  played: number;
+  wins: number;
+  losses: number;
+  points_for: number;
+  points_against: number;
+  point_diff: number;
+  win_pct: number;
+}
+
+export interface PoolData {
+  games_per_team: number;
+  /** False until the pool is scheduled (at the draw, or "Start pool play"). */
+  started: boolean;
+  games_played: number;
+  games_total: number;
+  /** Every pool game has a result: the bracket can be generated. */
+  complete: boolean;
+  /** The bracket exists, so pool results can no longer change. */
+  locked: boolean;
+  rounds: { round: number; matches: PoolMatch[] }[];
+  /** Rank order, which is also the seed order. */
+  standings: PoolStanding[];
+}
+
+// --- Stripe billing (FEATURE_TRACKER items 12/13) -------------------------------------
+
+/** GET /billing/status. Cheap — no call out to Stripe — so any screen can load it. */
+export interface BillingStatus {
+  /** False when this installation has no Stripe keys or the kill switch is off. The UI
+   *  hides its upgrade buttons on this rather than offering a checkout that would 503. */
+  billing_enabled: boolean;
+  test_mode: boolean;
+  plan: 'free' | 'paid';
+  /** 'manual' means a super admin granted the plan; there is no subscription to manage. */
+  plan_source: 'manual' | 'stripe';
+  plan_expires_at: string | null;
+  has_subscription: boolean;
+  can_manage_billing: boolean;
+  /** Which offers are configured. An unconfigured price is simply not sold. */
+  offers: {
+    tournament_unlock: boolean;
+    subscription_monthly: boolean;
+    subscription_annual: boolean;
+  };
+  free_participant_cap: number;
+  paid_participant_cap: number;
+}
+
+/** GET /billing/plans — public; the plan list plus the caps the Pricing page describes. */
+export interface BillingPlans {
+  /** False when this installation can't sell anything; plans is then empty. */
+  billing_enabled: boolean;
+  plans: BillingPlanOption[];
+  free_participant_cap: number;
+  paid_participant_cap: number;
+}
+
+/**
+ * One entry of GET /billing/plans — prices read live from Stripe. The one copy outside Stripe is
+ * FALLBACK_PLANS in pricing.component.ts, for the prerendered pricing page; keep it in step.
+ */
+export interface BillingPlanOption {
+  key: 'tournament_unlock' | 'subscription_monthly' | 'subscription_annual';
+  /** Minor units (cents), as Stripe reports them. Formatting is the frontend's job. */
+  unit_amount: number | null;
+  currency: string | null;
+  /** Absent for the one-time unlock, which does not recur. */
+  interval: 'day' | 'week' | 'month' | 'year' | null;
+  interval_count: number | null;
+}
+
+export interface BillingCheckoutSession {
+  /** Stripe-hosted Checkout URL to send the browser to. */
+  url: string;
+  session_id: string;
+}
+
+/** GET /billing/confirm — reconciles the session the organizer just came back from. */
+export interface BillingConfirmation {
+  status: 'paid' | 'pending';
+  kind: 'tournament_unlock' | 'subscription';
+  /** True when the webhook had already granted it before the redirect landed. */
+  already_fulfilled: boolean;
 }

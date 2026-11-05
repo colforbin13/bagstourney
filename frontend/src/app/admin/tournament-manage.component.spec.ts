@@ -4,8 +4,9 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { TournamentManageComponent } from './tournament-manage.component';
 import { TournamentService } from '../shared/services/tournament.service';
+import { BillingService } from '../shared/services/billing.service';
 import { confirmService } from '../shared/services/confirm.service';
-import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team } from '../shared/models/tournament.models';
+import { TournamentMember, UserSearchResult, TournamentCapabilities, Participant, Team, BillingStatus, PoolData } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
 
 describe('TournamentManageComponent', () => {
@@ -42,7 +43,14 @@ describe('TournamentManageComponent', () => {
         TournamentService,
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ id: String(tournamentId) }) } },
+          useValue: {
+            snapshot: {
+              paramMap: convertToParamMap({ id: String(tournamentId) }),
+              // Present in every real navigation. The component reads it to spot a
+              // ?session_id= return from Stripe Checkout.
+              queryParamMap: convertToParamMap({}),
+            },
+          },
         },
       ],
     }).compileComponents();
@@ -52,7 +60,35 @@ describe('TournamentManageComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
+  // ngOnInit also asks /billing/status (FEATURE_TRACKER item 13's per-tournament upgrade
+  // button). It is unrelated to everything the rest of this suite asserts, so it is swept
+  // up here — as billing-disabled, which is the shape that leaves the toolbar unchanged —
+  // rather than flushed by hand in every test. Tests that care about the button flush it
+  // themselves, and then find nothing left to sweep.
+  function sweepBillingStatus() {
+    for (const req of httpMock.match(`${environment.apiUrl}/billing/status`)) {
+      req.flush(billingStatus({ billing_enabled: false }));
+    }
+  }
+
+  function billingStatus(over: Partial<BillingStatus> = {}): BillingStatus {
+    return {
+      billing_enabled: true,
+      test_mode: true,
+      plan: 'free',
+      plan_source: 'manual',
+      plan_expires_at: null,
+      has_subscription: false,
+      can_manage_billing: false,
+      offers: { tournament_unlock: true, subscription_monthly: true, subscription_annual: true },
+      free_participant_cap: 32,
+      paid_participant_cap: 256,
+      ...over,
+    };
+  }
+
   afterEach(() => {
+    sweepBillingStatus();
     httpMock.verify();
   });
 
@@ -390,6 +426,94 @@ describe('TournamentManageComponent', () => {
     });
   });
 
+  describe('paste a list (fast blind draw)', () => {
+    it('opens in paste mode when the roster is empty', () => {
+      bootstrapWithParticipants([]);
+      fixture.detectChanges();
+
+      expect(component.pasteMode()).toBe(true);
+      expect(fixture.nativeElement.querySelector('textarea.paste-box')).not.toBeNull();
+    });
+
+    it('opens on the single-name box once players exist', () => {
+      bootstrapWithParticipants([{ id: 1, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' }]);
+      fixture.detectChanges();
+
+      expect(component.pasteMode()).toBe(false);
+      expect(fixture.nativeElement.querySelector('textarea.paste-box')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain('Paste a list of names');
+    });
+
+    it('previews new players, skips ones already on the roster, and counts teams', () => {
+      bootstrapWithParticipants([{ id: 1, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' }]);
+      component.pasteMode.set(true);
+      component.pasteText.set('ann\nBob\nCara\nDev');
+      fixture.detectChanges();
+
+      expect(component.pastePreview().names).toEqual(['Bob', 'Cara', 'Dev']);
+      const summary = fixture.nativeElement.querySelector('.paste-summary').textContent;
+      expect(summary).toContain('3 new players');
+      expect(summary).toContain('1 already listed');
+      expect(summary).toContain('2 teams');
+    });
+
+    it('warns when the roster would end up odd', () => {
+      bootstrapWithParticipants([]);
+      component.pasteText.set('Ann, Bob, Cara');
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.paste-summary').textContent).toContain('3 total, odd number');
+    });
+
+    it('posts the raw text, then reloads so the cap badge recounts', () => {
+      bootstrapWithParticipants([]);
+      component.pasteText.set('Ann\nBob\nCara\nDev');
+      component.addPastedParticipants();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/bulk`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ tournament_id: tournamentId, text: 'Ann\nBob\nCara\nDev' });
+      req.flush({
+        added: ['Ann', 'Bob', 'Cara', 'Dev'].map((name, i) => ({ id: i + 1, tournament_id: tournamentId, name, registration_status: 'approved' })),
+        skipped_duplicates: [],
+        skipped_too_long: 0,
+      });
+
+      expect(component.pasteText()).toBe('');
+      expect(component.toast()).toBe('Added 4 players.');
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      // Reloading must not flip the organizer back out of the mode they were in.
+      expect(component.pasteMode()).toBe(true);
+    });
+
+    it('shows the server error and keeps the text when the add is refused', () => {
+      bootstrapWithParticipants([]);
+      component.pasteText.set('Ann\nBob');
+      component.addPastedParticipants();
+
+      httpMock.expectOne(`${environment.apiUrl}/participants/bulk`)
+        .flush({ error: 'That list has 40 new players, but this tournament has room for 32 more.' }, { status: 400, statusText: 'Bad Request' });
+
+      expect(component.addError()).toContain('room for 32 more');
+      expect(component.pasteText()).toBe('Ann\nBob');
+      expect(component.adding()).toBe(false);
+    });
+
+    it('does not post when nothing new was pasted', () => {
+      bootstrapWithParticipants([{ id: 1, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' }]);
+      component.pasteText.set('ann');
+      component.addPastedParticipants();
+
+      httpMock.expectNone(`${environment.apiUrl}/participants/bulk`);
+    });
+  });
+
   describe('saveParticipant', () => {
     const participant: Participant = { id: 5, tournament_id: tournamentId, name: 'Alice', email: 'alice@example.com' };
 
@@ -479,6 +603,59 @@ describe('TournamentManageComponent', () => {
       expect(component.seedingModeBusy()).toBe(false);
     });
 
+    it('should PUT the chosen format', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      component.updateFormat('double');
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ format: 'double' });
+      req.flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Test Tournament', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', format: 'double',
+        created_at: '2026-01-01', capabilities: ownerCapabilities,
+      });
+
+      expect(component.tournament()!.format).toBe('double');
+      expect(component.formatBusy()).toBe(false);
+      expect(component.formatError()).toBe('');
+    });
+
+    it('should not PUT when the format is unchanged', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      // A tournament with no format field is single elimination.
+      component.updateFormat('single');
+      httpMock.expectNone(`${environment.apiUrl}/tournaments/${tournamentId}`);
+    });
+
+    it('should surface the server message when a format change is refused', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      component.updateFormat('double');
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({ error: 'Double elimination is a Pro feature. Upgrade to use it.' },
+               { status: 403, statusText: 'Forbidden' });
+
+      expect(component.formatError()).toBe('Double elimination is a Pro feature. Upgrade to use it.');
+      expect(component.formatBusy()).toBe(false);
+    });
+
+    it('should let a super-admin-granted override unlock double elimination without a paid plan', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+
+      expect(component.canUseDoubleElimination()).toBe(false);
+
+      // paid_override is item 13's per-tournament lever, independent of the account plan.
+      component.tournament.set({ ...component.tournament()!, paid_override: true });
+      expect(component.canUseDoubleElimination()).toBe(true);
+    });
+
     it('should show the shared Teams panel (drag-to-reorder) once teams exist while still in setup', () => {
       bootstrapAwaitingSeeds();
       fixture.detectChanges();
@@ -556,6 +733,150 @@ describe('TournamentManageComponent', () => {
 
       httpMock.expectNone(`${environment.apiUrl}/participants/1`);
       expect(component.participants()).toEqual([participant]);
+    });
+  });
+
+  describe('pool play', () => {
+    const team = (id: number, seed: number): Team => ({
+      id, tournament_id: tournamentId, name: `Team ${id}`, participant1_id: id * 10, participant2_id: id * 10 + 1,
+      participant1_name: `P${id}a`, participant2_name: `P${id}b`, seed,
+    } as Team);
+
+    function pool(over: Partial<PoolData> = {}): PoolData {
+      return {
+        games_per_team: 3, started: true, games_played: 2, games_total: 3, complete: false, locked: false,
+        rounds: [], standings: [], ...over,
+      };
+    }
+
+    function bootstrapPool(status: 'setup' | 'active', poolData: PoolData | null, opts: { direct?: boolean; teams?: Team[] } = {}) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Pool Night', status,
+        visibility: 'public', seeding_mode: 'pool_play', pool_games: 3,
+        team_entry_mode: opts.direct ? 'direct' : 'auto_draft',
+        created_at: '2026-01-01', paid_override: true, capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(opts.teams ?? []);
+      if (status === 'active') {
+        httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({ format: 'single', sides: [], pool: poolData });
+      }
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      fixture.detectChanges();
+    }
+
+    it('PUTs pool games per team', () => {
+      bootstrapPool('setup', null);
+      component.updatePoolGames(5);
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.body).toEqual({ pool_games: 5 });
+      req.flush({ ...component.tournament()!, pool_games: 5 });
+      expect(component.tournament()!.pool_games).toBe(5);
+    });
+
+    // Board assignments (item 8) share this setup: a paid tournament, setup or live.
+    it('PUTs the board count', () => {
+      bootstrapPool('setup', null);
+      component.updateBoards(4);
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.body).toEqual({ boards: 4 });
+      req.flush({ ...component.tournament()!, boards: 4 });
+      expect(component.tournament()!.boards).toBe(4);
+      expect(component.boardsBusy()).toBe(false);
+    });
+
+    it('PUTs what to call the playing spots, and relabels the card', () => {
+      bootstrapPool('setup', null);
+      component.updateBoardLabel('court');
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.body).toEqual({ board_label: 'court' });
+      req.flush({ ...component.tournament()!, board_label: 'court' });
+      fixture.detectChanges();
+      const labels = Array.from(fixture.nativeElement.querySelectorAll('.section-label') as NodeListOf<HTMLElement>)
+        .map(l => l.textContent!.trim());
+      expect(labels).toContain('Courts');
+    });
+
+    it('keeps the Boards card while the tournament is live', () => {
+      bootstrapPool('active', pool());
+      const labels = Array.from(fixture.nativeElement.querySelectorAll('.section-label') as NodeListOf<HTMLElement>)
+        .map(l => l.textContent!.trim());
+      expect(labels).toContain('Boards');
+    });
+
+    it('shows the server message when the board count is refused', () => {
+      bootstrapPool('setup', null);
+      component.updateBoards(2);
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({ error: 'Board assignments are a Pro feature. Upgrade to use them.' }, { status: 403, statusText: 'Forbidden' });
+      expect(component.boardsError()).toContain('Pro feature');
+      expect(component.boardsBusy()).toBe(false);
+    });
+
+    it('shows the server plan-gate message when pool play is refused', () => {
+      bootstrapCore();
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      component.updateSeedingMode('pool_play');
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`)
+        .flush({ error: 'Pool play is a Pro feature. Upgrade, or choose another seeding mode.' }, { status: 403, statusText: 'Forbidden' });
+      expect(component.seedingError()).toContain('Pro feature');
+      expect(component.seedingModeBusy()).toBe(false);
+    });
+
+    it('labels the draw as starting the pool and lays out the pool steps', () => {
+      bootstrapPool('setup', null);
+      expect(component.setupSteps().map(s => s.label)).toEqual([
+        'Add your players', 'Draw the teams', 'Play the pool, then generate the bracket',
+      ]);
+    });
+
+    it('offers Start Pool Play instead of Generate Bracket for direct entry', async () => {
+      bootstrapPool('setup', null, { direct: true, teams: [team(1, 1), team(2, 2)] });
+      const text = fixture.nativeElement.textContent;
+      expect(text).toContain('Start Pool Play');
+      expect(text).not.toContain('Generate Bracket');
+
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+      await component.confirmStartPool();
+      const req = httpMock.expectOne(`${environment.apiUrl}/pool/start`);
+      expect(req.request.body).toEqual({ tournament_id: tournamentId });
+      req.flush(pool());
+      // Reload puts the screen into the pool stage.
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'u', name: 'Pool Night', status: 'active', visibility: 'public',
+        seeding_mode: 'pool_play', team_entry_mode: 'direct', created_at: '2026-01-01', paid_override: true, capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([team(1, 1), team(2, 2)]);
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({ format: 'single', sides: [], pool: pool() });
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      expect(component.pool()?.started).toBe(true);
+    });
+
+    it('shows standings and a scores link while the pool runs, but no bracket button', () => {
+      bootstrapPool('active', pool(), { teams: [team(1, 1), team(2, 2)] });
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('app-pool-standings')).not.toBeNull();
+      expect(el.textContent).toContain('Enter pool scores');
+      expect(el.textContent).not.toContain('Generate Bracket');
+    });
+
+    it('offers seed tweaks, format and Generate Bracket once the pool is complete', () => {
+      bootstrapPool('active', pool({ complete: true, games_played: 3 }), { teams: [team(1, 1), team(2, 2)] });
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.textContent).toContain('Pool play finished');
+      expect(el.querySelectorAll('.pool-ready .team-seed-item').length).toBe(2);
+      expect(el.textContent).toContain('Format');
+      expect(el.textContent).toContain('Generate Bracket');
+      expect(el.textContent).not.toContain('Enter pool scores');
+    });
+
+    it('shows final standings and no seeding step once the bracket exists', () => {
+      bootstrapPool('active', pool({ complete: true, locked: true, games_played: 3 }), { teams: [team(1, 1), team(2, 2)] });
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('app-pool-standings')).not.toBeNull();
+      expect(el.querySelector('.pool-ready')).toBeNull();
     });
   });
 
@@ -647,10 +968,10 @@ describe('TournamentManageComponent', () => {
       component.addTeam();
 
       httpMock.expectOne(`${environment.apiUrl}/teams/direct`)
-        .flush({ error: 'This tournament uses auto-draft team entry — add participants and draw teams instead' },
+        .flush({ error: 'This tournament uses blind draw team entry — add participants and draw teams instead' },
           { status: 400, statusText: 'Bad Request' });
 
-      expect(component.addTeamError()).toBe('This tournament uses auto-draft team entry — add participants and draw teams instead');
+      expect(component.addTeamError()).toBe('This tournament uses blind draw team entry — add participants and draw teams instead');
       expect(component.newTeamName).toBe('The Ringers');
     });
 
@@ -887,6 +1208,157 @@ describe('TournamentManageComponent', () => {
       const href = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.tm-actions-row a'))
         .map(a => a.getAttribute('href'));
       expect(href).not.toContain(`/admin/tournament/${tournamentId}/score`);
+    });
+  });
+  // --- Stripe per-tournament upgrade (FEATURE_TRACKER item 13) ------------------------
+  describe('per-tournament upgrade', () => {
+    // Flushes the billing status this component asks for on init, so afterEach's sweep
+    // finds nothing left and these tests own the value under test.
+    function withBilling(over: Partial<BillingStatus> = {}) {
+      httpMock.expectOne(`${environment.apiUrl}/billing/status`).flush(billingStatus(over));
+      fixture.detectChanges();
+    }
+
+    it('offers the upgrade to an owner when billing is available', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+
+      expect(component.canBuyUnlock()).toBeTrue();
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Upgrade this tournament');
+    });
+
+    it('hides it from a manager, who cannot spend money on behalf of the owner', () => {
+      bootstrapCore(managerCapabilities);
+      withBilling();
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('hides it when the installation has no Stripe keys', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling({ billing_enabled: false });
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('hides it when no per-tournament price is configured', () => {
+      // Selling a subscription but not the one-off unlock is a supported configuration.
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling({ offers: { tournament_unlock: false, subscription_monthly: true, subscription_annual: false } });
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('hides it once the tournament is already upgraded, however that happened', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+      component.tournament.update(t => ({ ...t!, paid_override: true }));
+
+      expect(component.canBuyUnlock()).toBeFalse();
+    });
+
+    it('treats a failed billing lookup as nothing to sell', () => {
+      // A billing outage should cost an upgrade button, not the whole manage screen.
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      httpMock.expectOne(`${environment.apiUrl}/billing/status`)
+        .flush({ error: 'down' }, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(component.canBuyUnlock()).toBeFalse();
+      expect(component.tournament()).not.toBeNull();
+    });
+
+    it('redirects to Stripe when the upgrade is bought', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+
+      const billing = TestBed.inject(BillingService);
+      const redirect = spyOn(billing, 'redirectTo');
+
+      component.buyTournamentUnlock();
+      const req = httpMock.expectOne(`${environment.apiUrl}/billing/checkout/tournament`);
+      // Charging against the wrong tournament would upgrade the wrong event for real money.
+      expect(req.request.body).toEqual({ tournament_id: tournamentId });
+      req.flush({ url: 'https://checkout.stripe.com/c/pay/cs_test_x', session_id: 'cs_test_x' });
+
+      expect(redirect).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_test_x');
+    });
+
+    it('clears the busy state and reports the error when checkout fails', () => {
+      bootstrapCore(ownerCapabilities);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      withBilling();
+
+      component.buyTournamentUnlock();
+      httpMock.expectOne(`${environment.apiUrl}/billing/checkout/tournament`)
+        .flush({ error: 'This tournament is already upgraded' }, { status: 409, statusText: 'Conflict' });
+
+      // A stuck spinner would leave the organizer unable to retry.
+      expect(component.unlockBusy()).toBeFalse();
+      expect(component.toast()).toContain('already upgraded');
+    });
+  });
+
+  describe('balanced (A/B) draw', () => {
+    const player = (id: number, name: string, draw_group: 'A' | 'B') =>
+      ({ id, tournament_id: tournamentId, name, registration_status: 'approved', draw_group }) as Participant;
+
+    function bootstrapDraw(drawMode: 'random' | 'balanced', players: Participant[]) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Bags Night', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'auto_draft', draw_mode: drawMode,
+        created_at: '2026-01-01', paid_override: false, capabilities: ownerCapabilities,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush(players);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      fixture.detectChanges();
+    }
+
+    const roster = () => [player(1, 'Ann', 'A'), player(2, 'Bob', 'B'), player(3, 'Cara', 'A'), player(4, 'Dev', 'B')];
+
+    it('keeps the plain draw by default, with no group buttons and the option folded away', () => {
+      bootstrapDraw('random', roster());
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelectorAll('.group-toggle').length).toBe(0);
+      expect(el.querySelector<HTMLDetailsElement>('details.advanced')!.open).toBeFalse();
+      expect(el.textContent).toContain('randomly pair players into teams');
+    });
+
+    it('PUTs the draw mode from the Advanced checkbox', () => {
+      bootstrapDraw('random', roster());
+      const box = fixture.nativeElement.querySelector('details.advanced input[type=checkbox]') as HTMLInputElement;
+      box.click();
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ draw_mode: 'balanced' });
+      req.flush({ ...component.tournament()!, draw_mode: 'balanced' });
+      fixture.detectChanges();
+      expect(component.isBalancedDraw()).toBeTrue();
+      expect(fixture.nativeElement.querySelectorAll('.group-toggle').length).toBe(4);
+    });
+
+    it('shows the group counts and switches a player between A and B', () => {
+      bootstrapDraw('balanced', roster());
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.group-count')!.textContent).toContain('2 A · 2 B');
+      expect(el.textContent).toContain('pair each A player with a random B');
+
+      el.querySelector<HTMLButtonElement>('.group-toggle')!.click(); // Ann, A -> B
+      const req = httpMock.expectOne(`${environment.apiUrl}/participants/1`);
+      expect(req.request.body).toEqual({ draw_group: 'B' });
+      req.flush({ ...roster()[0], draw_group: 'B' });
+      fixture.detectChanges();
+
+      expect(component.groupCounts()).toEqual({ a: 1, b: 3, extra: 2 });
+      expect(el.textContent).toContain('2 B players will be paired with each other');
     });
   });
 });

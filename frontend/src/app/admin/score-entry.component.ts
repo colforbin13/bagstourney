@@ -3,17 +3,20 @@ import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
-import { Tournament, Match, BracketData } from '../shared/models/tournament.models';
+import { Tournament, Match, BracketData, PoolMatch } from '../shared/models/tournament.models';
 import { roundLabel, teamParticipants } from '../shared/bracket-labels';
+import { boardWord } from '../shared/board-labels';
 
-interface ScoreRow { match: Match; label: string; }
+// `key` rather than the match id identifies a row: pool games (FEATURE_TRACKER item 18) live
+// in their own table, so a pool game and a bracket match can share an id.
+interface ScoreRow { key: string; kind: 'bracket' | 'pool'; match: Match; label: string; }
 interface ScoreEntry { team1: string; team2: string; }
 
 /**
  * A scorekeeper's screen: the matches that can be played right now, and nothing else.
  * The bracket view can already take scores, but it makes you find the right card inside a
- * whole bracket — awkward on a phone at the boards, which is where scores actually get
- * entered. This lists only what's playable, largest-first.
+ * whole bracket — awkward on a phone out where play is happening, which is where scores
+ * actually get entered. This lists only what's playable, largest-first.
  */
 @Component({
   selector: 'app-score-entry',
@@ -52,15 +55,28 @@ interface ScoreEntry { team1: string; team2: string; }
                 This tournament is finished.
               } @else if (tournament()?.status === 'setup') {
                 The bracket hasn't been generated yet.
+              } @else if (bracketData()?.pool?.complete && !bracketData()?.pool?.locked) {
+                Pool play is finished. The bracket is generated from the manage screen.
               } @else {
                 Nothing to score right now — every ready match has been played.
               }
             </div>
           } @else {
             <div class="match-list">
-              @for (row of readyMatches(); track row.match.id) {
-                <div class="score-card">
-                  <div class="score-card-round">{{ row.label }} · Match {{ row.match.match_number }}</div>
+              @for (row of readyMatches(); track row.key) {
+                <div class="score-card" [class.on-board]="!!row.match.board_number">
+                  <div class="score-card-round">
+                    @if (boards()) {
+                      @if (row.match.board_number) {
+                        <span class="board-tag">{{ word().one }} {{ row.match.board_number }}</span>
+                      } @else if (upNextPosition(row); as pos) {
+                        <span class="board-tag waiting">Up next · {{ pos }}</span>
+                      } @else {
+                        <span class="board-tag waiting">Waiting</span>
+                      }
+                    }
+                    {{ row.label }} · Match {{ row.match.match_number }}
+                  </div>
                   <div class="score-row">
                     <div class="score-team">
                       <div class="score-team-name">{{ row.match.team1_name }}</div>
@@ -69,7 +85,7 @@ interface ScoreEntry { team1: string; team2: string; }
                       }
                     </div>
                     <input class="input score-input" type="number" inputmode="numeric" min="0"
-                      [(ngModel)]="scores[row.match.id].team1"
+                      [(ngModel)]="scores[row.key].team1"
                       [attr.aria-label]="'Score for ' + row.match.team1_name" placeholder="0" />
                   </div>
                   <div class="score-row">
@@ -80,20 +96,33 @@ interface ScoreEntry { team1: string; team2: string; }
                       }
                     </div>
                     <input class="input score-input" type="number" inputmode="numeric" min="0"
-                      [(ngModel)]="scores[row.match.id].team2"
+                      [(ngModel)]="scores[row.key].team2"
                       [attr.aria-label]="'Score for ' + row.match.team2_name" placeholder="0" />
                   </div>
-                  @if (rowError()[row.match.id]; as err) {
+                  @if (rowError()[row.key]; as err) {
                     <div class="form-error">{{ err }}</div>
                   }
-                  <button class="btn btn-primary score-save" [disabled]="submitting() === row.match.id"
-                    (click)="save(row.match)">
-                    @if (submitting() === row.match.id) {
+                  <button class="btn btn-primary score-save" [disabled]="submitting() === row.key"
+                    (click)="save(row)">
+                    @if (submitting() === row.key) {
                       <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> Saving…
                     } @else {
                       Save result
                     }
                   </button>
+                  @if (boards()) {
+                    <label class="move-board">
+                      {{ row.match.board_number ? 'Move to' : 'Send to' }}
+                      <select class="input" [ngModel]="row.match.board_number ?? null"
+                        (ngModelChange)="moveTo(row, $event)" [disabled]="moving() === row.key"
+                        [attr.aria-label]="word().one + ' for ' + row.match.team1_name + ' vs ' + row.match.team2_name">
+                        <option [ngValue]="null" disabled>Choose a {{ word().one.toLowerCase() }}</option>
+                        @for (b of boardChoices(); track b) {
+                          <option [ngValue]="b">{{ word().one }} {{ b }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
                 </div>
               }
             </div>
@@ -107,29 +136,29 @@ interface ScoreEntry { team1: string; team2: string; }
 
             @if (showCompleted()) {
               <div class="match-list" style="margin-top:12px">
-                @for (row of completedMatches(); track row.match.id) {
+                @for (row of completedMatches(); track row.key) {
                   <div class="score-card is-complete">
                     <div class="score-card-round">{{ row.label }} · Match {{ row.match.match_number }}</div>
-                    @if (editing() === row.match.id) {
+                    @if (editing() === row.key) {
                       <div class="score-row">
                         <div class="score-team"><div class="score-team-name">{{ row.match.team1_name }}</div></div>
                         <input class="input score-input" type="number" inputmode="numeric" min="0"
-                          [(ngModel)]="scores[row.match.id].team1"
+                          [(ngModel)]="scores[row.key].team1"
                           [attr.aria-label]="'Score for ' + row.match.team1_name" />
                       </div>
                       <div class="score-row">
                         <div class="score-team"><div class="score-team-name">{{ row.match.team2_name }}</div></div>
                         <input class="input score-input" type="number" inputmode="numeric" min="0"
-                          [(ngModel)]="scores[row.match.id].team2"
+                          [(ngModel)]="scores[row.key].team2"
                           [attr.aria-label]="'Score for ' + row.match.team2_name" />
                       </div>
-                      @if (rowError()[row.match.id]; as err) {
+                      @if (rowError()[row.key]; as err) {
                         <div class="form-error">{{ err }}</div>
                       }
                       <div class="edit-actions">
                         <button class="btn btn-sm" (click)="cancelEdit()">Cancel</button>
-                        <button class="btn btn-sm btn-primary" [disabled]="submitting() === row.match.id"
-                          (click)="save(row.match)">Save</button>
+                        <button class="btn btn-sm btn-primary" [disabled]="submitting() === row.key"
+                          (click)="save(row)">Save</button>
                       </div>
                     } @else {
                       <div class="score-row done">
@@ -140,7 +169,7 @@ interface ScoreEntry { team1: string; team2: string; }
                         <span class="score-team-name" [class.won]="row.match.winner_id === row.match.team2_id">{{ row.match.team2_name }}</span>
                         <span class="final-score">{{ row.match.team2_score }}</span>
                       </div>
-                      <button class="btn btn-sm" (click)="startEdit(row.match)">Fix this score</button>
+                      <button class="btn btn-sm" (click)="startEdit(row)">Fix this score</button>
                     }
                   </div>
                 }
@@ -187,6 +216,18 @@ interface ScoreEntry { team1: string; team2: string; }
       gap: 10px;
     }
     .score-card.is-complete { border-left-color: var(--marker); }
+    .board-tag {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-right: 6px;
+      letter-spacing: .06em;
+    }
+    .board-tag.waiting { background: var(--border); color: var(--text); }
+    .move-board { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-dim); }
+    .move-board select { flex: 1; padding: 6px 8px; font-size: .85rem; }
     .score-card-round {
       font-family: var(--mono);
       font-size: .65rem;
@@ -223,38 +264,68 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
   bracketData = signal<BracketData | null>(null);
   loading = signal(true);
   loadError = signal('');
-  submitting = signal<number | null>(null);
-  rowError = signal<Record<number, string>>({});
+  submitting = signal<string | null>(null);
+  moving = signal<string | null>(null);
+  rowError = signal<Record<string, string>>({});
   showCompleted = signal(false);
-  editing = signal<number | null>(null);
+  editing = signal<string | null>(null);
   toast = signal('');
   toastType = signal<'success' | 'error'>('success');
 
-  scores: Record<number, ScoreEntry> = {};
+  scores: Record<string, ScoreEntry> = {};
   tournamentId!: number;
 
-  // Another scorekeeper on the far set of boards may be filling the same bracket in, so
+  // Another scorekeeper at the far end of the venue may be filling the same bracket in, so
   // the list refreshes itself. Typed-but-unsaved scores survive it — see applyBracket().
   private refreshTimer: number | null = null;
   readonly refreshIntervalMs = 30000;
 
   canScore = computed(() => this.tournament()?.capabilities?.can_score ?? false);
 
+  // Flattened in play order: pool games first (while the pool is still open), then the whole
+  // winners bracket, then the losers bracket, then the grand final. Labels are qualified
+  // per side, so "Round 2" alone can never be ambiguous between the two trees.
   private flatMatches = computed<ScoreRow[]>(() => {
     const data = this.bracketData();
     if (!data) return [];
-    const roundNums = Object.keys(data.rounds).map(Number).sort((a, b) => a - b);
-    const total = roundNums.length;
     const out: ScoreRow[] = [];
-    roundNums.forEach((num, i) => {
-      const label = roundLabel(i + 1, total);
-      for (const match of data.rounds[num]) out.push({ match, label });
-    });
+    // Once the bracket exists the pool is locked server-side, so its games drop off this
+    // screen rather than offering a "Fix this score" that can only fail.
+    if (data.pool && !data.pool.locked) {
+      for (const round of data.pool.rounds) {
+        for (const pm of round.matches) {
+          out.push({ key: 'p' + pm.id, kind: 'pool', match: poolAsMatch(pm), label: `Pool round ${round.round}` });
+        }
+      }
+    }
+    for (const side of data.sides ?? []) {
+      const total = side.rounds.length;
+      side.rounds.forEach((round, i) => {
+        const label = roundLabel(i + 1, total, side.side, data.format);
+        for (const match of round.matches) out.push({ key: 'b' + match.id, kind: 'bracket', match, label });
+      });
+    }
     return out;
   });
 
-  // Byes never appear: they're auto-advanced placeholders with no score to enter.
-  readyMatches = computed(() => this.flatMatches().filter(r => r.match.status === 'ready'));
+  // Board assignments (FEATURE_TRACKER item 8). Null when the tournament has boards off.
+  boards = computed(() => this.bracketData()?.boards ?? null);
+  word = computed(() => boardWord(this.boards()?.label));
+  boardChoices = computed(() => Array.from({ length: this.boards()?.count ?? 0 }, (_, i) => i + 1));
+  private upNextIndex = computed(() => new Map((this.boards()?.up_next ?? []).map((key, i) => [key, i])));
+
+  // Byes never appear: they're auto-advanced placeholders with no score to enter. With
+  // boards on, the games being played come first in board order, then the queue, so the
+  // card a scorekeeper wants is the one they'd expect to find by walking the room.
+  readyMatches = computed(() => {
+    const ready = this.flatMatches().filter(r => r.match.status === 'ready');
+    if (!this.boards()) return ready;
+    const next = this.upNextIndex();
+    const rank = (r: ScoreRow) => r.match.board_number
+      ? r.match.board_number
+      : 1000 + (next.get(r.key) ?? 1000);
+    return [...ready].sort((a, b) => rank(a) - rank(b));
+  });
 
   // Newest first — a scorekeeper fixing a typo almost always means the one just entered.
   completedMatches = computed(() =>
@@ -294,13 +365,13 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
 
   private applyBracket(data: BracketData) {
     this.bracketData.set(data);
-    for (const match of Object.values(data.rounds).flat() as Match[]) {
+    for (const row of this.flatMatches()) {
       // Only seed a row that has no entry yet, so a background refresh never wipes a
       // score somebody is halfway through typing.
-      if (!this.scores[match.id]) {
-        this.scores[match.id] = {
-          team1: match.team1_score?.toString() ?? '',
-          team2: match.team2_score?.toString() ?? '',
+      if (!this.scores[row.key]) {
+        this.scores[row.key] = {
+          team1: row.match.team1_score?.toString() ?? '',
+          team2: row.match.team2_score?.toString() ?? '',
         };
       }
     }
@@ -313,12 +384,12 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
     return teamParticipants(teamName, p1, p2);
   }
 
-  startEdit(match: Match) {
-    this.scores[match.id] = {
-      team1: match.team1_score?.toString() ?? '',
-      team2: match.team2_score?.toString() ?? '',
+  startEdit(row: ScoreRow) {
+    this.scores[row.key] = {
+      team1: row.match.team1_score?.toString() ?? '',
+      team2: row.match.team2_score?.toString() ?? '',
     };
-    this.editing.set(match.id);
+    this.editing.set(row.key);
   }
 
   cancelEdit() {
@@ -326,29 +397,33 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
     this.rowError.set({});
   }
 
-  save(match: Match) {
-    const entry = this.scores[match.id];
+  save(row: ScoreRow) {
+    const match = row.match;
+    const entry = this.scores[row.key];
     const team1 = Number(entry?.team1);
     const team2 = Number(entry?.team2);
 
     if (entry?.team1 === '' || entry?.team2 === '' || Number.isNaN(team1) || Number.isNaN(team2)) {
-      this.setRowError(match.id, 'Enter both scores.');
+      this.setRowError(row.key, 'Enter both scores.');
       return;
     }
     if (team1 < 0 || team2 < 0) {
-      this.setRowError(match.id, 'Scores cannot be negative.');
+      this.setRowError(row.key, 'Scores cannot be negative.');
       return;
     }
     // Checked here as well as server-side so the message lands next to the inputs rather
     // than as a toast after a round trip.
     if (team1 === team2) {
-      this.setRowError(match.id, 'Scores cannot be tied — there has to be a winner.');
+      this.setRowError(row.key, 'Scores cannot be tied — there has to be a winner.');
       return;
     }
 
-    this.setRowError(match.id, '');
-    this.submitting.set(match.id);
-    this.svc.updateScore(match.id, team1, team2).subscribe({
+    this.setRowError(row.key, '');
+    this.submitting.set(row.key);
+    const request = row.kind === 'pool'
+      ? this.svc.updatePoolScore(match.id, team1, team2)
+      : this.svc.updateScore(match.id, team1, team2);
+    request.subscribe({
       next: () => {
         this.submitting.set(null);
         this.editing.set(null);
@@ -360,13 +435,36 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.submitting.set(null);
-        this.setRowError(match.id, err?.error?.error ?? 'Could not save that score.');
+        this.setRowError(row.key, err?.error?.error ?? 'Could not save that score.');
       },
     });
   }
 
-  private setRowError(matchId: number, message: string) {
-    this.rowError.update(errs => ({ ...errs, [matchId]: message }));
+  /** 1-based place in the up-next queue, or null for a game that can't be played yet. */
+  upNextPosition(row: ScoreRow): number | null {
+    const i = this.upNextIndex().get(row.key);
+    return i === undefined ? null : i + 1;
+  }
+
+  moveTo(row: ScoreRow, board: number | null) {
+    if (board == null || board === row.match.board_number) return;
+    this.moving.set(row.key);
+    this.svc.moveToBoard(this.tournamentId, row.kind === 'pool' ? 'pool' : 'match', row.match.id, board).subscribe({
+      next: () => {
+        this.moving.set(null);
+        this.showToast(`Moved to ${this.word().one.toLowerCase()} ${board}.`, 'success');
+        this.load(true);
+      },
+      error: err => {
+        this.moving.set(null);
+        this.showToast(err?.error?.error ?? 'Could not move that game.', 'error');
+        this.load(true);
+      },
+    });
+  }
+
+  private setRowError(key: string, message: string) {
+    this.rowError.update(errs => ({ ...errs, [key]: message }));
   }
 
   private showToast(msg: string, type: 'success' | 'error') {
@@ -374,4 +472,18 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
     this.toastType.set(type);
     setTimeout(() => this.toast.set(''), 2500);
   }
+}
+
+// A pool game in the shape the score cards already render. It has no forward edges and no
+// participant-name columns, so those are null; the cards only show the team names.
+function poolAsMatch(pm: PoolMatch): Match {
+  return {
+    id: pm.id, tournament_id: 0, round: pm.round, match_number: pm.match_number,
+    team1_id: pm.team1_id, team2_id: pm.team2_id,
+    team1_score: pm.team1_score, team2_score: pm.team2_score, winner_id: pm.winner_id,
+    next_match_id: null, next_match_slot: null, status: pm.status, board_number: pm.board_number ?? null,
+    team1_name: pm.team1_name, team2_name: pm.team2_name, winner_name: null,
+    team1_participant1_name: null, team1_participant2_name: null,
+    team2_participant1_name: null, team2_participant2_name: null,
+  };
 }

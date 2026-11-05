@@ -37,11 +37,18 @@ interface TournamentGroup {
           </svg>
         </div>
         <div class="hero-inner">
-          <p class="hero-eyebrow">Bag toss tournament manager</p>
-          <h1 class="hero-title">Set it up in minutes.<br />Settle it on the boards.</h1>
+          <p class="hero-eyebrow">Tournament manager for two-player teams</p>
+          <h1 class="hero-title">Set it up in minutes.<br />Settle it at the venue.</h1>
           <p class="hero-lede">
             Sign-ups, team draws, seeding, and live scoring in one place — so you can run the
             tournament instead of redrawing a whiteboard bracket every round.
+          </p>
+          <!-- The one place a sport gets named on this page. Everything else stays neutral,
+               because the app genuinely doesn't care which game it is — but a visitor who
+               can't see their own game in the copy assumes it isn't supported. -->
+          <p class="hero-sports">
+            Bags, KanJam, pickleball, horseshoes, darts, euchre — any bracket of two-person
+            teams. <a routerLink="/sports">See what people run →</a>
           </p>
           <!-- The page itself is identical for everyone; only these two destinations move,
                since sending a signed-in organizer to the register/sign-in screens would be
@@ -55,7 +62,7 @@ interface TournamentGroup {
               <a class="btn" routerLink="/admin/login">Sign in</a>
             }
           </div>
-          <p class="hero-note">Free to start · Nothing to install · Works on the phone in your pocket</p>
+          <p class="hero-note"><a routerLink="/pricing">Free to start</a> · Nothing to install · Works on the phone in your pocket</p>
         </div>
       </header>
 
@@ -65,24 +72,24 @@ interface TournamentGroup {
             <span class="step-num">Step 01</span>
             <h2 class="step-title">Get everyone in</h2>
             <p class="step-body">
-              Type your players in yourself, or share a link and QR code at the door and let them
-              sign themselves up while you set up the boards.
+              Paste in your list of players, or share a link and QR code at the door and let them
+              sign themselves up while you're still setting up.
             </p>
           </li>
           <li class="step">
             <span class="step-num">Step 02</span>
             <h2 class="step-title">Draw the teams</h2>
             <p class="step-body">
-              Auto-draft random pairs or enter teams directly, then let the seeding fall where it
-              may — or drag the ladder into the order you want.
+              Blind draw random pairs or enter teams directly, then let the seeding fall where it
+              may, drag the ladder into the order you want, or let pool play games earn the seeds.
             </p>
           </li>
           <li class="step">
             <span class="step-num">Step 03</span>
             <h2 class="step-title">Score it live</h2>
             <p class="step-body">
-              Tap scores in from the boards. Winners advance on their own, and everyone watching
-              sees the bracket move the moment it happens.
+              Tap scores in as each game finishes. Winners advance on their own, and everyone
+              watching sees the bracket move the moment it happens.
             </p>
           </li>
         </ol>
@@ -96,6 +103,7 @@ interface TournamentGroup {
           <li>Live public bracket</li>
           <li>Email score updates</li>
           <li>Scorekeeper accounts</li>
+          <li>Board assignments</li>
         </ul>
         <a class="walkthrough-link" routerLink="/how-it-works">Read the full walkthrough →</a>
       </section>
@@ -203,6 +211,15 @@ interface TournamentGroup {
       line-height: 1.6;
       color: var(--text-dim);
     }
+    .hero-sports {
+      max-width: 46ch;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      margin-top: 14px;
+
+      a { white-space: nowrap; }
+    }
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
@@ -216,6 +233,7 @@ interface TournamentGroup {
       color: var(--muted);
       margin-top: 18px;
     }
+    .hero-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
     .steps {
       padding: 40px 16px 8px;
@@ -403,6 +421,10 @@ export class TournamentListComponent implements OnInit {
     }
     if (t.status === 'active' && s) {
       if (s.current_round && s.total_rounds) parts.push(`Round ${s.current_round} of ${s.total_rounds}`);
+      // Pool play: live with pool rounds but no bracket yet.
+      else if (!s.total_rounds && s.pool_rounds) {
+        parts.push(s.pool_current_round ? `Pool round ${s.pool_current_round} of ${s.pool_rounds}` : 'Pool play finished');
+      }
       if (s.match_count > 0) parts.push(`${s.matches_played} of ${s.match_count} matches`);
     }
     const started = this.startedLabel(t.created_at);

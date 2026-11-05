@@ -13,15 +13,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/middleware/auth.php';
+require_once __DIR__ . '/lib/BracketBuilder.php';
+require_once __DIR__ . '/lib/NameList.php';
+require_once __DIR__ . '/lib/BlindDraw.php';
+require_once __DIR__ . '/lib/PoolPlay.php';
+require_once __DIR__ . '/lib/BoardQueue.php';
+require_once __DIR__ . '/lib/PageView.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/TournamentController.php';
 require_once __DIR__ . '/controllers/ParticipantController.php';
 require_once __DIR__ . '/controllers/TeamController.php';
 require_once __DIR__ . '/controllers/MatchController.php';
+require_once __DIR__ . '/controllers/PoolController.php';
+require_once __DIR__ . '/controllers/BoardController.php';
 require_once __DIR__ . '/controllers/TournamentAccessController.php';
 require_once __DIR__ . '/controllers/UserController.php';
 require_once __DIR__ . '/controllers/NotificationController.php';
 require_once __DIR__ . '/controllers/AuditLogController.php';
+require_once __DIR__ . '/controllers/BillingController.php';
+require_once __DIR__ . '/controllers/AnalyticsController.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -40,7 +50,12 @@ $idInvalid = $idSegment !== null && !ctype_digit($idSegment);
 $id        = ($idSegment !== null && ctype_digit($idSegment)) ? (int)$idSegment : null;
 $action    = ($id !== null && $id > 0) ? ($segments[2] ?? null) : ($segments[1] ?? null);
 
-$body = json_decode(file_get_contents('php://input'), true) ?? [];
+// Kept as the raw string as well as the decoded array: Stripe's webhook signature is an
+// HMAC over the exact bytes that were sent, so re-encoding $body would change whitespace
+// and key order and could never verify. Read once — php://input is a stream, and reading
+// it twice is not reliable across every SAPI.
+$rawBody = file_get_contents('php://input');
+$body = json_decode($rawBody, true) ?? [];
 
 try {
     switch ($resource) {
@@ -110,6 +125,9 @@ try {
                 // No requireTournamentRole() here by design: this is exactly the endpoint
                 // anonymous attendees are meant to hit.
                 $ctrl->selfRegister($body);
+            } elseif ($method === 'POST' && $action === 'bulk') {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->bulkCreate($body); // fast blind-draw setup: add a pasted list of names
             } elseif ($method === 'POST') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->create($body);
@@ -199,6 +217,42 @@ try {
             }
             break;
 
+        // --- Pool play (FEATURE_TRACKER item 18) ---
+        // Reading the pool needs no route of its own: GET /matches carries it.
+        case 'pool':
+            $db = getDB();
+            $ctrl = new PoolController($db);
+            if ($method === 'POST' && !$id && $action === 'start') {
+                // Direct entry's "Start pool play". A blind draw starts its pool from POST /teams.
+                $actor = requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->startAction($body, $actor);
+            } elseif ($method === 'PUT' && $id) {
+                $stmt = $db->prepare('SELECT tournament_id FROM pool_matches WHERE id = ?');
+                $stmt->execute([$id]);
+                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager', 'scorekeeper']);
+                $ctrl->updateScore($id, $body, $actor);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Board assignments (FEATURE_TRACKER item 8) ---
+        // Reading needs no route of its own: GET /matches carries each game's board and the
+        // up-next order. The count itself is a tournament setting (PUT /tournaments/{id}).
+        case 'boards':
+            $db = getDB();
+            if ($method === 'PUT' && $id) {
+                // PUT /boards/{tournamentId} — move a game to a board by hand. Scorekeepers run
+                // the boards at a venue, so they can do this too.
+                $actor = requireTournamentRole($db, $id, ['owner', 'manager', 'scorekeeper']);
+                (new BoardController($db))->moveAction($id, $body, $actor);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
         // --- Tournament member access ---
         case 'tournament-members':
             $db = getDB();
@@ -273,9 +327,55 @@ try {
             }
             break;
 
+        // --- Stripe billing (FEATURE_TRACKER items 12/13) ---
+        // Parsed from $segments directly rather than the shared $id/$action pair, the way
+        // 'notifications' does: none of these paths carry a numeric id, so the generic
+        // parsing would read 'checkout' as an invalid id.
+        case 'billing':
+            $ctrl = new BillingController(getDB());
+            $billingAction = $segments[1] ?? null;
+            $billingSubAction = $segments[2] ?? null;
+
+            if ($method === 'POST' && $billingAction === 'webhook') {
+                // Deliberately no auth helper: Stripe cannot present a token, and the
+                // signature over $rawBody is the access control. Must come before any
+                // requireCurrentUser() in this block.
+                $ctrl->webhook($rawBody, $_SERVER['HTTP_STRIPE_SIGNATURE'] ?? '');
+            } elseif ($method === 'GET' && $billingAction === 'status') {
+                $ctrl->status(requireCurrentUser(getDB()));
+            } elseif ($method === 'GET' && $billingAction === 'plans') {
+                // Public: the Pricing page shows it to visitors who have no account yet.
+                $ctrl->plans();
+            } elseif ($method === 'GET' && $billingAction === 'confirm') {
+                $ctrl->confirm($_GET, requireCurrentUser(getDB()));
+            } elseif ($method === 'POST' && $billingAction === 'checkout' && $billingSubAction === 'subscription') {
+                $ctrl->startSubscriptionCheckout($body, requireCurrentUser(getDB()));
+            } elseif ($method === 'POST' && $billingAction === 'checkout' && $billingSubAction === 'tournament') {
+                $ctrl->startTournamentUnlockCheckout($body, requireCurrentUser(getDB()));
+            } elseif ($method === 'POST' && $billingAction === 'portal') {
+                $ctrl->openPortal(requireCurrentUser(getDB()));
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
         case 'audit-log':
             if ($method === 'GET' && !$id) {
                 (new AuditLogController(getDB()))->list($_GET);
+            } else {
+                http_response_code(404);
+                echo json_encode(['error' => 'Not found']);
+            }
+            break;
+
+        // --- Traffic ---
+        case 'analytics':
+            $ctrl = new AnalyticsController(getDB());
+            if ($action === 'pageview' && $method === 'POST') {
+                $ctrl->record($body);
+            } elseif ($action === null && $method === 'GET' && !$id) {
+                $ctrl->summary($_GET);
             } else {
                 http_response_code(404);
                 echo json_encode(['error' => 'Not found']);
@@ -286,9 +386,17 @@ try {
             http_response_code(404);
             echo json_encode(['error' => 'Not found']);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    // Throwable, not Exception: PHP 8 raises TypeError/ValueError/ArgumentCountError as
+    // Error, which is not an Exception. Caught narrowly, those escape this handler and PHP
+    // appends its own fatal-error output to the half-written JSON body, so the client gets
+    // a response it cannot parse instead of a clean 500.
+    error_log('api/index.php: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    // Deliberately generic: an unexpected throwable here is often a PDOException, whose
+    // message carries the failing SQL. Controllers still emit their own validation
+    // messages; this handler only sees failures the caller can do nothing about.
+    echo json_encode(['error' => 'Internal server error']);
 }
 
 ?>

@@ -6,8 +6,9 @@ import { BehaviorSubject } from 'rxjs';
 import { BracketViewComponent } from './bracket-view.component';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
-import { Tournament, TournamentCapabilities, BracketData } from '../shared/models/tournament.models';
+import { Tournament, TournamentCapabilities, BracketData, Match, PoolData } from '../shared/models/tournament.models';
 import { environment } from '../../environments/environment';
+import { singleEliminationBracket, doubleEliminationBracket, emptyBracket as makeEmptyBracket } from '../shared/testing/bracket-fixtures';
 
 describe('BracketViewComponent', () => {
   let component: BracketViewComponent;
@@ -15,7 +16,7 @@ describe('BracketViewComponent', () => {
   let httpMock: HttpTestingController;
   const tournamentId = 1;
 
-  const emptyBracket: BracketData = { rounds: {} };
+  const emptyBracket: BracketData = makeEmptyBracket();
 
   function tournamentWith(capabilities?: TournamentCapabilities): Tournament {
     return {
@@ -124,8 +125,7 @@ describe('BracketViewComponent', () => {
 
   describe('bracket connector geometry', () => {
     function loadTwoRoundBracket() {
-      const bracket: BracketData = {
-        rounds: {
+      const bracket: BracketData = singleEliminationBracket({
           1: [
             {
               id: 1, tournament_id: tournamentId, round: 1, match_number: 1,
@@ -154,8 +154,7 @@ describe('BracketViewComponent', () => {
               team2_participant1_name: null, team2_participant2_name: null,
             } as any,
           ],
-        },
-      };
+      });
       fixture.detectChanges();
       httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
       httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(bracket);
@@ -189,20 +188,18 @@ describe('BracketViewComponent', () => {
   });
 
   it('renders a muted participant sub-label only for teams with a customized name', () => {
-    const bracket: BracketData = {
-      rounds: {
-        1: [
-          {
-            id: 1, tournament_id: tournamentId, round: 1, match_number: 1,
-            team1_id: 10, team2_id: 20, team1_score: null, team2_score: null,
-            winner_id: null, next_match_id: null, next_match_slot: null, status: 'ready',
-            team1_name: 'The Champions', team2_name: 'Carol & Dave', winner_name: null,
-            team1_participant1_name: 'Alice', team1_participant2_name: 'Bob',
-            team2_participant1_name: 'Carol', team2_participant2_name: 'Dave',
-          } as any,
-        ],
-      },
-    };
+    const bracket: BracketData = singleEliminationBracket({
+      1: [
+        {
+          id: 1, tournament_id: tournamentId, round: 1, match_number: 1,
+          team1_id: 10, team2_id: 20, team1_score: null, team2_score: null,
+          winner_id: null, next_match_id: null, next_match_slot: null, status: 'ready',
+          team1_name: 'The Champions', team2_name: 'Carol & Dave', winner_name: null,
+          team1_participant1_name: 'Alice', team1_participant2_name: 'Bob',
+          team2_participant1_name: 'Carol', team2_participant2_name: 'Dave',
+        } as any,
+      ],
+    });
 
     fixture.detectChanges();
     httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
@@ -293,19 +290,19 @@ describe('BracketViewComponent', () => {
   describe('mirrored layout', () => {
     /** A full bracket of `rounds` rounds: 2^(rounds-pos) matches in round `pos`. */
     function bracketOf(rounds: number): BracketData {
-      const data: BracketData = { rounds: {} };
+      const byRound: { [round: number]: any[] } = {};
       for (let pos = 1; pos <= rounds; pos++) {
         const count = Math.pow(2, rounds - pos);
-        data.rounds[pos] = Array.from({ length: count }, (_, i) => ({
+        byRound[pos] = Array.from({ length: count }, (_, i) => ({
           id: pos * 100 + i + 1, tournament_id: tournamentId, round: pos, match_number: i + 1,
           team1_id: null, team2_id: null, team1_score: null, team2_score: null, winner_id: null,
           next_match_id: null, next_match_slot: null, status: 'pending',
           team1_name: null, team2_name: null, winner_name: null,
           team1_participant1_name: null, team1_participant2_name: null,
           team2_participant1_name: null, team2_participant2_name: null,
-        })) as unknown as BracketData['rounds'][number];
+        }));
       }
-      return data;
+      return singleEliminationBracket(byRound);
     }
 
     function bootstrapBracket(rounds: number) {
@@ -548,6 +545,201 @@ describe('BracketViewComponent', () => {
       jasmine.clock().tick(component.autoReloadIntervalMs * 3);
 
       httpMock.expectNone(`${environment.apiUrl}/tournaments/${tournamentId}`);
+    });
+  });
+
+  describe('double elimination layout', () => {
+    /**
+     * An 8-team double-elimination bracket, shaped exactly as BracketBuilder produces:
+     * winners 4/2/1, losers 2/2/1/1, then the grand final and its deciding match.
+     */
+    function doubleBracket(): BracketData {
+      const mk = (id: number, round: number, matchNumber: number, next: number | null): Match => ({
+        id, tournament_id: tournamentId, round, match_number: matchNumber,
+        team1_id: null, team2_id: null, team1_score: null, team2_score: null, winner_id: null,
+        next_match_id: next, next_match_slot: null, status: 'pending',
+        team1_name: null, team2_name: null, winner_name: null,
+        team1_participant1_name: null, team1_participant2_name: null,
+        team2_participant1_name: null, team2_participant2_name: null,
+      } as Match);
+
+      return doubleEliminationBracket({
+        winners: {
+          1: [mk(1, 1, 1, 5), mk(2, 1, 2, 5), mk(3, 1, 3, 6), mk(4, 1, 4, 6)],
+          2: [mk(5, 2, 1, 7), mk(6, 2, 2, 7)],
+          3: [mk(7, 3, 1, 20)],
+        },
+        losers: {
+          1: [mk(11, 1, 1, 13), mk(12, 1, 2, 14)],
+          2: [mk(13, 2, 1, 15), mk(14, 2, 2, 15)],
+          3: [mk(15, 3, 1, 16)],
+          4: [mk(16, 4, 1, 20)],
+        },
+        grandFinal: {
+          1: [mk(20, 1, 1, 21)],
+          2: [mk(21, 2, 1, null)],
+        },
+      });
+    }
+
+    function bootstrapDouble() {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(doubleBracket());
+      fixture.detectChanges();
+    }
+
+    it('renders the two trees as separate stacked sections', () => {
+      bootstrapDouble();
+
+      expect(component.isDoubleElimination()).toBe(true);
+      expect(component.sideLayouts().map(s => s.side)).toEqual(['winners', 'losers', 'grand_final']);
+
+      const headings = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.bracket-side-heading'))
+        .map(el => el.textContent!.trim());
+      expect(headings).toEqual(['Winners Bracket', 'Losers Bracket', 'Grand Final']);
+    });
+
+    it('does not use the mirrored layout, whose geometry assumes a halving tree', () => {
+      bootstrapDouble();
+      expect(fixture.nativeElement.querySelector('.bracket-mirrored')).toBeNull();
+    });
+
+    it('apportions rows from each round\'s real match count, not from a power of two', () => {
+      bootstrapDouble();
+      const losers = component.sideLayouts().find(s => s.side === 'losers')!;
+
+      // The losers bracket halves every *two* rounds: 2, 2, 1, 1. A tree-shaped span would
+      // give round 2 a span of 2 and push its second match off the bottom of the column.
+      expect(losers.rows).toBe(2);
+      expect(losers.rounds.map(r => r.matches.length)).toEqual([2, 2, 1, 1]);
+      expect(losers.rounds[1].matches.map(e => e.gridRow)).toEqual(['1 / span 1', '2 / span 1']);
+      expect(losers.rounds[2].matches.map(e => e.gridRow)).toEqual(['1 / span 2']);
+    });
+
+    it('reduces to the same placement a single-elimination tree gets', () => {
+      bootstrapDouble();
+      const winners = component.sideLayouts().find(s => s.side === 'winners')!;
+
+      expect(winners.rows).toBe(4);
+      expect(winners.rounds[0].matches.map(e => e.gridRow))
+        .toEqual(['1 / span 1', '2 / span 1', '3 / span 1', '4 / span 1']);
+      expect(winners.rounds[1].matches.map(e => e.gridRow)).toEqual(['1 / span 2', '3 / span 2']);
+      expect(winners.rounds[2].matches.map(e => e.gridRow)).toEqual(['1 / span 4']);
+    });
+
+    it('draws connectors from real next_match_id links, not positional pairing', () => {
+      bootstrapDouble();
+      const losers = component.sideLayouts().find(s => s.side === 'losers')!;
+
+      // A losers major round takes one entrant from the previous losers round and one
+      // dropped in from the winners tree, so this is a 1-into-1 line, not a 2-into-1.
+      const minorToMajor = losers.rounds[0].connectors;
+      expect(minorToMajor.length).toBe(2);
+      expect(minorToMajor[0].y1).toBe(minorToMajor[0].y2);
+
+      // The round after it genuinely does converge two matches into one.
+      const majorToMinor = losers.rounds[1].connectors;
+      expect(majorToMinor.length).toBe(1);
+      expect(majorToMinor[0].y1).not.toBe(majorToMinor[0].y2);
+    });
+
+    it('labels rounds per side so the two round 2s can never be confused', () => {
+      bootstrapDouble();
+      const labels = component.sideLayouts().map(s => s.rounds.map(r => r.label));
+
+      expect(labels[0]).toEqual(['Winners Round 1', 'Winners Semifinal', 'Winners Final']);
+      expect(labels[1]).toEqual(['Losers Round 1', 'Losers Round 2', 'Losers Semifinal', 'Losers Final']);
+      expect(labels[2]).toEqual(['Grand Final', 'Deciding Match']);
+    });
+
+    it('points the trophy at the grand final, not the last winners round', () => {
+      bootstrapDouble();
+      expect(component.decidingMatchId()).toBe(20);
+    });
+  });
+
+  describe('pool play', () => {
+    const poolData: PoolData = {
+      games_per_team: 2, started: true, games_played: 1, games_total: 2, complete: false, locked: false,
+      rounds: [
+        { round: 1, matches: [{ id: 1, round: 1, match_number: 1, team1_id: 1, team2_id: 2, team1_name: 'Reds', team2_name: 'Blues', team1_score: 21, team2_score: 9, winner_id: 1, status: 'complete' }] },
+        { round: 2, matches: [{ id: 2, round: 2, match_number: 1, team1_id: 1, team2_id: 3, team1_name: 'Reds', team2_name: 'Greens', team1_score: null, team2_score: null, winner_id: null, status: 'ready' }] },
+      ],
+      standings: [
+        { team_id: 1, team_name: 'Reds', participant1_name: null, participant2_name: null, rank: 1, played: 1, wins: 1, losses: 0, points_for: 21, points_against: 9, point_diff: 12, win_pct: 1 },
+        { team_id: 3, team_name: 'Greens', participant1_name: null, participant2_name: null, rank: 2, played: 0, wins: 0, losses: 0, points_for: 0, points_against: 0, point_diff: 0, win_pct: 0 },
+        { team_id: 2, team_name: 'Blues', participant1_name: null, participant2_name: null, rank: 3, played: 1, wins: 0, losses: 1, points_for: 9, points_against: 21, point_diff: -12, win_pct: 0 },
+      ],
+    };
+
+    function bootWithPool(data: BracketData) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({ ...tournamentWith(), seeding_mode: 'pool_play' });
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(data);
+      fixture.detectChanges();
+    }
+
+    it('shows standings and pool games, newest round first, before the bracket exists', () => {
+      bootWithPool({ ...emptyBracket, pool: poolData });
+      const el: HTMLElement = fixture.nativeElement;
+
+      expect(el.textContent).not.toContain('Bracket not generated yet');
+      expect(el.querySelector('app-pool-standings')).not.toBeNull();
+      const labels = Array.from(el.querySelectorAll('.pool-round-label')).map(l => l.textContent!.trim());
+      expect(labels).toEqual(['Pool round 2', 'Pool round 1']);
+      expect(el.querySelector('.pool-game.done .pool-score')!.textContent).toContain('21–9');
+    });
+
+    it('shows only the round in play on the TV view', () => {
+      bootWithPool({ ...emptyBracket, pool: poolData });
+      component.kiosk.set(true);
+      expect(component.poolRoundsToShow().map(r => r.round)).toEqual([2]);
+    });
+
+    it('keeps the final standings under the bracket once it exists', () => {
+      bootWithPool({ ...singleEliminationBracket({ 1: [
+        { id: 9, tournament_id: 1, round: 1, match_number: 1, team1_id: 1, team2_id: 2, team1_score: null, team2_score: null,
+          winner_id: null, next_match_id: null, next_match_slot: null, status: 'ready',
+          team1_name: 'Reds', team2_name: 'Blues', winner_name: null,
+          team1_participant1_name: null, team1_participant2_name: null, team2_participant1_name: null, team2_participant2_name: null } as any,
+      ] }), pool: { ...poolData, complete: true, locked: true } });
+
+      expect(fixture.nativeElement.querySelector('.pool-after app-pool-standings')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.pool-view')).toBeNull();
+    });
+  });
+
+  describe('board assignments', () => {
+    const live = (id: number, board: number | null) => ({
+      id, tournament_id: 1, round: 1, match_number: id, team1_id: id * 10, team2_id: id * 10 + 1,
+      team1_score: null, team2_score: null, winner_id: null, next_match_id: null, next_match_slot: null,
+      status: 'ready', board_number: board, team1_name: 'T' + id, team2_name: 'U' + id, winner_name: null,
+      team1_participant1_name: null, team1_participant2_name: null, team2_participant1_name: null, team2_participant2_name: null,
+    } as any);
+
+    function boot(status: Tournament['status'] = 'active') {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({ ...tournamentWith(), status, boards: 1 });
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({
+        ...singleEliminationBracket({ 1: [live(1, 1), live(2, null)] }),
+        boards: { count: 1, playing: [{ board: 1, key: 'b1' }], up_next: ['b2'] },
+      });
+      fixture.detectChanges();
+    }
+
+    it('marks the live game with its board and shows the boards panel', () => {
+      boot();
+      const el: HTMLElement = fixture.nativeElement;
+      const chips = Array.from(el.querySelectorAll('.match-card .board-chip')).map(c => c.textContent!.trim());
+      expect(chips).toEqual(['Board 1']);
+      expect(el.querySelector('app-boards-panel .tile')!.textContent).toContain('T1');
+      expect(el.querySelector('app-boards-panel .next-list')!.textContent).toContain('T2');
+    });
+
+    it('hides the boards panel once the tournament is over', () => {
+      boot('complete');
+      expect(fixture.nativeElement.querySelector('app-boards-panel')).toBeNull();
     });
   });
 });

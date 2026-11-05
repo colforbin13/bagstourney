@@ -14,18 +14,33 @@ import { AuthService } from '../shared/services/auth.service';
         <h1>From a pile of players to a champion.</h1>
         <p class="lede">
           The whole run of a tournament, start to finish, so you know what you're getting into
-          before you set one up. It takes about five minutes of actual work.
+          before you set one up. It takes about five minutes of actual work. Nothing below
+          depends on which game you're playing — see
+          <a routerLink="/sports">the sports people run</a> if you're wondering whether yours
+          fits.
         </p>
       </header>
+
+      <!-- The same walkthrough, watched instead of read. Deliberately click-to-play with
+           preload="none": it carries a music and sound track, so it isn't wallpaper, and an
+           unplayed visit should cost the poster and nothing else. Everything the video says
+           is written out below it, so the page is complete with video blocked or sound off. -->
+      <figure class="tour">
+        <video src="assets/bracketway-tour.mp4" poster="assets/bracketway-tour.jpg"
+          controls playsinline preload="none" width="1280" height="720"></video>
+        <figcaption>
+          Sign-ups, the draw, live scoring and the bracket on the wall — the whole run in 23 seconds.
+        </figcaption>
+      </figure>
 
       <ol class="walkthrough">
         <li class="chapter">
           <span class="chapter-num">Step 01</span>
           <h2>Create the tournament</h2>
           <p>
-            A name is the only thing you have to decide. The three other choices all have
-            sensible defaults, but they're worth understanding, because two of them lock once
-            you draw teams.
+            A name is the only thing you have to decide. Everything else has a sensible
+            default, but it's worth understanding, because two of the choices lock once you
+            draw teams.
           </p>
           <dl class="choices">
             <dt>Public or private</dt>
@@ -34,18 +49,44 @@ import { AuthService } from '../shared/services/auth.service';
               are unlisted and reachable only by their link — though anyone holding that link
               can watch. Changeable at any time.
             </dd>
-            <dt>Auto-draft or direct entry</dt>
+            <dt>Blind draw or direct entry</dt>
             <dd>
-              Auto-draft means players sign up as individuals and get randomly paired into
+              Blind draw means players sign up as individuals and get randomly paired into
               teams. Direct entry means you type in each team yourself, partners already
-              decided. <strong>The player sign-up link only works with auto-draft</strong> —
+              decided. <strong>The player sign-up link only works with blind draw</strong> —
               there's no pool of unpaired players for a walk-up to join otherwise.
+              Got a few strong players and a few beginners? Turn on the balanced (A/B) draw
+              under Advanced, mark your stronger players A, and every A is paired with a
+              random B, so the weakest players never end up together.
             </dd>
-            <dt>Automatic or manual seeding</dt>
+            <dt>Automatic, manual or pool play seeding</dt>
             <dd>
               Automatic seeds teams for you at the draw and starts play immediately. Manual
               gives you a drag-and-drop ladder to arrange first. Pick manual if you know who
               the strong teams are and want them apart in the bracket.
+              Pool play has every team play 2 to 5 games first, with no rematches, and seeds
+              the bracket from the standings: win percentage, then point differential. Every
+              team gets more games, and the seeds are earned.
+              <strong>Pool play is a <a routerLink="/pricing">Pro feature</a>.</strong>
+            </dd>
+            <dt>Single or double elimination</dt>
+            <dd>
+              Single elimination is one loss and you're out. Double elimination gives every
+              team a second chance: your first loss drops you into a losers bracket, and only
+              a second knocks you out. It's kinder to a team that draws the eventual champion
+              early, at the cost of roughly twice as many games.
+              <strong>Double elimination is a <a routerLink="/pricing">Pro feature</a></strong>, and unlike the other
+              choices here it's locked once the bracket is generated — the bracket's whole
+              shape depends on it.
+            </dd>
+            <dt>Board assignments</dt>
+            <dd>
+              Tell Bracketway how many boards you have, and each game goes to the next free
+              board as soon as one opens up. The bracket and TV view show who's on which board
+              and who's up next, so players know where to go without asking. Staff can move a
+              game to a different board, and you can change the count mid-event. Not playing on
+              boards? Call them courts, lanes, tables, pits or fields instead.
+              <strong>Board assignments are a <a routerLink="/pricing">Pro feature</a>.</strong>
             </dd>
           </dl>
         </li>
@@ -54,9 +95,10 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 02</span>
           <h2>Get your players in</h2>
           <p>
-            Type them in one at a time, or open the tournament's sign-up link — there's a QR
-            code for it — and let people add themselves from their phones while you set up the
-            boards.
+            Paste in a whole list of names at once (straight from a notes app, a spreadsheet
+            column or a group text), type them in one at a time, or open the tournament's
+            sign-up link — there's a QR code for it — and let people add themselves from their
+            phones while you're still setting up.
           </p>
           <p>
             Self sign-ups land as <em>pending</em> and don't join the roster until you approve
@@ -69,9 +111,11 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 03</span>
           <h2>Draw the teams</h2>
           <p>
-            One button pairs every approved player at random into two-person teams. If you
-            chose automatic seeding, this also seeds them, builds the bracket, and starts play
-            in a single step. If you chose manual, you get the ladder to reorder first.
+            One button pairs every approved player at random into two-person teams (with the
+            balanced draw, each A gets a random B). If you chose automatic seeding, this also
+            seeds them, builds the bracket, and starts play in a single step. If you chose
+            manual, you get the ladder to reorder first. With pool play, the pool games start
+            right away and the bracket is built from the standings once they're done.
           </p>
           <p>
             Don't like the pairings? Redraw them as many times as you want, right up until you
@@ -83,8 +127,15 @@ import { AuthService } from '../shared/services/auth.service';
           <span class="chapter-num">Step 04</span>
           <h2>The bracket gets built</h2>
           <p>
-            Single elimination: lose once and you're out. Your teams get slotted into the
-            nearest bracket that fits them — 8 teams into 8 slots, 9 teams into 16.
+            Your teams get slotted into the nearest bracket that fits them — 8 teams into 8
+            slots, 9 teams into 16. In single elimination, losing once ends your run.
+          </p>
+          <p>
+            In double elimination the same tree becomes the <strong>winners bracket</strong>,
+            and a second <strong>losers bracket</strong> runs alongside it collecting everyone
+            knocked out of the first. The two survivors meet in a grand final. If the team
+            coming up from the losers bracket wins it, both sides have one loss each and a
+            single deciding rematch is played.
           </p>
           <p>
             When the count isn't a clean power of two, the leftover slots become
@@ -96,7 +147,7 @@ import { AuthService } from '../shared/services/auth.service';
 
         <li class="chapter">
           <span class="chapter-num">Step 05</span>
-          <h2>Score it from the boards</h2>
+          <h2>Score it as you play</h2>
           <p>
             Tap in each match's score as it finishes. The winner advances to the next round on
             its own — you never move anyone by hand — and the public bracket updates for
@@ -109,8 +160,8 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
           <p>
             Running the scores is its own screen, too — it lists just the matches that can be
-            played right now, so whoever's working the boards isn't hunting through a bracket
-            on their phone between throws.
+            played right now, so whoever's keeping score isn't hunting through a whole bracket
+            on their phone between games.
           </p>
         </li>
 
@@ -148,8 +199,8 @@ import { AuthService } from '../shared/services/auth.service';
           You don't have to run everything yourself. A tournament's owner can add other people
           as <strong>managers</strong> (full setup control) or <strong>scorekeepers</strong>
           (score entry only, no ability to change the roster or the bracket). Handy when you
-          want a friend on the far set of boards entering scores without being able to redraw
-          your teams by accident.
+          want a friend at the far end of the venue entering scores without being able to
+          redraw your teams by accident.
         </p>
       </section>
 
@@ -176,6 +227,30 @@ import { AuthService } from '../shared/services/auth.service';
     }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
+
+    /* The tour is a 16:9 frame authored at 1920px, and its bracket scenes stop being
+       readable somewhere below 900px wide. Let it break out of the page's 680px column
+       wherever the viewport can hold it, and fall back to the column width below that. */
+    .tour { width: 960px; margin: 0 0 40px calc(50% - 480px); }
+    .tour video {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .tour figcaption {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--text-dim);
+      text-align: center;
+    }
+    @media (max-width: 1060px) {
+      .tour { width: 100%; margin-left: 0; }
+    }
 
     .walkthrough { display: flex; flex-direction: column; gap: 36px; list-style: none; }
     .chapter { border-top: 2px solid var(--border); padding-top: 16px; }

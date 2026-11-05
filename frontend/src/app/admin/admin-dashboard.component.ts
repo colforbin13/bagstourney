@@ -3,6 +3,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
+import { AuthService } from '../shared/services/auth.service';
 import { Tournament } from '../shared/models/tournament.models';
 import { confirmService } from '../shared/services/confirm.service';
 
@@ -39,7 +40,7 @@ import { confirmService } from '../shared/services/confirm.service';
           </label>
           <label class="field">
             <select class="input" [(ngModel)]="newTeamEntryMode">
-              <option value="auto_draft">Auto-draft teams</option>
+              <option value="auto_draft">Blind draw</option>
               <option value="direct">Enter teams directly</option>
             </select>
             <span class="field-hint">{{ teamEntryHint() }}</span>
@@ -48,8 +49,34 @@ import { confirmService } from '../shared/services/confirm.service';
             <select class="input" [(ngModel)]="newSeedingMode">
               <option value="automatic">Automatic seeding</option>
               <option value="manual">Manual seeding</option>
+              <option value="pool_play" [disabled]="!isPaidPlan()">
+                Pool play{{ isPaidPlan() ? '' : ' (Pro)' }}
+              </option>
             </select>
             <span class="field-hint">{{ seedingHint() }}</span>
+          </label>
+          @if (newSeedingMode === 'pool_play') {
+            <label class="field">
+              <select class="input" [(ngModel)]="newPoolGames" aria-label="Pool games per team">
+                @for (n of poolGameChoices; track n) {
+                  <option [ngValue]="n">{{ n }} pool games per team</option>
+                }
+              </select>
+              <span class="field-hint">Every team plays this many games, no rematches, before the bracket.</span>
+            </label>
+          }
+          <!-- Double elimination is shown to everyone but only selectable on a paid plan.
+               Hiding it outright would make the paid tier invisible to exactly the people
+               it is meant to convert. The disabled option is UX only — the server refuses
+               the format at both creation and bracket generation. -->
+          <label class="field">
+            <select class="input" [(ngModel)]="newFormat">
+              <option value="single">Single elimination</option>
+              <option value="double" [disabled]="!isPaidPlan()">
+                Double elimination{{ isPaidPlan() ? '' : ' (Pro)' }}
+              </option>
+            </select>
+            <span class="field-hint">{{ formatHint() }}</span>
           </label>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-top:14px">
@@ -157,10 +184,15 @@ export class AdminDashboardComponent implements OnInit {
   toast = signal('');
   newName = '';
   newVisibility: 'public' | 'private' = 'public';
-  newSeedingMode: 'automatic' | 'manual' = 'automatic';
+  newSeedingMode: 'automatic' | 'manual' | 'pool_play' = 'automatic';
+  newPoolGames = 3;
+  readonly poolGameChoices = [2, 3, 4, 5];
   newTeamEntryMode: 'auto_draft' | 'direct' = 'auto_draft';
+  newFormat: 'single' | 'double' = 'single';
 
-  constructor(private svc: TournamentService) {}
+  constructor(private svc: TournamentService, private auth: AuthService) {}
+
+  isPaidPlan(): boolean { return this.auth.isPaidPlan(); }
 
   ngOnInit() { this.load(); }
 
@@ -179,9 +211,24 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   seedingHint(): string {
-    return this.newSeedingMode === 'automatic'
+    if (this.newSeedingMode === 'pool_play') {
+      return 'Teams play a few pool games first, and the standings set the bracket seeds. Locked once teams are drawn.';
+    }
+    if (this.newSeedingMode === 'manual') {
+      return 'Drag teams into the seed order you want, then generate the bracket. Locked once teams are drawn.';
+    }
+    return this.isPaidPlan()
       ? 'Seeds assigned for you at the draw. Locked once teams are drawn.'
-      : 'Drag teams into the seed order you want, then generate the bracket. Locked once teams are drawn.';
+      : 'Seeds assigned for you at the draw. Locked once teams are drawn. Pool play is a Pro feature.';
+  }
+
+  formatHint(): string {
+    if (this.newFormat === 'double') {
+      return 'Every team gets a second chance — one loss drops you to the losers bracket, two are out. Locked once the bracket is generated.';
+    }
+    return this.isPaidPlan()
+      ? 'One loss and you are out. Locked once the bracket is generated.'
+      : 'One loss and you are out. Double elimination is a Pro feature.';
   }
 
   load() {
@@ -196,17 +243,25 @@ export class AdminDashboardComponent implements OnInit {
     if (!name) { this.createError.set('Enter a tournament name.'); return; }
     this.creating.set(true);
     this.createError.set('');
-    this.svc.createTournament(name, this.newVisibility, this.newSeedingMode, this.newTeamEntryMode).subscribe({
+    this.svc.createTournament(name, this.newVisibility, this.newSeedingMode, this.newTeamEntryMode, this.newFormat, this.newPoolGames).subscribe({
       next: t => {
         this.newName = '';
         this.newVisibility = 'public';
         this.newSeedingMode = 'automatic';
+        this.newPoolGames = 3;
         this.newTeamEntryMode = 'auto_draft';
+        this.newFormat = 'single';
         this.creating.set(false);
         this.tournaments.update(list => [t, ...list]);
         this.showToast('Tournament created!');
       },
-      error: () => { this.creating.set(false); this.createError.set('Failed to create tournament.'); },
+      // Prefer the server's own message — a plan gate explains itself far better than a
+      // generic failure, and a stale cached profile means the UI can let a request through
+      // that the server then refuses.
+      error: err => {
+        this.creating.set(false);
+        this.createError.set(err?.error?.error || 'Failed to create tournament.');
+      },
     });
   }
 

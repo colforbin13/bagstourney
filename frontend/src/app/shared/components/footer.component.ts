@@ -1,6 +1,7 @@
 // src/app/shared/components/footer.component.ts
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-footer',
@@ -8,6 +9,11 @@ import { RouterLink } from '@angular/router';
   imports: [RouterLink],
   template: `
     <footer class="app-footer">
+      <!-- Every public bracket ends here, so this is the line that turns players and
+           spectators into organizers. Signed-in organizers already have an account. -->
+      @if (!auth.isLoggedIn()) {
+        <a routerLink="/admin/register" class="app-footer-cta">Run your own tournament for free</a>
+      }
       <a routerLink="/" class="app-footer-brand">
         <svg width="14" height="12" viewBox="0 0 30 26" fill="none" aria-hidden="true">
           <circle cx="4" cy="4" r="3.2" fill="var(--accent)"/>
@@ -18,13 +24,44 @@ import { RouterLink } from '@angular/router';
         </svg>
         <span>Powered by Bracketway</span>
       </a>
+      <nav class="app-footer-links" aria-label="Site information">
+        <a routerLink="/blind-draw-generator">Blind draw generator</a>
+        <a routerLink="/cornhole-fundraiser">Fundraiser guide</a>
+        <a routerLink="/pricing">Pricing</a>
+        <a routerLink="/terms">Terms</a>
+        <a routerLink="/refunds">Refunds</a>
+        <a routerLink="/privacy">Privacy</a>
+      </nav>
     </footer>
   `,
   styles: [`
     .app-footer {
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
       padding: 32px 16px 24px;
+    }
+    .app-footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px 16px;
+      a {
+        color: var(--muted);
+        font-size: 0.72rem;
+        text-decoration: none;
+        &:hover { color: var(--text-dim); text-decoration: underline; }
+      }
+    }
+    /* Posters and the printed bracket shouldn't carry site links. */
+    @media print { .app-footer-links, .app-footer-cta { display: none; } }
+    .app-footer-cta {
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      &:hover { text-decoration: underline; }
     }
     .app-footer-brand {
       display: flex;
@@ -37,4 +74,6 @@ import { RouterLink } from '@angular/router';
     }
   `]
 })
-export class FooterComponent {}
+export class FooterComponent {
+  readonly auth = inject(AuthService);
+}

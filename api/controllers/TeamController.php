@@ -2,9 +2,7 @@
 // api/controllers/TeamController.php
 
 class TeamController {
-    public function __construct(PDO $db) {
-		$this->db = $db;
-	}
+    public function __construct(private readonly PDO $db) {}
 
     public function listByTournament(int $tournamentId): void {
         $stmt = $this->db->prepare('
@@ -22,8 +20,9 @@ class TeamController {
     }
 
     /**
-     * POST /teams — draw teams randomly from all participants, then seed them,
-     * then generate the single-elimination bracket structure.
+     * POST /teams — draw teams from all participants, then seed them, then generate the
+     * bracket structure. BlindDraw::pair() does the pairing: a plain random draw, or the
+     * balanced A/B draw when tournaments.draw_mode says so.
      */
     public function draw(array $body): void {
         $tournamentId = (int)($body['tournament_id'] ?? 0);
@@ -49,7 +48,7 @@ class TeamController {
             // Get participants — only 'approved' rows (self-registered walk-ups start
             // 'pending' and must never end up on a team without the organizer having
             // reviewed them first).
-            $stmt = $this->db->prepare('SELECT * FROM participants WHERE tournament_id = ? AND registration_status = "approved" ORDER BY RAND()');
+            $stmt = $this->db->prepare('SELECT * FROM participants WHERE tournament_id = ? AND registration_status = "approved"');
             $stmt->execute([$tournamentId]);
             $participants = $stmt->fetchAll();
 
@@ -74,12 +73,13 @@ class TeamController {
 
             // Clear any existing teams/matches for this tournament
             $this->db->prepare('DELETE FROM matches WHERE tournament_id = ?')->execute([$tournamentId]);
+            $this->db->prepare('DELETE FROM pool_matches WHERE tournament_id = ?')->execute([$tournamentId]);
             $this->db->prepare('DELETE FROM teams WHERE tournament_id = ?')->execute([$tournamentId]);
 
             // Pair participants into teams
             $teams = [];
-            $chunks = array_chunk($participants, 2);
-            foreach ($chunks as $i => $pair) {
+            $pairs = BlindDraw::pair($participants, $tournament['draw_mode'] ?? 'random');
+            foreach ($pairs as $i => $pair) {
                 $teamName = $pair[0]['name'] . ' & ' . $pair[1]['name'];
                 $seed = $i + 1;
                 $stmt = $this->db->prepare(
@@ -98,9 +98,15 @@ class TeamController {
             // 'setup' until the organizer confirms a seed order via generateBracketAction().
             // Automatic seeding (the default) generates the bracket immediately, unchanged.
             if (($tournament['seeding_mode'] ?? 'automatic') === 'automatic') {
-                $this->generateBracket($tournamentId, $teams);
+                $this->requireFormatAllowed($tournamentId, $tournament['format'] ?? 'single');
+                $this->generateBracket($tournamentId, $teams, $tournament['format'] ?? 'single');
                 $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                     ->execute(['active', $tournamentId]);
+                (new BoardController($this->db))->reconcile($tournamentId);
+            } elseif ($tournament['seeding_mode'] === 'pool_play') {
+                // Like automatic seeding, one step: the draw forms teams and starts the
+                // pool, and the tournament goes live. The bracket comes after the pool.
+                (new PoolController($this->db))->start($tournamentId);
             }
 
             $this->db->commit();
@@ -121,6 +127,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -152,7 +166,7 @@ class TeamController {
                 throw new Exception('Tournament is not in setup phase');
             }
             if (($tournament['team_entry_mode'] ?? 'auto_draft') !== 'direct') {
-                throw new Exception('This tournament uses auto-draft team entry — add participants and draw teams instead');
+                throw new Exception('This tournament uses blind draw team entry — add participants and draw teams instead');
             }
 
             $cap = effectiveParticipantCap($this->db, $tournamentId);
@@ -194,6 +208,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -213,12 +235,10 @@ class TeamController {
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt = $this->db->prepare('SELECT status, seeding_mode FROM tournaments WHERE id = ?');
             $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch();
-            if (!$tournament || $tournament['status'] !== 'setup') {
-                throw new Exception('Teams can only be reordered before the bracket is generated');
-            }
+            $this->requireSeedsOpen($tournamentId, $tournament, 'Teams can only be reordered before the bracket is generated');
 
             $stmt = $this->db->prepare('SELECT id FROM teams WHERE tournament_id = ?');
             $stmt->execute([$tournamentId]);
@@ -255,6 +275,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -274,12 +302,10 @@ class TeamController {
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt = $this->db->prepare('SELECT status, format, seeding_mode FROM tournaments WHERE id = ?');
             $stmt->execute([$tournamentId]);
             $tournament = $stmt->fetch();
-            if (!$tournament || $tournament['status'] !== 'setup') {
-                throw new Exception('Tournament is not awaiting bracket generation');
-            }
+            $this->requireSeedsOpen($tournamentId, $tournament, 'Tournament is not awaiting bracket generation');
 
             $stmt = $this->db->prepare('SELECT id, seed FROM teams WHERE tournament_id = ? ORDER BY seed');
             $stmt->execute([$tournamentId]);
@@ -293,10 +319,12 @@ class TeamController {
                 throw new Exception('Need at least 2 teams to generate a bracket');
             }
 
-            $this->generateBracket($tournamentId, $teams);
+            $this->requireFormatAllowed($tournamentId, $tournament['format'] ?? 'single');
+            $this->generateBracket($tournamentId, $teams, $tournament['format'] ?? 'single');
 
             $this->db->prepare('UPDATE tournaments SET status = ? WHERE id = ?')
                 ->execute(['active', $tournamentId]);
+            (new BoardController($this->db))->reconcile($tournamentId);
 
             $this->db->commit();
 
@@ -315,6 +343,14 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -379,188 +415,131 @@ class TeamController {
             $this->db->rollBack();
             http_response_code(400);
             echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // Separate from the catch above, not merged into it: an Error is not a validation
+            // failure and must not be echoed as a 400 message, but it still has to unwind the
+            // transaction before reaching the router's 500 handler. See AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
         }
     }
 
     /**
-     * Build a standard single-elimination bracket.
-     * Teams are seeded: 1v(last), 2v(last-1), etc.
+     * The second half of the paid-tier format gate (TournamentController::create()/update()
+     * is the first): re-checked here because the format could have been chosen while the
+     * plan was active and the bracket generated after it lapsed.
+     *
+     * Deliberately the *last* moment it is ever checked. Once the bracket exists nothing
+     * re-validates it, so a lapsed plan can never break a tournament that is already being
+     * played — the worst available failure mode is a live bracket dying at a venue mid-event.
+     *
+     * Throwing leaves the caller's transaction to roll back, so a tournament that fails here
+     * still has no teams and no bracket, and stays in 'setup' where its format can be
+     * switched back to single elimination.
      */
-    private function generateBracket(int $tournamentId, array $teams): void {
-        $numTeams = count($teams);
+    /**
+     * Seeds can be set, and the bracket generated from them, in two windows: a manual or
+     * direct-entry tournament still in setup, and a pool-play tournament whose pool is
+     * finished (it is 'active' by then, so spectators could follow the pool). A pool-play
+     * tournament in setup has not played its pool yet, so it is refused, as is one whose
+     * pool still has games left: its seeds are still moving.
+     */
+    private function requireSeedsOpen(int $tournamentId, $tournament, string $closedMessage): void {
+        if (!$tournament) throw new Exception($closedMessage);
+        if (($tournament['seeding_mode'] ?? '') === 'pool_play') {
+            if ($tournament['status'] === 'setup') {
+                throw new Exception('Start pool play first. The pool standings set the seeds.');
+            }
+            if (!PoolController::inPoolStage($this->db, $tournamentId)) {
+                throw new Exception($closedMessage);
+            }
+            if (!PoolController::poolComplete($this->db, $tournamentId)) {
+                throw new Exception('Finish every pool game first. The standings set the seeds.');
+            }
+            return;
+        }
+        if ($tournament['status'] !== 'setup') {
+            throw new Exception($closedMessage);
+        }
+    }
 
-        // Round up to next power of 2 for bracket size
-        $bracketSize = 1;
-        while ($bracketSize < $numTeams) $bracketSize *= 2;
+    private function requireFormatAllowed(int $tournamentId, string $format): void {
+        if (formatRequiresPaidPlan($format) && !tournamentHasPaidFeatures($this->db, $tournamentId)) {
+            throw new Exception(
+                'Double elimination is a Pro feature. Upgrade, or switch this tournament to single elimination.'
+            );
+        }
+    }
 
-        // Compute number of rounds (log base 2). Use safe formula to avoid relying on optional log($value, $base) overloads.
-        $numRounds = (int)(log($bracketSize) / log(2));
-
-        // Build seeded matchups using standard bracket seeding
-        // Seed 1 vs last, 2 vs second-last, etc.
-        $seeds = range(1, $bracketSize);
-        $matchups = $this->buildSeededMatchups($seeds);
-
-        // Map seed → team (null = bye)
-        $seedMap = [];
+    /**
+     * Persist a bracket for $teams.
+     *
+     * The bracket's *shape* — pairings, byes, where winners advance, where losers drop — is
+     * computed by BracketBuilder, which is pure and unit-tested in
+     * tests/BracketBuilderTest.php and tests/BracketDoubleEliminationTest.php. This method
+     * only writes that shape out. Keep the split: bracket logic that lives here cannot be
+     * tested without a database, which is what made this the riskiest code in the repo to
+     * change (see FEATURE_TRACKER.md item 16).
+     *
+     * @param array  $teams  Rows with at least 'id' and 'seed'.
+     * @param string $format 'single' or 'double'. Anything else is treated as 'single', so a
+     *                       row predating the format column can never be read as double.
+     */
+    private function generateBracket(int $tournamentId, array $teams, string $format = 'single'): void {
+        $seedToTeamId = [];
         foreach ($teams as $team) {
-            $seedMap[$team['seed']] = $team;
+            $seedToTeamId[(int)$team['seed']] = (int)$team['id'];
         }
 
-        // Create all matches for all rounds, starting from round 1
-        // matchNumber within a round determines bracket position
-        $matchesPerRound = [];
-        for ($r = 1; $r <= $numRounds; $r++) {
-            $matchesPerRound[$r] = $bracketSize / pow(2, $r);
+        // Throws on a field smaller than two teams or on gapped seeds. Both surface through
+        // the caller's catch block as a 400 instead of silently producing a wrong draw.
+        $plan = $format === 'double'
+            ? BracketBuilder::doubleElimination($seedToTeamId)
+            : BracketBuilder::singleElimination($seedToTeamId);
+
+        $insert = $this->db->prepare('
+            INSERT INTO matches
+                (tournament_id, round, match_number, bracket_side, is_reset, team1_id, team2_id, winner_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ');
+        $matchIds = [];
+        foreach ($plan as $index => $match) {
+            $insert->execute([
+                $tournamentId,
+                $match['round'],
+                $match['match_number'],
+                $match['bracket_side'],
+                $match['is_reset'] ? 1 : 0,
+                $match['team1_id'],
+                $match['team2_id'],
+                $match['winner_id'],
+                $match['status'],
+            ]);
+            $matchIds[$index] = (int)$this->db->lastInsertId();
         }
 
-        // Insert round 1 matches first (without next_match_id links yet)
-        $round1Matches = [];
-        foreach ($matchups as $i => $pair) {
-            $matchNumber = $i + 1;
-            $team1 = $seedMap[$pair[0]] ?? null;
-            $team2 = $seedMap[$pair[1]] ?? null;
-
-            $team1Id = $team1['id'] ?? null;
-            $team2Id = $team2['id'] ?? null;
-
-            // Determine status
-            $status = 'pending';
-            $winnerId = null;
-
-            // Handle byes: if one team is null, mark as a bye (auto-win) but don't mark as 'complete'
-            // We store winner_id so we can place the team into the next round, but use 'bye' to prevent
-            // cascading propagation beyond the immediate next round during bracket construction.
-            if ($team1Id && !$team2Id) {
-                $status = 'bye';
-                $winnerId = $team1Id;
-            } elseif (!$team1Id && $team2Id) {
-                $status = 'bye';
-                $winnerId = $team2Id;
-            } elseif ($team1Id && $team2Id) {
-                $status = 'ready';
+        // Second pass: the builder's forward pointers are array indexes, which can only be
+        // resolved to real match ids once every row above exists. Both edges are written in
+        // one statement so a match is never left half-linked.
+        $link = $this->db->prepare('
+            UPDATE matches
+            SET next_match_id = ?, next_match_slot = ?, loser_match_id = ?, loser_match_slot = ?
+            WHERE id = ?
+        ');
+        foreach ($plan as $index => $match) {
+            if ($match['next_match'] === null && $match['loser_match'] === null) {
+                continue;
             }
-
-            $stmt = $this->db->prepare('
-                INSERT INTO matches (tournament_id, round, match_number, team1_id, team2_id, winner_id, status)
-                VALUES (?, 1, ?, ?, ?, ?, ?)
-            ');
-            $stmt->execute([$tournamentId, $matchNumber, $team1Id, $team2Id, $winnerId, $status]);
-            $round1Matches[$matchNumber] = (int)$this->db->lastInsertId();
+            $link->execute([
+                $match['next_match'] === null ? null : $matchIds[$match['next_match']],
+                $match['next_match_slot'],
+                $match['loser_match'] === null ? null : $matchIds[$match['loser_match']],
+                $match['loser_match_slot'],
+                $matchIds[$index],
+            ]);
         }
-
-        // Insert subsequent rounds
-        $prevRoundMatches = $round1Matches;
-        for ($r = 2; $r <= $numRounds; $r++) {
-            $count = $matchesPerRound[$r];
-            $currentRoundMatches = [];
-            for ($mn = 1; $mn <= $count; $mn++) {
-                $stmt = $this->db->prepare('
-                    INSERT INTO matches (tournament_id, round, match_number, status)
-                    VALUES (?, ?, ?, "pending")
-                ');
-                $stmt->execute([$tournamentId, $r, $mn]);
-                $currentRoundMatches[$mn] = (int)$this->db->lastInsertId();
-            }
-
-            // Link previous round matches to this round
-            foreach ($prevRoundMatches as $mn => $matchId) {
-                $nextMn = (int)ceil($mn / 2);
-                $slot   = ($mn % 2 === 1) ? 1 : 2;
-                $this->db->prepare('UPDATE matches SET next_match_id = ?, next_match_slot = ? WHERE id = ?')
-                    ->execute([$currentRoundMatches[$nextMn], $slot, $matchId]);
-            }
-
-            // Place bye winners into the next round's slots only — no cascading.
-            foreach ($prevRoundMatches as $mn => $matchId) {
-                $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
-                $stmt->execute([$matchId]);
-                $m = $stmt->fetch();
-                if (!$m || !$m['next_match_id'] || !$m['winner_id']) continue;
-
-                $col = (int)$m['next_match_slot'] === 1 ? 'team1_id' : 'team2_id';
-                $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
-                    ->execute([$m['winner_id'], $m['next_match_id']]);
-
-                $this->maybeMarkReady((int)$m['next_match_id']);
-            }
-
-            $prevRoundMatches = $currentRoundMatches;
-        }
-
-        // Safety: ensure final match is not auto-declared a winner due to chained byes.
-        // Clear any 'bye' status and winner_id on final matches so the championship must be played.
-        $this->db->prepare('UPDATE matches SET status = "pending", winner_id = NULL WHERE tournament_id = ? AND next_match_id IS NULL AND status = "bye"')
-            ->execute([$tournamentId]);
-    }
-
-    private function maybeMarkReady(int $matchId): void {
-        $stmt = $this->db->prepare('SELECT team1_id, team2_id FROM matches WHERE id = ?');
-        $stmt->execute([$matchId]);
-        $m = $stmt->fetch();
-        if ($m && $m['team1_id'] && $m['team2_id']) {
-            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$matchId]);
-        }
-    }
-
-    /**
-     * Propagate the winner from a source match into its next match slot and cascade
-     * through subsequent rounds when the target match has only one team (a bye).
-     */
-    private function propagateWinnerFromMatchToNext(int $sourceMatchId): void {
-        $stmt = $this->db->prepare('SELECT winner_id, next_match_id, next_match_slot FROM matches WHERE id = ?');
-        $stmt->execute([$sourceMatchId]);
-        $m = $stmt->fetch();
-        if (!$m || !$m['next_match_id'] || !$m['winner_id']) return;
-
-        $nextId = (int)$m['next_match_id'];
-        $slot   = (int)$m['next_match_slot'];
-        $col    = $slot === 1 ? 'team1_id' : 'team2_id';
-
-        $this->db->prepare("UPDATE matches SET $col = ? WHERE id = ?")
-            ->execute([$m['winner_id'], $nextId]);
-
-        $stmt2 = $this->db->prepare('SELECT team1_id, team2_id, status FROM matches WHERE id = ?');
-        $stmt2->execute([$nextId]);
-        $nm = $stmt2->fetch();
-
-        if ($nm && $nm['team1_id'] && $nm['team2_id']) {
-            $this->db->prepare('UPDATE matches SET status = "ready" WHERE id = ?')->execute([$nextId]);
-        } elseif ($nm && ($nm['team1_id'] || $nm['team2_id'])) {
-            // Only one team in the next match — it's itself a bye, keep cascading
-            $byeWinnerId = $nm['team1_id'] ?? $nm['team2_id'];
-            $this->db->prepare('UPDATE matches SET status = "bye", winner_id = ? WHERE id = ?')
-                ->execute([$byeWinnerId, $nextId]);
-            $this->propagateWinnerFromMatchToNext($nextId); // recurse
-        }
-    }
-
-    private function buildSeededMatchups(array $seeds): array {
-        $size = count($seeds);
-        if ($size < 2) return [];
-        $order = $this->seedOrder($size);
-        $matchups = [];
-        for ($i = 0; $i < $size; $i += 2) {
-            $matchups[] = [$seeds[$order[$i] - 1], $seeds[$order[$i + 1] - 1]];
-        }
-        return $matchups;
-    }
-
-    /**
-     * Standard single-elimination seeding order for a bracket of $size (a power of 2),
-     * as a permutation of positions 1..$size. Built recursively so that seed 1 and seed 2
-     * can only meet in the final, {1,2} and {3,4} can only meet in the semifinal, and so on —
-     * i.e. top seeds are placed in opposite bracket halves rather than paired sequentially.
-     */
-    private function seedOrder(int $size): array {
-        if ($size <= 1) return [1];
-        $prev = $this->seedOrder((int)($size / 2));
-        $order = [];
-        foreach ($prev as $s) {
-            $order[] = $s;
-            $order[] = $size + 1 - $s;
-        }
-        return $order;
     }
 }
 

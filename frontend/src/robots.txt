@@ -1,0 +1,11 @@
+# Bracketway: public pages are open to search engines; signed-in screens are not useful to them.
+User-agent: *
+Disallow: /admin
+Disallow: /api/
+Disallow: /register/
+Disallow: /poster/
+Disallow: /notifications/
+Disallow: /reset-password
+Disallow: /verify-email
+
+Sitemap: https://bracketway.com/sitemap.xml

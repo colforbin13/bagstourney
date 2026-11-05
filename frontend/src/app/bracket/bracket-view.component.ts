@@ -1,16 +1,42 @@
 // src/app/bracket/bracket-view.component.ts
-import { Component, OnInit, AfterViewInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, DOCUMENT, signal, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
 import { Tournament, Match, BracketData } from '../shared/models/tournament.models';
-import { roundLabel as labelForRound, teamParticipants as participantsFor } from '../shared/bracket-labels';
+import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
+import { BoardsPanelComponent } from '../shared/components/boards-panel.component';
+import { boardWord } from '../shared/board-labels';
+import { SITE_URL, setCanonicalLink } from '../shared/seo';
+import {
+  roundLabel as labelForRound,
+  teamParticipants as participantsFor,
+  championName,
+  BracketSideName,
+} from '../shared/bracket-labels';
 
 interface ScoreEntry { team1: string; team2: string; }
 
 interface Connector { y1: number; y2: number; mid: number; }
+
+/** One round column of the generalized per-side layout used for double elimination. */
+interface SideRound {
+  pos: number;
+  label: string;
+  matches: { match: Match; gridRow: string }[];
+  connectors: Connector[];
+  isLast: boolean;
+}
+
+interface SideLayout {
+  side: BracketSideName;
+  heading: string;
+  /** Row units the whole side needs — its widest round's match count. */
+  rows: number;
+  rounds: SideRound[];
+}
 
 /** One round column of one half of the mirrored (TV) layout. */
 interface MirrorRound {
@@ -33,7 +59,7 @@ interface MirrorLayout {
 @Component({
   selector: 'app-bracket-view',
   standalone: true,
-  imports: [RouterLink, FormsModule, NgTemplateOutlet],
+  imports: [RouterLink, FormsModule, NgTemplateOutlet, PoolStandingsComponent, BoardsPanelComponent],
   templateUrl: './bracket-view.component.html',
   styleUrl: './bracket-view.component.css'
 })
@@ -80,13 +106,15 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Computed bracket data ──────────────────────────────────────────────────
 
+  isDoubleElimination = computed(() => this.bracketData()?.format === 'double');
+
+  // The winners bracket, which for single elimination is the whole tournament. The mirrored
+  // TV layout and the mobile column layout both read this, so single elimination renders
+  // through exactly the code path it always has.
   rounds = computed(() => {
-    const data = this.bracketData();
-    if (!data) return [];
-    return Object.entries(data.rounds)
-      .map(([num, matches]) => ({ num: +num, matches: matches as Match[] }))
-      .sort((a, b) => a.num - b.num)
-      .map((r, i) => ({ ...r, pos: i + 1 }));
+    const winners = (this.bracketData()?.sides ?? []).find(s => s.side === 'winners');
+    if (!winners) return [];
+    return winners.rounds.map((r, i) => ({ num: r.round, matches: r.matches, pos: i + 1 }));
   });
 
   totalRounds = computed(() => this.rounds().length);
@@ -97,12 +125,125 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly rowUnitPx = 150;
   readonly gutterWidth = 32;
 
-  champion = computed(() => {
-    const rs = this.rounds();
-    if (!rs.length) return null;
-    const final = rs[rs.length - 1]?.matches[0];
-    return final?.winner_name ?? null;
+  champion = computed(() => championName(this.bracketData()));
+
+  // Pool play (FEATURE_TRACKER item 18). Null unless the tournament uses it.
+  pool = computed(() => this.bracketData()?.pool ?? null);
+
+  // Board assignments (FEATURE_TRACKER item 8): shown only while games are being played.
+  boardWord = computed(() => boardWord(this.bracketData()?.boards?.label));
+  showBoards = computed(() => !!this.bracketData()?.boards && this.tournament()?.status === 'active');
+
+  // On a TV only the round being played fits alongside the standings; anywhere else, every
+  // round, newest first, so the latest results are at the top of a phone screen.
+  poolRoundsToShow = computed(() => {
+    const p = this.pool();
+    if (!p) return [];
+    if (this.kiosk()) {
+      const current = p.rounds.find(r => r.matches.some(m => m.status !== 'complete'));
+      return current ? [current] : p.rounds.slice(-1);
+    }
+    return [...p.rounds].reverse();
   });
+
+  /**
+   * The match that actually crowns the champion, so the trophy marker can be placed without
+   * assuming "last round of the only tree". In double elimination that is the deciding match
+   * when it was played, otherwise the grand final.
+   */
+  decidingMatchId = computed<number | null>(() => {
+    const sides = this.bracketData()?.sides ?? [];
+    const grandFinal = sides.find(s => s.side === 'grand_final');
+    if (grandFinal) {
+      const decider = grandFinal.rounds[1]?.matches[0];
+      if (decider?.winner_id) return decider.id;
+      return grandFinal.rounds[0]?.matches[0]?.id ?? null;
+    }
+    const winners = sides.find(s => s.side === 'winners');
+    const lastRound = winners?.rounds[winners.rounds.length - 1];
+    return lastRound?.matches[0]?.id ?? null;
+  });
+
+  /** Whether this match's winner should be shown wearing the trophy. */
+  crownsChampion(match: Match): boolean {
+    return this.tournament()?.status === 'complete' && match.id === this.decidingMatchId();
+  }
+
+  /**
+   * Stacked winners → losers → grand final sections, used for double elimination.
+   *
+   * Deliberately not an extension of the mirrored layout. That geometry assumes a perfect
+   * binary tree — every round exactly half the size of the one before — which the losers
+   * bracket breaks: it alternates minor and major rounds, so its sizes halve every *two*
+   * rounds. Rows here are apportioned from each round's real match count instead, which
+   * reduces to the same placement a perfect tree produces, and connectors are derived from
+   * actual next_match_id links rather than from positional pairing.
+   */
+  sideLayouts = computed<SideLayout[]>(() => {
+    const data = this.bracketData();
+    if (!data?.sides) return [];
+
+    return data.sides.map(side => {
+      const rows = Math.max(1, ...side.rounds.map(r => r.matches.length));
+      const total = side.rounds.length;
+
+      const band = (k: number, count: number) => {
+        const start = Math.round(((k - 1) * rows) / count) + 1;
+        const end = Math.round((k * rows) / count) + 1;
+        return { start, span: Math.max(1, end - start) };
+      };
+      const centerOf = (k: number, count: number) => {
+        const b = band(k, count);
+        return (b.start - 1 + b.span / 2) * this.rowUnitPx;
+      };
+
+      const rounds: SideRound[] = side.rounds.map((round, i) => {
+        const ordered = [...round.matches].sort((a, b) => a.match_number - b.match_number);
+        const count = ordered.length;
+
+        const matches = ordered.map((match, k) => {
+          const b = band(k + 1, count);
+          return { match, gridRow: `${b.start} / span ${b.span}` };
+        });
+
+        const connectors: Connector[] = [];
+        const next = side.rounds[i + 1];
+        if (next) {
+          const nextOrdered = [...next.matches].sort((a, b) => a.match_number - b.match_number);
+          const positionById = new Map(nextOrdered.map((m, idx) => [m.id, idx + 1]));
+          // Several matches can feed the same target (a normal 2-into-1), or just one can
+          // (a losers major round, whose other entrant drops in from the winners tree and
+          // so has no line to draw inside this section).
+          const bySources = new Map<number, number[]>();
+          ordered.forEach((match, k) => {
+            const targetPos = match.next_match_id != null ? positionById.get(match.next_match_id) : undefined;
+            if (!targetPos) return;
+            if (!bySources.has(targetPos)) bySources.set(targetPos, []);
+            bySources.get(targetPos)!.push(centerOf(k + 1, count));
+          });
+          bySources.forEach((ys, targetPos) => {
+            connectors.push({ y1: ys[0], y2: ys[ys.length - 1], mid: centerOf(targetPos, nextOrdered.length) });
+          });
+        }
+
+        return {
+          pos: i + 1,
+          label: labelForRound(i + 1, total, side.side, data.format),
+          matches,
+          connectors,
+          isLast: i === total - 1,
+        };
+      });
+
+      return { side: side.side, heading: this.sideHeading(side.side), rows, rounds };
+    });
+  });
+
+  private sideHeading(side: BracketSideName): string {
+    if (side === 'losers') return 'Losers Bracket';
+    if (side === 'grand_final') return 'Grand Final';
+    return 'Winners Bracket';
+  }
 
   // Whether the current viewer can actually submit/edit scores for this tournament —
   // distinct from auth.isLoggedIn(), which only says they're logged in as *someone*,
@@ -264,6 +405,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private tournamentId!: number;
   private uuid: string | null = null;
+  private readonly document = inject(DOCUMENT);
 
   constructor(
     private route: ActivatedRoute,
@@ -368,7 +510,13 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loading.set(true);
     if (this.uuid) {
       this.svc.getTournamentByUuid(this.uuid).subscribe({
-        next: t => { this.tournament.set(t); this.tournamentId = t.id; },
+        next: t => {
+          this.tournament.set(t);
+          this.tournamentId = t.id;
+          // One address per bracket for search engines, whatever ?tv= or trailing slash this
+          // visit arrived with. Matches the canonical api/preview.php serves.
+          if (t.uuid) setCanonicalLink(this.document, `${SITE_URL}/bracket/${encodeURIComponent(t.uuid)}`);
+        },
         error: () => this.showError('Tournament not found.'),
       });
       this.svc.getBracketByUuid(this.uuid).subscribe({
@@ -389,11 +537,11 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private applyBracketData(data: BracketData) {
     this.bracketData.set(data);
-    Object.values(data.rounds).flat().forEach((m: Match) => {
+    (data.sides ?? []).forEach(side => side.rounds.forEach(round => round.matches.forEach((m: Match) => {
       if (!this.scores[m.id]) {
         this.scores[m.id] = { team1: '', team2: '' };
       }
-    });
+    })));
     this.loading.set(false);
     // The bracket's natural size changes as rounds arrive (and can change again on an
     // auto-reload, once byes resolve into real matchups), so re-fit after each render.
