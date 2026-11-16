@@ -4,6 +4,27 @@
 class MatchController {
     public function __construct(private readonly PDO $db) {}
 
+    // A match row with its teams' and players' names attached, as every response returns it.
+    private const MATCH_SELECT = '
+        SELECT
+            m.*,
+            t1.name as team1_name,
+            t2.name as team2_name,
+            tw.name as winner_name,
+            t1p1.name as team1_participant1_name,
+            t1p2.name as team1_participant2_name,
+            t2p1.name as team2_participant1_name,
+            t2p2.name as team2_participant2_name
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN teams tw ON m.winner_id = tw.id
+        LEFT JOIN participants t1p1 ON t1.participant1_id = t1p1.id
+        LEFT JOIN participants t1p2 ON t1.participant2_id = t1p2.id
+        LEFT JOIN participants t2p1 ON t2.participant1_id = t2p1.id
+        LEFT JOIN participants t2p2 ON t2.participant2_id = t2p2.id
+    ';
+
     // Resolves a uuid to its tournament before delegating to bracket() — no visibility
     // check here, matching TournamentController::getByUuid(): knowing the uuid is itself
     // the access grant for a private tournament.
@@ -20,27 +41,7 @@ class MatchController {
     }
 
     public function bracket(int $tournamentId): void {
-        $stmt = $this->db->prepare('
-            SELECT
-                m.*,
-                t1.name as team1_name,
-                t2.name as team2_name,
-                tw.name as winner_name,
-                t1p1.name as team1_participant1_name,
-                t1p2.name as team1_participant2_name,
-                t2p1.name as team2_participant1_name,
-                t2p2.name as team2_participant2_name
-            FROM matches m
-            LEFT JOIN teams t1 ON m.team1_id  = t1.id
-            LEFT JOIN teams t2 ON m.team2_id  = t2.id
-            LEFT JOIN teams tw ON m.winner_id  = tw.id
-            LEFT JOIN participants t1p1 ON t1.participant1_id = t1p1.id
-            LEFT JOIN participants t1p2 ON t1.participant2_id = t1p2.id
-            LEFT JOIN participants t2p1 ON t2.participant1_id = t2p1.id
-            LEFT JOIN participants t2p2 ON t2.participant2_id = t2p2.id
-            WHERE m.tournament_id = ?
-            ORDER BY m.round ASC, m.match_number ASC
-        ');
+        $stmt = $this->db->prepare(self::MATCH_SELECT . ' WHERE m.tournament_id = ? ORDER BY m.round ASC, m.match_number ASC');
         $stmt->execute([$tournamentId]);
         $matches = $stmt->fetchAll();
 
@@ -212,26 +213,7 @@ class MatchController {
             );
 
             // Return updated match
-            $stmt = $this->db->prepare('
-                SELECT
-                    m.*,
-                    t1.name as team1_name,
-                    t2.name as team2_name,
-                    tw.name as winner_name,
-                    t1p1.name as team1_participant1_name,
-                    t1p2.name as team1_participant2_name,
-                    t2p1.name as team2_participant1_name,
-                    t2p2.name as team2_participant2_name
-                FROM matches m
-                LEFT JOIN teams t1 ON m.team1_id = t1.id
-                LEFT JOIN teams t2 ON m.team2_id = t2.id
-                LEFT JOIN teams tw ON m.winner_id = tw.id
-                LEFT JOIN participants t1p1 ON t1.participant1_id = t1p1.id
-                LEFT JOIN participants t1p2 ON t1.participant2_id = t1p2.id
-                LEFT JOIN participants t2p1 ON t2.participant1_id = t2p1.id
-                LEFT JOIN participants t2p2 ON t2.participant2_id = t2p2.id
-                WHERE m.id = ?
-            ');
+            $stmt = $this->db->prepare(self::MATCH_SELECT . ' WHERE m.id = ?');
             $stmt->execute([$matchId]);
             echo json_encode($stmt->fetch());
 

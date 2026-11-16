@@ -85,10 +85,9 @@ function requireTournamentRole(PDO $db, int $tournamentId, array $allowedRoles):
 // session — for endpoints (like viewing a tournament) that work for anonymous callers but
 // should still report richer information when the caller is authenticated.
 function currentUserOrNull(PDO $db): ?array {
-    $headers = getallheaders();
-    $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-    if (!str_starts_with($auth, 'Bearer ')) return null;
-    $claims = verifyJWT(substr($auth, 7));
+    $token = bearerToken();
+    if ($token === null) return null;
+    $claims = verifyJWT($token);
     if (!$claims) return null;
     return currentUser($db, $claims);
 }
@@ -265,15 +264,21 @@ function verifyJWT(string $token): ?array {
     return $data;
 }
 
-function requireAuth(): array {
+// The request's Bearer token, or null when it carries none.
+function bearerToken(): ?string {
     $headers = getallheaders();
     $auth = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-    if (!str_starts_with($auth, 'Bearer ')) {
+    return str_starts_with($auth, 'Bearer ') ? substr($auth, 7) : null;
+}
+
+function requireAuth(): array {
+    $token = bearerToken();
+    if ($token === null) {
         http_response_code(401);
         echo json_encode(['error' => 'Unauthorized']);
         exit;
     }
-    $claims = verifyJWT(substr($auth, 7));
+    $claims = verifyJWT($token);
     if (!$claims) {
         http_response_code(401);
         echo json_encode(['error' => 'Invalid or expired token']);
