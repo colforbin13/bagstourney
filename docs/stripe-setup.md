@@ -30,6 +30,61 @@ which is why the default is the safe direction rather than the conservative-look
 
 ---
 
+## Where setup stands (as of 2026-11-16)
+
+**Live.** Testing, validation and live-mode setup are complete, and production runs billing
+with live Stripe values in the server's `database.php`. The live prices match
+`FALLBACK_PLANS` in `pricing.component.ts` ($9.99 a month, $12.99 per tournament); keep the
+two in step when a price changes in Stripe.
+
+The rest of this section is the history of getting there, kept because the test results and
+the two bugs they found are worth knowing.
+
+**Done by 2026-10-09**
+
+- Stripe account created, with a sandbox ("Bracketway sandbox").
+- Sandbox catalogue: monthly subscription ($9.99) and one-time tournament upgrade ($12.99).
+  No annual price — that option is simply not offered.
+- Sandbox customer portal works (opened and used to cancel a subscription).
+- Local `api/config/database.php` holds the sandbox secret key, a webhook secret and the two
+  price ids.
+- Migration `017_stripe_billing.sql` applied to the production database.
+- Stripe CLI installed and authorized for the sandbox.
+- Production PHP confirmed to have `mbstring`, which the webhook handler needs.
+
+**Tested locally against the sandbox**
+
+| Path | Result |
+|---|---|
+| Subscription purchase | Plan granted via the return page |
+| Cancel at period end (portal) | Plan kept, `plan_expires_at` set |
+| Immediate cancellation (CLI) | Plan revoked, back to free |
+| Tournament unlock purchase | Tournament upgraded via the webhook |
+| Full refund of an unlock (CLI) | Upgrade removed, checkout marked `reversed` |
+| `invoice.payment_failed` (synthetic `stripe trigger`) | Recorded as ignored, no plan change |
+| Bad webhook signature | Rejected with 400 |
+
+Two bugs surfaced and were fixed in commit `31e251b`: Stripe unlocks were recorded as
+`manual` (so refunds could never reverse them), and an event whose handler died mid-flight
+was never retried. Neither has a unit test — both are MySQL-specific SQL — and no checkout
+has been run end to end since the unlock fix; the corrected statement was verified directly.
+
+**Done after 2026-10-09**
+
+- The billing fixes (`31e251b`, and `42ef534` so Stripe can't revoke a super admin's grant)
+  deployed to production.
+- Terms, refund and privacy pages published (`/terms`, `/refunds`, `/privacy`, 2026-10-15).
+- The remaining testing and validation, including the production webhook path.
+- Live-mode account verification, and sections 0–4 below repeated in **live** mode.
+- Live values put in the server's `database.php`, edited on the server. `deploy.ps1` never
+  copies the local file over it.
+
+Test leftovers in the production database, all from the sandbox: two `billing_checkouts`
+rows, several `billing_events` rows, audit-log entries, and soft-deleted tournament 60. The
+`claude-organizer` test account is back on the free plan.
+
+---
+
 ## 0. Enable Managed Payments
 
 Before anything else, at **Settings → Managed Payments**:

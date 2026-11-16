@@ -16,12 +16,11 @@ shifting as items get scoped in detail. The numeric labels are stable IDs assign
 each item was first added, not a priority ranking (this is also why the order no longer
 matches numeric order — e.g. item 12 outranks items 5/7/8 despite the higher number).
 
-Note that **items 12 and 13 are feature complete but not yet earning** — their enforcement
-plumbing has been live in production since 2026-08-13/14, and the Stripe billing half was
-built 2026-09-08 (see each item's status note). They stay here rather than moving to Done
-because nothing has been sold yet: the integration ships disabled until real Stripe keys,
-prices and a live-mode webhook endpoint exist, and those are dashboard/business steps
-rather than code. Every other item below is genuinely unstarted.
+Note that **items 12 and 13 are live in production** — their enforcement plumbing since
+2026-08-13/14, and Stripe billing (built 2026-09-08) with live keys, prices and webhook by
+2026-11-16 (see each item's status note and `docs/stripe-setup.md`). They stay here rather
+than moving to Done until they have earned: the open question they answer is whether
+organizers will pay. Every other item below is genuinely unstarted.
 
 Items 19-23 were added 2026-10-23 from a comparison with Scoreholio, the best-known
 cornhole tournament app, in the order Matt approved. Scoreholio features judged not worth
@@ -104,10 +103,10 @@ their event — is worse than carrying them through the retry window), and a lap
 touches tournaments the organizer already owns, matching the standing rule that the gates
 read the plan only at the moment of a *new* choice.
 
-**Not yet earning.** The code ships disabled and needs Stripe keys, price ids and a
-live-mode webhook endpoint — `docs/stripe-setup.md` is the walkthrough, including the
-go-live items that are business rather than code (ToS, refund policy, accepting the Managed
-Payments terms). Tax is no longer on that list: Managed Payments handles it.
+**Live by 2026-11-16.** Testing, validation and live-mode setup are complete, and
+production runs with live Stripe values. `docs/stripe-setup.md` holds the walkthrough and
+the history, including the business steps (ToS, refund policy, the Managed Payments terms).
+Tax is Stripe's: Managed Payments handles it.
 
 Priority note: promoted to the front of the monetization chain on 2026-08-12 — the
 simplest payment integration of the four monetization items (single merchant, no
@@ -192,7 +191,7 @@ Three design points worth not re-deriving later:
   at-least-once delivery cannot double-grant. A row left in `error` is deliberately
   reprocessable, so a transient failure heals on one of Stripe's three days of retries.
 
-**Not yet earning** — same as item 12: needs keys, prices and a live webhook endpoint. See
+**Live by 2026-11-16** — same as item 12: live keys, prices and webhook are in place. See
 `docs/stripe-setup.md`.
 
 Priority note: sequenced right after item 12 since it reuses item 12's gating mechanism
