@@ -10,7 +10,6 @@ import { AuthService } from '../shared/services/auth.service';
   template: `
     <div class="page">
       <header class="intro">
-        <p class="eyebrow">How it works</p>
         <h1>From a pile of players to a champion.</h1>
         <p class="lede">
           The whole run of a tournament, start to finish, so you know what you're getting into
@@ -217,14 +216,6 @@ import { AuthService } from '../shared/services/auth.service';
   `,
   styles: [`
     .intro { margin-bottom: 40px; }
-    .eyebrow {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
 
@@ -256,9 +247,8 @@ import { AuthService } from '../shared/services/auth.service';
     .chapter { border-top: 2px solid var(--border); padding-top: 16px; }
     .chapter-num {
       font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .14em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--accent);
     }
     .chapter h2 { font-size: 1.6rem; margin: 8px 0 12px; }
@@ -279,9 +269,8 @@ import { AuthService } from '../shared/services/auth.service';
     }
     .choices dt {
       font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text);
       margin-bottom: 5px;
     }

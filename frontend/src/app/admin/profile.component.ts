@@ -10,11 +10,11 @@ import { ChangePasswordComponent } from './change-password.component';
   template: `
     <div class="page">
       <div class="page-header">
-        <h1>Your Profile</h1>
+        <h1>Your profile</h1>
       </div>
 
       <div class="card" style="margin-bottom:24px">
-        <div class="section-label">Account Details</div>
+        <div class="section-label">Account details</div>
         <div class="detail-row">
           <span class="detail-label">Username</span>
           <span class="detail-value">{{ auth.user()?.username ?? '—' }}</span>
@@ -25,7 +25,7 @@ import { ChangePasswordComponent } from './change-password.component';
         </div>
         <div class="detail-row">
           <span class="detail-label">Role</span>
-          <span class="detail-value">{{ auth.user()?.role === 'super_admin' ? 'Super Admin' : 'Organizer' }}</span>
+          <span class="detail-value">{{ auth.user()?.role === 'super_admin' ? 'Super admin' : 'Organizer' }}</span>
         </div>
       </div>
 
@@ -35,9 +35,8 @@ import { ChangePasswordComponent } from './change-password.component';
   styles: [`
     .section-label {
       font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text-dim);
       margin-bottom: 10px;
     }

@@ -13,8 +13,7 @@ import { TournamentService } from '../shared/services/tournament.service';
     <div class="notif-wrap">
       <div class="notif-card">
         <div class="notif-header">
-          <span class="notif-icon">◈</span>
-          <h1>Email Preferences</h1>
+          <h1>Email preferences</h1>
         </div>
 
         @if (loading()) {

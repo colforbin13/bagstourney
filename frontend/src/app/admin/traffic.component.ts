@@ -141,22 +141,22 @@ const PAGE_NAMES: Record<string, string> = {
       display: flex; flex-direction: column; gap: 2px;
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
     }
-    .label { font-family: var(--mono); font-size: 0.65rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .label { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--muted); }
     .value { font-family: var(--display); font-size: 2rem; line-height: 1.1; }
-    .note { font-size: 0.75rem; color: var(--text-dim); }
+    .note { font-size: 0.78rem; color: var(--text-dim); }
 
     section.card { margin-bottom: 16px; }
     h2 { font-size: 1.2rem; margin: 0 0 12px; }
 
     .chart { display: flex; align-items: flex-end; gap: 2px; height: 160px; }
     .bar-slot { flex: 1; height: 100%; display: flex; align-items: flex-end; }
-    .bar { width: 100%; min-height: 1px; background: var(--accent); border-radius: 2px 2px 0 0; }
-    .axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.7rem; color: var(--muted); margin-top: 6px; }
+    .bar { width: 100%; min-height: 1px; background: var(--accent); border-radius: 0; }
+    .axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
 
     .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
     .columns section.card { margin-bottom: 0; }
     table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); border-bottom: 2px solid var(--border); padding: 6px 4px; }
+    th { text-align: left; font-size: 0.78rem; letter-spacing: 0; color: var(--text-dim); border-bottom: 2px solid var(--border); padding: 6px 4px; }
     td { padding: 6px 4px; border-bottom: 1px solid var(--border); word-break: break-word; }
     .num { text-align: right; white-space: nowrap; }
     .none { color: var(--text-dim); font-size: 0.85rem; margin: 0; }

@@ -32,8 +32,8 @@ import { Subscription } from 'rxjs';
     }
     .cb-modal {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      border: 1.5px solid var(--text);
+      border-radius: 0;
       min-width: 320px;
       max-width: 90%;
       box-shadow: 0 12px 40px rgba(0,0,0,0.3);

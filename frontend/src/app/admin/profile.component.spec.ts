@@ -46,9 +46,9 @@ describe('ProfileComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Organizer');
   });
 
-  it('should show "Super Admin" for a super_admin role', async () => {
+  it('should show "Super admin" for a super_admin role', async () => {
     await setup({ ...organizerUser, role: 'super_admin' });
-    expect(fixture.nativeElement.textContent).toContain('Super Admin');
+    expect(fixture.nativeElement.textContent).toContain('Super admin');
   });
 
   it('should render the change password form', async () => {

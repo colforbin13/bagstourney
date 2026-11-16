@@ -1,8 +1,7 @@
 .section-label {
   font-family: var(--mono);
-  font-size: 0.65rem;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0;
   color: var(--text-dim);
   margin-bottom: 10px;
   display: flex;
@@ -20,10 +19,10 @@
   height: 20px;
   flex-shrink: 0;
   border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface-2);
+  border-radius: 0;
+  background: var(--surface);
   font-family: var(--mono);
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   color: var(--muted);
 }
 .setup-step-label { font-size: 0.875rem; font-weight: 500; color: var(--text-dim); }
@@ -53,17 +52,18 @@
 .advanced { margin-top: 12px; font-size: .85rem; }
 .advanced summary { cursor: pointer; color: var(--text-dim); font-size: .8rem; }
 .advanced .check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
-.group-count { font-family: var(--mono); color: var(--muted); letter-spacing: .04em; }
+.group-count { font-family: var(--mono); color: var(--muted); letter-spacing: 0; }
 .group-toggle { min-width: 32px; font-family: var(--mono); font-weight: 600; }
 .group-toggle.is-a { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .count {
-  background: var(--border);
+  background: var(--surface);
   color: var(--text-dim);
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-radius: 0;
   padding: 0 6px;
-  font-size: .65rem;
+  font-size: 0.78rem;
 }
-.warn { color: var(--danger); font-size: .65rem; }
+.warn { color: var(--danger); font-size: 0.78rem; }
 .row { display: flex; gap: 8px; }
 .paste-box { resize: vertical; min-height: 140px; line-height: 1.4; }
 .paste-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
@@ -151,7 +151,7 @@
 .qr-modal-hint { font-size: .8rem; color: var(--text-dim); margin-top: 12px; text-align: center; }
 .qr-modal-url {
   font-family: var(--mono);
-  font-size: .68rem;
+  font-size: 0.78rem;
   color: var(--muted);
   margin-top: 6px;
   max-width: 240px;
@@ -174,7 +174,7 @@
   border-radius: var(--radius);
   font-size: .875rem;
 }
-.notify-status { color: var(--text-dim); font-size: .75rem; }
+.notify-status { color: var(--text-dim); font-size: 0.78rem; }
 
 /* Inline edit forms (participant / team) */
 .edit-form { display: flex; flex-direction: column; gap: 8px; width: 100%; }
@@ -223,14 +223,14 @@
 }
 .seed {
   font-family: var(--mono);
-  font-size: .7rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
   width: 24px;
   flex-shrink: 0;
 }
 .team-info { display: flex; flex-direction: column; gap: 2px; }
 .team-name { font-weight: 500; font-size: .875rem; }
-.team-players { font-size: .75rem; color: var(--text-dim); }
+.team-players { font-size: 0.78rem; color: var(--text-dim); }
 
 /* Staff & Access */
 .member-list { display: flex; flex-direction: column; gap: 6px; }
@@ -245,7 +245,7 @@
 }
 .member-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .member-name { font-weight: 500; font-size: .875rem; }
-.member-meta { font-size: .75rem; color: var(--text-dim); }
+.member-meta { font-size: 0.78rem; color: var(--text-dim); }
 .badge-owner { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
 .badge-cap-warning { background: rgba(var(--danger-rgb), 0.1); color: var(--danger); border: 1px solid rgba(var(--danger-rgb), 0.35); }
 .badge-visibility-public  { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }

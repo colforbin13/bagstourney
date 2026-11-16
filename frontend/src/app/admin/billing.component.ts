@@ -24,7 +24,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
   template: `
     <div class="page">
       <div class="page-header">
-        <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;">← Admin</a>
+        <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Admin</a>
         <h1 style="margin-top:4px;">Billing</h1>
       </div>
 
@@ -138,7 +138,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
       padding: 20px;
     }
     .plan-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-    .plan-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+    .plan-label { font-size: 0.78rem; letter-spacing: 0; color: var(--text-dim); }
     .plan-name { font-size: 1.5rem; font-weight: 600; margin: 2px 0 6px; }
     .plan-detail { font-size: 0.85rem; color: var(--text-dim); }
     .section-title { font-size: 1.1rem; margin: 28px 0 12px; }
@@ -153,7 +153,7 @@ import { BillingStatus, BillingPlanOption } from '../shared/models/tournament.mo
       gap: 8px;
       align-items: flex-start;
     }
-    .offer-name { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); }
+    .offer-name { font-size: 0.78rem; letter-spacing: 0; color: var(--text-dim); }
     .offer-price { font-size: 1.6rem; font-weight: 600; }
     .offer-interval { font-size: 0.85rem; font-weight: 400; color: var(--text-dim); }
     .offer-detail { font-size: 0.85rem; color: var(--text-dim); flex: 1; }

@@ -93,6 +93,8 @@ export interface Tournament {
   // bracket is generated. Optional so responses predating migration 016 still parse.
   format?: 'single' | 'double';
   created_at: string;
+  // Who created it. Used to tell the seeded example tournaments apart (shared/examples.ts).
+  created_by_user_id?: number | null;
   // FEATURE_TRACKER item 13: a per-tournament plan unlock, set by a Stripe purchase or by
   // hand by a super admin (see TournamentController::update()).
   paid_override: boolean;

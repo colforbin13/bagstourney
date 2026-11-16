@@ -24,7 +24,6 @@ interface Row {
   template: `
     <article class="page">
       <header class="intro">
-        <p class="eyebrow">Comparison</p>
         <h1>Bracketway vs Scoreholio</h1>
         <p class="lede">
           Scoreholio is the best-known tournament app in cornhole, and for good reason. Bracketway
@@ -115,10 +114,6 @@ interface Row {
   `,
   styles: [`
     .intro { margin-bottom: 28px; }
-    .eyebrow {
-      font-family: var(--mono); font-size: 0.68rem; letter-spacing: .16em;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
     section { margin-bottom: 32px; }
@@ -132,8 +127,8 @@ interface Row {
     .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.85rem; line-height: 1.5; color: var(--text-dim); }
     @media (max-width: 520px) { .cols { grid-template-columns: 1fr; gap: 8px; } }
     .who {
-      display: block; font-family: var(--mono); font-size: 0.65rem; letter-spacing: .1em;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+      display: block; font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0;
+      color: var(--muted); margin-bottom: 2px;
     }
     .checked, .disclaimer { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
     .cta h2 { margin-top: 0; }

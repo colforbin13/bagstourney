@@ -9,6 +9,7 @@ import { Tournament, Match, BracketData } from '../shared/models/tournament.mode
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { BoardsPanelComponent } from '../shared/components/boards-panel.component';
 import { boardWord } from '../shared/board-labels';
+import { isExampleTournament } from '../shared/examples';
 import { SITE_URL, setCanonicalLink } from '../shared/seo';
 import {
   roundLabel as labelForRound,
@@ -65,6 +66,8 @@ interface MirrorLayout {
 })
 export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   tournament  = signal<Tournament | null>(null);
+  // A seeded example says so under its name, so nobody takes it for a real event.
+  readonly isExample = computed(() => isExampleTournament(this.tournament()));
   bracketData = signal<BracketData | null>(null);
   loading     = signal(true);
   submitting  = signal<number | null>(null);
@@ -122,7 +125,15 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   // Must stay in sync with --row-unit, which this binds onto .bracket-matches — single
   // source of truth for both the CSS grid track size and the connector-line pixel math
   // below, which needs the same value to compute match centers.
-  readonly rowUnitPx = 150;
+  //
+  // A round-1 card fits in one row unit, so the unit has to hold the tallest card. With
+  // staff controls showing, a card also carries the Save/Edit row (~45px), which takes a
+  // two-team card with a board strip to ~194px — at 150 it spilled over the next card and
+  // hid its Edit button. 216 adds a line of slack for a team name that wraps. Visitors
+  // don't get that row, so they keep the tighter bracket.
+  get rowUnitPx(): number {
+    return this.showScoring() ? 216 : 150;
+  }
   readonly gutterWidth = 32;
 
   champion = computed(() => championName(this.bracketData()));
@@ -240,9 +251,9 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   private sideHeading(side: BracketSideName): string {
-    if (side === 'losers') return 'Losers Bracket';
-    if (side === 'grand_final') return 'Grand Final';
-    return 'Winners Bracket';
+    if (side === 'losers') return 'Losers bracket';
+    if (side === 'grand_final') return 'Grand final';
+    return 'Winners bracket';
   }
 
   // Whether the current viewer can actually submit/edit scores for this tournament —

@@ -26,9 +26,9 @@ export function roundLabel(
 ): string {
   if (side === 'grand_final') {
     // Position 2 exists only when the losers-bracket side won the grand final, levelling
-    // both teams at one loss. "Deciding Match" says what it is without the esports jargon
+    // both teams at one loss. "Deciding match" says what it is without the esports jargon
     // ("bracket reset") that most people running a backyard tournament won't know.
-    return pos === 1 ? 'Grand Final' : 'Deciding Match';
+    return pos === 1 ? 'Grand final' : 'Deciding match';
   }
 
   const fromEnd = total - pos;
@@ -43,9 +43,9 @@ export function roundLabel(
   // In double elimination neither side's last round is *the* final — the grand final is —
   // so they are qualified rather than named outright.
   const prefix = side === 'losers' ? 'Losers' : 'Winners';
-  if (fromEnd === 0) return `${prefix} Final`;
-  if (fromEnd === 1) return `${prefix} Semifinal`;
-  return `${prefix} Round ${pos}`;
+  if (fromEnd === 0) return `${prefix} final`;
+  if (fromEnd === 1) return `${prefix} semifinal`;
+  return `${prefix} round ${pos}`;
 }
 
 /**

@@ -20,7 +20,7 @@ import { confirmService } from '../shared/services/confirm.service';
       <!-- New tournament -->
       <div class="card" style="margin-bottom:24px">
         <div class="card-head">
-          <div class="section-label">New Tournament</div>
+          <div class="section-label">New tournament</div>
           <a class="card-head-link" routerLink="/how-it-works">How it works →</a>
         </div>
         <input class="input" type="text" [(ngModel)]="newName"
@@ -105,7 +105,7 @@ import { confirmService } from '../shared/services/confirm.service';
             <div class="list-item">
               <div class="list-main">
                 <a class="list-name" [routerLink]="['/admin/tournament', t.id]">{{ t.name }}</a>
-                <span class="badge badge-{{ t.status }}">{{ t.status }}</span>
+                <span class="badge badge-{{ t.status }}">{{ t.status === 'active' ? 'Live' : t.status === 'complete' ? 'Final' : 'Setup' }}</span>
               </div>
               <div class="list-actions">
                 <a class="btn btn-sm" [routerLink]="['/bracket', t.id]">View</a>
@@ -125,9 +125,8 @@ import { confirmService } from '../shared/services/confirm.service';
   styles: [`
     .section-label {
       font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text-dim);
       margin-bottom: 10px;
     }
@@ -140,7 +139,7 @@ import { confirmService } from '../shared/services/confirm.service';
       margin-bottom: 10px;
     }
     .card-head .section-label { margin-bottom: 0; }
-    .card-head-link { font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
+    .card-head-link { font-size: 0.78rem; color: var(--accent); white-space: nowrap; }
     .field {
       display: flex;
       flex-direction: column;
@@ -148,7 +147,7 @@ import { confirmService } from '../shared/services/confirm.service';
       flex: 1;
       min-width: 160px;
     }
-    .field-hint { font-size: 0.7rem; line-height: 1.4; color: var(--muted); }
+    .field-hint { font-size: 0.78rem; line-height: 1.4; color: var(--muted); }
     .form-error { font-size: 0.8rem; color: var(--danger); margin-top: 8px; }
     .list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .list-item {
@@ -162,7 +161,9 @@ import { confirmService } from '../shared/services/confirm.service';
       border-radius: var(--radius);
       flex-wrap: wrap;
     }
-    .list-main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+    /* The 220px basis is what lets the row wrap: with a basis of 0 the name shrank to
+       "Sat…" on a phone instead of the buttons dropping onto their own line. */
+    .list-main { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 0; }
     .list-name {
       font-weight: 500;
       font-size: 0.9rem;
@@ -266,7 +267,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   async delete(t: Tournament) {
-    const ok = await confirmService.confirm(`Delete "${t.name}"? A super admin can restore it later from Deleted Tournaments.`);
+    const ok = await confirmService.confirm(`Delete "${t.name}"? A super admin can restore it later from Deleted tournaments.`);
     if (!ok) return;
     this.svc.deleteTournament(t.id).subscribe({
       next: () => {

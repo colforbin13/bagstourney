@@ -12,8 +12,7 @@ import { TournamentService } from '../shared/services/tournament.service';
     <div class="notif-wrap">
       <div class="notif-card">
         <div class="notif-header">
-          <span class="notif-icon">◈</span>
-          <h1>Confirm Subscription</h1>
+          <h1>Confirm subscription</h1>
         </div>
 
         @if (loading()) {

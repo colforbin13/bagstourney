@@ -101,9 +101,8 @@ type PosterKind = 'bracket' | 'register';
     }
     .poster-eyebrow {
       font-family: var(--mono);
-      font-size: 0.7rem;
-      letter-spacing: .18em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--accent);
     }
     .poster-name {
@@ -118,7 +117,7 @@ type PosterKind = 'bracket' | 'register';
     .poster-sub { font-size: 0.95rem; color: var(--text-dim); max-width: 34ch; margin: 6px 0 0; }
     .poster-url {
       font-family: var(--mono);
-      font-size: 0.75rem;
+      font-size: 0.78rem;
       color: var(--muted);
       overflow-wrap: anywhere;
       max-width: 100%;
@@ -130,7 +129,7 @@ type PosterKind = 'bracket' | 'register';
       gap: 6px;
       margin-top: 14px;
       color: var(--muted);
-      font-size: 0.72rem;
+      font-size: 0.78rem;
     }
 
     @media print {

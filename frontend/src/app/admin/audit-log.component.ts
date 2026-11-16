@@ -47,7 +47,7 @@ const PAGE_SIZES = [25, 50, 100, 200];
   template: `
     <div class="page-wide">
       <div class="page-header">
-        <h1>Audit Log</h1>
+        <h1>Audit log</h1>
       </div>
 
       <div class="card filters">
@@ -144,10 +144,9 @@ const PAGE_SIZES = [25, 50, 100, 200];
       border-bottom: 2px solid var(--border);
       padding: 10px 12px;
       text-align: left;
-      font-size: 0.7rem;
+      font-size: 0.78rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0;
       color: var(--text-dim);
       white-space: nowrap;
     }
@@ -165,7 +164,7 @@ const PAGE_SIZES = [25, 50, 100, 200];
       font-size: 0.78rem;
       background: var(--surface-2);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 0;
       padding: 2px 6px;
       white-space: nowrap;
     }
@@ -173,7 +172,7 @@ const PAGE_SIZES = [25, 50, 100, 200];
     .dim { color: var(--text-dim); font-size: 0.8rem; }
     .details {
       font-family: var(--mono);
-      font-size: 0.75rem;
+      font-size: 0.78rem;
       color: var(--text-dim);
       max-width: 320px;
       white-space: pre-wrap;

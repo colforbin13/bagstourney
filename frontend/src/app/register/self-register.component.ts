@@ -13,7 +13,6 @@ import { TournamentService } from '../shared/services/tournament.service';
     <div class="notif-wrap">
       <div class="notif-card">
         <div class="notif-header">
-          <span class="notif-icon">◈</span>
           <h1>{{ tournamentName() || 'Register' }}</h1>
         </div>
 
@@ -106,7 +105,7 @@ import { TournamentService } from '../shared/services/tournament.service';
       background: var(--accent);
       flex-shrink: 0;
     }
-    .reg-hint { font-size: 0.72rem; line-height: 1.45; color: var(--muted); }
+    .reg-hint { font-size: 0.78rem; line-height: 1.45; color: var(--muted); }
   `],
 })
 export class SelfRegisterComponent implements OnInit {

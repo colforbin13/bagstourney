@@ -95,12 +95,12 @@ describe('NavComponent', () => {
 
   it('should not show the Audit Log link for a non-super-admin', () => {
     setup(true, false);
-    expect(fixture.nativeElement.textContent).not.toContain('Audit Log');
+    expect(fixture.nativeElement.textContent).not.toContain('Audit log');
   });
 
   it('should show the Audit Log link for a super admin', () => {
     setup(true, true);
-    expect(fixture.nativeElement.textContent).toContain('Audit Log');
+    expect(fixture.nativeElement.textContent).toContain('Audit log');
   });
 
   it('should show the Traffic link to a super admin only', () => {

@@ -13,11 +13,11 @@ import { UserAccount } from '../shared/models/tournament.models';
   template: `
     <div class="page-wide">
       <div class="page-header">
-        <h1>User Management</h1>
+        <h1>User management</h1>
       </div>
 
       <div class="card" style="margin-bottom:24px">
-        <div class="section-label">Create User</div>
+        <div class="section-label">Create user</div>
         <div class="row create-user-row">
           <input class="input" [(ngModel)]="newUserUsername" placeholder="Username" />
           <input class="input" type="email" [(ngModel)]="newUserEmail" placeholder="Email" />
@@ -64,12 +64,12 @@ import { UserAccount } from '../shared/models/tournament.models';
                       [disabled]="isUpdating(user.id)"
                       class="role-select">
                       <option value="organizer">Organizer</option>
-                      <option value="super_admin">Super Admin</option>
+                      <option value="super_admin">Super admin</option>
                     </select>
                   </td>
                   <td class="status">
-                    <span class="badge" [class.badge-active]="user.status === 'active'" [class.badge-disabled]="user.status === 'disabled'">
-                      {{ user.status }}
+                    <span class="badge" [class.status-active]="user.status === 'active'" [class.status-disabled]="user.status === 'disabled'">
+                      {{ user.status === 'active' ? 'Active' : 'Disabled' }}
                     </span>
                   </td>
                   <td class="plan">
@@ -119,8 +119,8 @@ import { UserAccount } from '../shared/models/tournament.models';
             <div class="user-card" [class.disabled]="user.status === 'disabled'">
               <div class="user-card-top">
                 <span class="username">{{ user.username }}</span>
-                <span class="badge" [class.badge-active]="user.status === 'active'" [class.badge-disabled]="user.status === 'disabled'">
-                  {{ user.status }}
+                <span class="badge" [class.status-active]="user.status === 'active'" [class.status-disabled]="user.status === 'disabled'">
+                  {{ user.status === 'active' ? 'Active' : 'Disabled' }}
                 </span>
               </div>
               <div class="email">{{ user.email }}</div>
@@ -132,7 +132,7 @@ import { UserAccount } from '../shared/models/tournament.models';
                   [disabled]="isUpdating(user.id)"
                   class="role-select">
                   <option value="organizer">Organizer</option>
-                  <option value="super_admin">Super Admin</option>
+                  <option value="super_admin">Super admin</option>
                 </select>
               </div>
               <div class="user-card-row">
@@ -194,9 +194,8 @@ import { UserAccount } from '../shared/models/tournament.models';
 
     .section-label {
       font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text-dim);
       margin-bottom: 10px;
     }
@@ -218,10 +217,9 @@ import { UserAccount } from '../shared/models/tournament.models';
       border-bottom: 2px solid var(--border);
       padding: 12px 16px;
       text-align: left;
-      font-size: 0.75rem;
+      font-size: 0.78rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0;
       color: var(--text-dim);
     }
     
@@ -242,8 +240,8 @@ import { UserAccount } from '../shared/models/tournament.models';
     .role-select {
       padding: 6px 8px;
       border: 1px solid var(--border);
-      border-radius: 4px;
-      background: var(--surface-2);
+      border-radius: 0;
+      background: var(--surface);
       color: var(--text);
       font-size: 0.9rem;
       cursor: pointer;
@@ -252,16 +250,11 @@ import { UserAccount } from '../shared/models/tournament.models';
       &:disabled { opacity: 0.5; cursor: not-allowed; }
     }
     
+    /* Not badge-active: the global stylesheet owns that name for the pink "Live" badge, and
+       pink means live-right-now only. Account status is quiet stock with a ruled edge. */
     .badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      
-      &.badge-active { background: rgba(var(--marker-rgb), 0.15); color: var(--marker); }
-      &.badge-disabled { background: rgba(var(--danger-rgb), 0.15); color: var(--danger); }
+      &.status-active { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+      &.status-disabled { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
     }
 
     .created { font-size: 0.9rem; color: var(--text-dim); }
@@ -286,9 +279,8 @@ import { UserAccount } from '../shared/models/tournament.models';
     .user-card-row { display: flex; align-items: center; gap: 8px; }
     .field-label {
       font-family: var(--mono);
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: .05em;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text-dim);
     }
     .user-card-actions { display: flex; gap: 8px; margin-top: 2px; }

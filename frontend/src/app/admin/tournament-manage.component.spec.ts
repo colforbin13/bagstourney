@@ -421,7 +421,7 @@ describe('TournamentManageComponent', () => {
       ]);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.textContent).not.toContain('Draw Teams');
+      expect(fixture.nativeElement.textContent).not.toContain('Draw teams');
       expect(fixture.nativeElement.textContent).toContain('awaiting approval');
     });
   });
@@ -661,8 +661,8 @@ describe('TournamentManageComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.textContent).toContain('Drag to reorder');
-      expect(fixture.nativeElement.textContent).toContain('Generate Bracket');
-      expect(fixture.nativeElement.textContent).not.toContain('Add Participant');
+      expect(fixture.nativeElement.textContent).toContain('Generate bracket');
+      expect(fixture.nativeElement.textContent).not.toContain('Add participant');
       expect(component.teams()).toEqual(mockTeams);
     });
 
@@ -831,11 +831,11 @@ describe('TournamentManageComponent', () => {
       ]);
     });
 
-    it('offers Start Pool Play instead of Generate Bracket for direct entry', async () => {
+    it('offers Start pool play instead of Generate bracket for direct entry', async () => {
       bootstrapPool('setup', null, { direct: true, teams: [team(1, 1), team(2, 2)] });
       const text = fixture.nativeElement.textContent;
-      expect(text).toContain('Start Pool Play');
-      expect(text).not.toContain('Generate Bracket');
+      expect(text).toContain('Start pool play');
+      expect(text).not.toContain('Generate bracket');
 
       spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
       await component.confirmStartPool();
@@ -859,16 +859,16 @@ describe('TournamentManageComponent', () => {
       const el: HTMLElement = fixture.nativeElement;
       expect(el.querySelector('app-pool-standings')).not.toBeNull();
       expect(el.textContent).toContain('Enter pool scores');
-      expect(el.textContent).not.toContain('Generate Bracket');
+      expect(el.textContent).not.toContain('Generate bracket');
     });
 
-    it('offers seed tweaks, format and Generate Bracket once the pool is complete', () => {
+    it('offers seed tweaks, format and Generate bracket once the pool is complete', () => {
       bootstrapPool('active', pool({ complete: true, games_played: 3 }), { teams: [team(1, 1), team(2, 2)] });
       const el: HTMLElement = fixture.nativeElement;
       expect(el.textContent).toContain('Pool play finished');
       expect(el.querySelectorAll('.pool-ready .team-seed-item').length).toBe(2);
       expect(el.textContent).toContain('Format');
-      expect(el.textContent).toContain('Generate Bracket');
+      expect(el.textContent).toContain('Generate bracket');
       expect(el.textContent).not.toContain('Enter pool scores');
     });
 
@@ -913,12 +913,12 @@ describe('TournamentManageComponent', () => {
       expect(component.teamEntryModeBusy()).toBe(false);
     });
 
-    it('should show the Add Team form instead of Add Participant', () => {
+    it('should show the Add team form instead of Add participant', () => {
       bootstrapDirect();
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.textContent).toContain('Add Team');
-      expect(fixture.nativeElement.textContent).not.toContain('Add Participant');
+      expect(fixture.nativeElement.textContent).toContain('Add team');
+      expect(fixture.nativeElement.textContent).not.toContain('Add participant');
     });
 
     it('should require a team name and both member names before adding a team', () => {
@@ -975,7 +975,7 @@ describe('TournamentManageComponent', () => {
       expect(component.newTeamName).toBe('The Ringers');
     });
 
-    it('should show a delete button per team, not the auto-draft Redraw Teams button', () => {
+    it('should show a delete button per team, not the auto-draft Redraw teams button', () => {
       const team: Team = {
         id: 20, tournament_id: tournamentId, name: 'The Ringers',
         participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
@@ -983,7 +983,7 @@ describe('TournamentManageComponent', () => {
       bootstrapDirect([team]);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.textContent).not.toContain('Redraw Teams');
+      expect(fixture.nativeElement.textContent).not.toContain('Redraw teams');
       expect(fixture.nativeElement.textContent).toContain('Add at least 2 teams');
     });
 
@@ -1030,7 +1030,7 @@ describe('TournamentManageComponent', () => {
       expect(component.teams()).toEqual([team]);
     });
 
-    it('should disable Generate Bracket with fewer than 2 teams', () => {
+    it('should disable Generate bracket with fewer than 2 teams', () => {
       const team: Team = {
         id: 20, tournament_id: tournamentId, name: 'The Ringers',
         participant1_id: 1, participant2_id: 2, participant1_name: 'Alice', participant2_name: 'Bob', seed: 1,
@@ -1039,7 +1039,7 @@ describe('TournamentManageComponent', () => {
       fixture.detectChanges();
 
       const generateBtn: HTMLButtonElement = Array.from(fixture.nativeElement.querySelectorAll('button'))
-        .find((b: any) => b.textContent.trim() === 'Generate Bracket') as HTMLButtonElement;
+        .find((b: any) => b.textContent.trim() === 'Generate bracket') as HTMLButtonElement;
       expect(generateBtn.disabled).toBe(true);
     });
   });

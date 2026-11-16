@@ -18,7 +18,6 @@ import { AuthService } from '../shared/services/auth.service';
   template: `
     <article class="page">
       <header class="intro">
-        <p class="eyebrow">Guide</p>
         <h1>How to run a cornhole fundraiser tournament</h1>
         <p class="lede">
           A cornhole tournament is one of the easiest fundraisers to put on. Almost anyone can
@@ -176,10 +175,6 @@ import { AuthService } from '../shared/services/auth.service';
   `,
   styles: [`
     .intro { margin-bottom: 28px; }
-    .eyebrow {
-      font-family: var(--mono); font-size: 0.68rem; letter-spacing: .16em;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
     section { margin-bottom: 32px; }

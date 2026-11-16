@@ -79,6 +79,22 @@ describe('TournamentListComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.step').length).toBe(3);
   });
 
+  // The hero's example sheet is the page's one demonstration, so it has to really draw.
+  it('should pair the example sign-up sheet into teams when Draw is pressed', () => {
+    setup([makeTournament()]);
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelectorAll('.sheet-line').length).toBe(6);
+
+    el.querySelector<HTMLButtonElement>('.sheet-draw')!.click();
+    fixture.detectChanges();
+
+    expect(component.teams()!.length).toBe(3);
+    expect(el.querySelectorAll('.sheet-line.is-drawn').length).toBe(3);
+    const drawn = component.teams()!.flatMap(t => t.players).sort();
+    expect(drawn).toEqual([...component.players].sort());
+    expect(el.querySelector('.sheet-draw')!.textContent).toContain('Draw again');
+  });
+
   it('should hide the landing content on the slimmed-down /tournaments route', () => {
     setup([makeTournament()], true, false);
     expect(component.showLanding()).toBe(false);
@@ -136,6 +152,24 @@ describe('TournamentListComponent', () => {
     const groups = component.groups();
     expect(groups.map(g => g.key)).toEqual(['active', 'complete']);
     expect(groups[0].items[0].name).toBe('Running');
+  });
+
+  // Seeded examples are public but are not real activity, so they must never be counted
+  // under "Live now" or "Completed" on the page that sells the product.
+  it('should list example tournaments in their own labelled group, after real ones', () => {
+    setup([
+      makeTournament({ id: 1, name: 'Demo Night', status: 'active', created_by_user_id: 5 }),
+      makeTournament({ id: 2, name: 'Real Final', status: 'complete', created_by_user_id: 1 }),
+      makeTournament({ id: 3, name: 'Demo Final', status: 'complete', created_by_user_id: 5 }),
+    ]);
+    const groups = component.groups();
+    expect(groups.map(g => g.key)).toEqual(['complete', 'example']);
+    expect(groups[0].items.map(t => t.name)).toEqual(['Real Final']);
+    expect(groups[1].items.map(t => t.name)).toEqual(['Demo Night', 'Demo Final']);
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.group-note')).toBeTruthy();
+    expect(el.querySelectorAll('.row-example').length).toBe(2);
   });
 
   it('should omit groups that have no tournaments', () => {

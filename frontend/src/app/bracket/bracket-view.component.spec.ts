@@ -481,6 +481,22 @@ describe('BracketViewComponent', () => {
       expect(component.showScoring()).toBe(false);
     });
 
+    it('should keep the tight row height for a visitor, who gets no score controls', () => {
+      bootstrap(tournamentWith());
+      expect(component.showScoring()).toBe(false);
+      expect(component.rowUnitPx).toBe(150);
+    });
+
+    it('should give each row room for the score controls only while they show', () => {
+      bootstrap(tournamentWith(scorer));
+      expect(component.showScoring()).toBe(true);
+      // A card with its Save/Edit row measured ~194px; it must not spill into the next one.
+      expect(component.rowUnitPx).toBeGreaterThanOrEqual(194);
+
+      enterKiosk();
+      expect(component.rowUnitPx).toBe(150);
+    });
+
     it('should not leave the body class behind when the view is destroyed', () => {
       bootstrap(tournamentWith());
       enterKiosk();
@@ -597,7 +613,7 @@ describe('BracketViewComponent', () => {
 
       const headings = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.bracket-side-heading'))
         .map(el => el.textContent!.trim());
-      expect(headings).toEqual(['Winners Bracket', 'Losers Bracket', 'Grand Final']);
+      expect(headings).toEqual(['Winners bracket', 'Losers bracket', 'Grand final']);
     });
 
     it('does not use the mirrored layout, whose geometry assumes a halving tree', () => {
@@ -648,9 +664,9 @@ describe('BracketViewComponent', () => {
       bootstrapDouble();
       const labels = component.sideLayouts().map(s => s.rounds.map(r => r.label));
 
-      expect(labels[0]).toEqual(['Winners Round 1', 'Winners Semifinal', 'Winners Final']);
-      expect(labels[1]).toEqual(['Losers Round 1', 'Losers Round 2', 'Losers Semifinal', 'Losers Final']);
-      expect(labels[2]).toEqual(['Grand Final', 'Deciding Match']);
+      expect(labels[0]).toEqual(['Winners round 1', 'Winners semifinal', 'Winners final']);
+      expect(labels[1]).toEqual(['Losers round 1', 'Losers round 2', 'Losers semifinal', 'Losers final']);
+      expect(labels[2]).toEqual(['Grand final', 'Deciding match']);
     });
 
     it('points the trophy at the grand final, not the last winners round', () => {

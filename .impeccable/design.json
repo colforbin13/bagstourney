@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-16T00:00:00Z",
+  "title": "Design System: Bracketway",
+  "extensions": {
+    "colorMeta": {
+      "sheet": { "role": "primary", "displayName": "Sheet Green", "canonical": "#1FBF6B", "tonalRamp": ["#06301A", "#0B5230", "#117A47", "#17A35A", "#1FBF6B", "#5FD596", "#A5E8C4", "#E3F8EC"] },
+      "sheet-deep": { "role": "primary", "displayName": "Sheet Green, Pressed", "canonical": "#17A35A", "tonalRamp": ["#06301A", "#0B5230", "#117A47", "#17A35A", "#1FBF6B", "#5FD596", "#A5E8C4", "#E3F8EC"] },
+      "toner": { "role": "primary", "displayName": "Toner", "canonical": "#141414", "tonalRamp": ["#141414", "#2A2A2A", "#444444", "#666666", "#8A8A8A", "#B0B0B0", "#D6D6D6", "#F2F2F2"] },
+      "toner-pressed": { "role": "primary", "displayName": "Toner, Pressed", "canonical": "#33383A", "tonalRamp": ["#141414", "#2A2A2A", "#444444", "#666666", "#8A8A8A", "#B0B0B0", "#D6D6D6", "#F2F2F2"] },
+      "highlight": { "role": "secondary", "displayName": "Highlighter Pink", "canonical": "#FF7AA8", "tonalRamp": ["#4A0F25", "#7D1F42", "#B83A66", "#E85C8E", "#FF7AA8", "#FFA3C3", "#FFCBDD", "#FFEEF4"] },
+      "marker": { "role": "tertiary", "displayName": "Marker Green", "canonical": "#0B7A43", "tonalRamp": ["#032A17", "#064D2A", "#0B7A43", "#2B9A62", "#5DB888", "#96D3B1", "#C8E8D6", "#ECF7F1"] },
+      "danger": { "role": "tertiary", "displayName": "Correction Red", "canonical": "#B3261E", "tonalRamp": ["#3D0B08", "#6E1611", "#B3261E", "#D24A42", "#E27A74", "#EDA9A5", "#F6D2D0", "#FCEFEE"] },
+      "white-stock": { "role": "neutral", "displayName": "White Stock", "canonical": "#FFFFFF", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#FFFFFF"] },
+      "recessed-stock": { "role": "neutral", "displayName": "Recessed Stock", "canonical": "#EDF0EB", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] },
+      "ruled-line": { "role": "neutral", "displayName": "Ruled Line", "canonical": "#868E86", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] },
+      "toner-dim": { "role": "neutral", "displayName": "Toner, Dimmed", "canonical": "#3C423D", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#5F685F", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The home headline only. Step numerals use the same weight at width 112%." },
+      "headline": { "displayName": "Headline", "purpose": "Page titles on working screens; marketing page titles run larger." },
+      "title": { "displayName": "Title", "purpose": "Card and panel headings, pricing tier names, the sign-up sheet title." },
+      "body": { "displayName": "Body", "purpose": "Running copy. Emphasis comes from weight, not colour." },
+      "label": { "displayName": "Label", "purpose": "Board names, toolbar group labels, small metadata. Sentence case, no tracking." }
+    },
+    "shadows": [
+      { "name": "sheet-edge", "value": "0 1px 0 rgba(0, 0, 0, .22), 0 14px 22px -16px rgba(0, 0, 0, .45)", "purpose": "The white sign-up sheet resting on the green hero." },
+      { "name": "menu-edge", "value": "0 10px 18px -8px rgba(0, 0, 0, .35)", "purpose": "The header dropdown menu, a white sheet over the page." },
+      { "name": "lifted", "value": "0 4px 14px rgba(0, 0, 0, 0.18)", "purpose": "A row while it is being dragged." }
+    ],
+    "motion": [
+      { "name": "ease-settle", "value": "cubic-bezier(.16, 1, .3, 1)", "purpose": "Paper settling: drawn team rows, tab lettering, the hero action lift, list row indent, disclosure chevron." },
+      { "name": "set-down", "value": "0.5s ease-settle, 70ms stagger, from translate(-18px, -12px) rotate(-3deg)", "purpose": "Drawn teams landing on the sign-up sheet. Rows stay readable throughout; off under reduced motion." },
+      { "name": "state", "value": "0.15s", "purpose": "Background, border and colour changes on hover and focus." },
+      { "name": "toast-in", "value": "0.2s ease, 8px rise", "purpose": "Toast entrance." }
+    ],
+    "breakpoints": [
+      { "name": "hero-action-full", "value": "520px" },
+      { "name": "bracket-stack", "value": "600px" },
+      { "name": "nav-collapse", "value": "640px" },
+      { "name": "pricing-columns", "value": "720px" },
+      { "name": "hero-stack", "value": "860px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action on a working screen: a toner-filled box.",
+      "html": "<button class=\"ds-btn-primary\">Create a free account</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; background: var(--accent, #141414); color: var(--accent-ink, #FFFFFF); border: 1px solid var(--accent, #141414); border-radius: 0; font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s, color .15s; } .ds-btn-primary:hover { background: var(--accent-dim, #33383A); border-color: var(--accent-dim, #33383A); } .ds-btn-primary:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "The default button: toner outline on whatever stock it sits on.",
+      "html": "<button class=\"ds-btn-outline\">How it works</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; background: transparent; color: var(--text, #141414); border: 1px solid var(--text, #141414); border-radius: 0; font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s, color .15s; } .ds-btn-outline:hover { background: var(--surface-2, #EDF0EB); } .ds-btn-outline:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive actions only. Outlined red that fills on hover.",
+      "html": "<button class=\"ds-btn-danger\">Delete tournament</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; background: transparent; color: var(--danger, #B3261E); border: 1px solid var(--danger, #B3261E); border-radius: 0; font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); font-size: 0.875rem; font-weight: 600; cursor: pointer; white-space: nowrap; transition: border-color .15s, background .15s, color .15s; } .ds-btn-danger:hover { background: var(--danger, #B3261E); color: var(--danger-ink, #FFFFFF); } .ds-btn-danger:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Hero Action",
+      "kind": "button",
+      "refersTo": "hero-action",
+      "description": "The large action printed on the green sheet. Lifts 2px on hover and settles on press.",
+      "html": "<div class=\"ds-hero-ground\"><a class=\"ds-hero-go\" href=\"#\">Create a tournament</a></div>",
+      "css": ".ds-hero-ground { background: var(--sheet, #1FBF6B); padding: 24px; } .ds-hero-go { display: inline-flex; align-items: center; min-height: 56px; padding: 0 28px; background: var(--text, #141414); color: var(--surface, #FFFFFF); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); font-size: 1.2rem; font-weight: 800; letter-spacing: -.01em; text-decoration: none; transition: transform .18s cubic-bezier(.16, 1, .3, 1), background .15s; } .ds-hero-go:hover { background: var(--accent-dim, #33383A); transform: translateY(-2px); } .ds-hero-go:active { transform: translateY(0); } .ds-hero-go:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "White stock with a ruled-line border; focus thickens it to a toner rule.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Filter by name\" />",
+      "css": ".ds-input { width: 100%; padding: 10px 12px; background: var(--surface, #FFFFFF); border: 1px solid var(--border, #868E86); border-radius: 0; color: var(--text, #141414); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); font-size: 16px; outline: none; transition: border-color .15s; } .ds-input:focus { border-color: var(--text, #141414); box-shadow: inset 0 0 0 1px var(--text, #141414); } .ds-input::placeholder { color: var(--muted, #5F685F); }"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-live",
+      "description": "Live takes the highlighter; Setup and Final stay quiet on white stock.",
+      "html": "<span class=\"ds-badge ds-badge-live\">Live</span> <span class=\"ds-badge ds-badge-quiet\">Final</span> <span class=\"ds-badge ds-badge-quiet\">Setup</span>",
+      "css": ".ds-badge { display: inline-block; padding: 2px 8px; border-radius: 0; font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); font-size: 0.78rem; font-weight: 700; letter-spacing: .02em; } .ds-badge-live { background: var(--highlight, #FF7AA8); color: var(--text, #141414); border: 1px solid var(--highlight, #FF7AA8); } .ds-badge-quiet { background: var(--surface, #FFFFFF); color: var(--text-dim, #3C423D); border: 1px solid var(--border, #868E86); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A white sheet with a 1.5px toner rule and square corners. No shadow.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Pro</h3><p class=\"ds-card-body\">For organizers who run tournaments regularly.</p></div>",
+      "css": ".ds-card { background: var(--surface, #FFFFFF); border: 1.5px solid var(--text, #141414); border-radius: 0; padding: 20px; color: var(--text, #141414); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); } .ds-card-title { font-size: 1.5rem; font-weight: 800; font-stretch: 108%; letter-spacing: -.025em; line-height: 1.05; margin: 0 0 6px; } .ds-card-body { font-size: 0.85rem; line-height: 1.5; color: var(--text-dim, #3C423D); margin: 0; }"
+    },
+    {
+      "name": "Header",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "The green sheet across the top of every screen: bracket mark, wordmark, toner links.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-brand\" href=\"#\"><svg width=\"20\" height=\"18\" viewBox=\"0 0 30 26\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"4\" cy=\"4\" r=\"3.2\" fill=\"#141414\"/><circle cx=\"4\" cy=\"22\" r=\"3.2\" fill=\"#141414\"/><circle cx=\"26\" cy=\"13\" r=\"3\" fill=\"#FFFFFF\" stroke=\"#141414\" stroke-width=\"1.6\"/><path d=\"M7 4H14C16 4 16 13 18 13\" stroke=\"#141414\" stroke-width=\"1.6\" fill=\"none\"/><path d=\"M7 22H14C16 22 16 13 18 13\" stroke=\"#141414\" stroke-width=\"1.6\" fill=\"none\"/></svg><span class=\"ds-nav-title\">Bracketway</span></a><div class=\"ds-nav-links\"><a href=\"#\" class=\"ds-active\">Pricing</a><a href=\"#\">Sign in</a><a href=\"#\">Create account</a></div></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 0 16px; background: var(--sheet, #1FBF6B); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); } .ds-nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; } .ds-nav-title { font-size: 1.4rem; font-weight: 900; font-stretch: 112%; letter-spacing: -.03em; line-height: 1; color: var(--text, #141414); } .ds-nav-links { display: flex; align-items: center; gap: 16px; } .ds-nav-links a { font-size: 0.95rem; font-weight: 600; color: var(--text, #141414); text-decoration: none; padding: 6px 0; } .ds-nav-links a:hover, .ds-nav-links a.ds-active { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: .25em; } .ds-nav a:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; }"
+    },
+    {
+      "name": "Tear-off Tabs",
+      "kind": "custom",
+      "refersTo": "tear-off-tab",
+      "description": "The strip along the bottom of the home flyer. Dashed cut lines, lettering on its side, the first tab inked.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab ds-tab-go\" href=\"#\"><span>Start free</span></a><a class=\"ds-tab\" href=\"#\"><span>Blind draw</span></a><a class=\"ds-tab\" href=\"#\"><span>How it works</span></a><a class=\"ds-tab\" href=\"#\"><span>Pricing</span></a></nav>",
+      "css": ".ds-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--sheet, #1FBF6B); border-top: 2.5px dashed var(--text, #141414); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); } .ds-tab { display: flex; align-items: center; justify-content: center; height: 138px; border-right: 2.5px dashed var(--text, #141414); color: var(--text, #141414); text-decoration: none; transition: background .15s; } .ds-tab:last-child { border-right: none; } .ds-tab span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 1rem; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; transition: transform .25s cubic-bezier(.16, 1, .3, 1); } .ds-tab:hover { background: var(--sheet-deep, #17A35A); } .ds-tab:hover span { transform: rotate(180deg) translateY(6px); } .ds-tab:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: -5px; } .ds-tab-go { background: var(--text, #141414); color: var(--sheet, #1FBF6B); } .ds-tab-go:hover { background: var(--accent-dim, #33383A); } .ds-tab-go:focus-visible { outline-color: var(--sheet, #1FBF6B); }"
+    },
+    {
+      "name": "Sign-up Sheet",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "White stock set down slightly crooked on the green sheet: ruled name lines and a toner draw bar.",
+      "html": "<div class=\"ds-sheet-ground\"><section class=\"ds-sheet\"><h2 class=\"ds-sheet-title\">Sign-up sheet</h2><ol class=\"ds-sheet-lines\"><li><span class=\"ds-sheet-n\">1</span><span>Dana</span></li><li><span class=\"ds-sheet-n\">2</span><span>Marcus</span></li><li><span class=\"ds-sheet-n\">3</span><span>Priya</span></li></ol><button type=\"button\" class=\"ds-sheet-draw\">Draw the teams</button></section></div>",
+      "css": ".ds-sheet-ground { background: var(--sheet, #1FBF6B); padding: 28px; } .ds-sheet { max-width: 340px; background: var(--surface, #FFFFFF); padding: 22px 24px 18px; transform: rotate(1.2deg); box-shadow: 0 1px 0 rgba(0, 0, 0, .22), 0 14px 22px -16px rgba(0, 0, 0, .45); color: var(--text, #141414); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); } .ds-sheet-title { margin: 0; font-size: 1.7rem; font-weight: 900; font-stretch: 108%; letter-spacing: -.025em; line-height: 1.05; padding-bottom: 10px; border-bottom: 3px solid var(--text, #141414); } .ds-sheet-lines { list-style: none; margin: 0; padding: 0; } .ds-sheet-lines li { display: flex; align-items: flex-end; gap: 12px; height: 2.9rem; padding-bottom: 6px; border-bottom: 1.5px solid var(--text, #141414); font-size: 1.12rem; font-weight: 600; } .ds-sheet-n { width: 1.2em; font-weight: 400; color: var(--text-dim, #3C423D); } .ds-sheet-draw { display: block; width: 100%; min-height: 54px; margin-top: 18px; border: none; background: var(--text, #141414); color: var(--surface, #FFFFFF); font-family: inherit; font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; cursor: pointer; transition: background .15s; } .ds-sheet-draw:hover { background: var(--accent-dim, #33383A); } .ds-sheet-draw:active { background: #000; } .ds-sheet-draw:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Door Flyer",
+    "overview": "Bracketway looks like the event flyer taped to the bar door: one sheet of bright copy paper and one black ink. Pages that persuade print on the green sheet edge to edge, navigation included, with heavy, slightly wide toner type set very large in sentence case. Anything a person writes on or reads work from is white stock: the sign-up sheet, inputs, cards, and every working screen, which sits on white under the same green header.\n\nThe system is spare on purpose. There is one typeface, one ink, square corners, ruled lines and dashed cut lines. A second ink, pink highlighter, appears only to say something is live right now. Depth is paper depth: a sheet lying on another sheet. Motion is paper motion: things slide and settle like a sheet being set down. Nothing glows, and nothing fades in on scroll.\n\nIt should feel as easy as a sign-up sheet to a first-time organizer standing at a venue with a phone in one hand. The wrong outcomes, named by the owner, are corporate software, childish or jokey, and dark and moody.",
+    "keyCharacteristics": [
+      "One sheet colour, one black ink, one highlighter with a single meaning",
+      "One typeface (Archivo) doing every job through weight and width",
+      "Square corners, toner rules, dashed cut lines where something tears off",
+      "Sentence case everywhere, large and plain",
+      "White stock for anything written on; the green sheet for anything announced",
+      "Paper depth and paper motion only"
+    ],
+    "rules": [
+      { "name": "The One Ink Rule", "body": "Type, links and primary actions are toner. A link is marked by its underline (1.5px, thickening to 2.5px on hover), never by a colour. Marker green and correction red are the only other inks, and each has one job.", "section": "colors" },
+      { "name": "The Highlighter Rule", "body": "Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. Text selection is toner turned inside out for the same reason.", "section": "colors" },
+      { "name": "The Sheet and Stock Rule", "body": "Persuade surfaces print on the green sheet. Working screens are white stock under the green header. The header is what makes a working page recognisably Bracketway without colouring the work.", "section": "colors" },
+      { "name": "The One Face Rule", "body": "Archivo is the only typeface. Hierarchy comes from weight and width, never from a second family.", "section": "typography" },
+      { "name": "The Sentence Case Rule", "body": "Everything is sentence case. No uppercase, no tracked-out labels, no small label sitting above a heading.", "section": "typography" },
+      { "name": "The Sheet's Edge Rule", "body": "Shadows belong to a sheet's edge. Cards, buttons, inputs and badges are flat at rest and flat on hover.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do print Persuade surfaces on the green sheet edge to edge, and keep working screens on white stock under the green header.",
+      "Do use toner (#141414) for all type, links and primary actions, and mark links with an underline.",
+      "Do keep the highlighter for \"live right now\" and marker green for \"won or confirmed\".",
+      "Do set everything in Archivo, building hierarchy from weight (400 to 900) and width (100 to 112%).",
+      "Do write in sentence case.",
+      "Do keep corners square and draw structure with rules: 1.5px toner for a card's edge, 1px grey for cells inside it, 2.5px dashed for a cut line.",
+      "Do draw icons as SVG in a 2px square stroke in the current ink.",
+      "Do keep touch targets at 44px or more on phones, and inputs at 16px text.",
+      "Do honour reduced motion: the settle animations switch off."
+    ],
+    "donts": [
+      "Don't use the highlighter as decoration, a hover state or a brand accent.",
+      "Don't colour a link or a primary action with anything but toner.",
+      "Don't add a second typeface, including a monospace for numbers or labels; tabular numerals already do that job.",
+      "Don't set labels in uppercase or tracked-out capitals, and don't put a small label above a heading.",
+      "Don't round corners on cards, buttons, inputs or badges. The bracket mark's nodes and the spinner are the only round forms.",
+      "Don't put a shadow on anything that isn't a sheet lying on, or lifting off, another sheet.",
+      "Don't use a dashed line as a general divider; it means \"cut here\".",
+      "Don't fill a working screen with the sheet colour.",
+      "Don't make things glow, or fade content in on scroll. Things slide and settle.",
+      "Don't drift toward the three named wrong outcomes: corporate software, childish or jokey, dark and moody."
+    ]
+  }
+}

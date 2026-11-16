@@ -47,18 +47,18 @@ interface BoardGame { key: string; team1: string; team2: string; }
     }
   `,
   styles: [`
-    .boards { display: flex; flex-wrap: wrap; gap: 16px 28px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+    .boards { display: flex; flex-wrap: wrap; gap: 16px 28px; background: var(--surface); border: 1.5px solid var(--text); border-radius: var(--radius); padding: 14px 16px; }
     .boards-col { flex: 2 1 280px; min-width: 0; }
     .boards-col.next { flex: 1 1 200px; }
-    .boards-title { font-family: var(--mono); font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+    .boards-title { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--text-dim); margin-bottom: 8px; }
     .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-    .tile { border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 8px 10px; min-width: 0; }
-    .tile-board { font-family: var(--mono); font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+    .tile { border: 1px solid var(--border); border-top: 3px solid var(--text); padding: 8px 10px; min-width: 0; }
+    .tile-board { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
     .tile-team { font-weight: 500; font-size: .85rem; overflow-wrap: anywhere; }
-    .tile-vs { font-size: .7rem; color: var(--muted); margin: 1px 0; }
+    .tile-vs { font-size: 0.78rem; color: var(--muted); margin: 1px 0; }
     .next-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: .85rem; }
     .next-list li { overflow-wrap: anywhere; }
-    .vs { color: var(--muted); font-size: .75rem; }
+    .vs { color: var(--muted); font-size: 0.78rem; }
     .boards-empty { font-size: .85rem; color: var(--muted); }
     /* TV: read from across a room, and keep to one band so the bracket keeps its space. */
     .boards.large { border-radius: 0; border-width: 0 0 1px; padding: 10px 20px; flex-wrap: nowrap; }

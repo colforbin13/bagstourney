@@ -24,23 +24,23 @@ describe('roundLabel', () => {
   });
 
   it('qualifies both trees in double elimination, since neither ends the tournament', () => {
-    expect(roundLabel(3, 3, 'winners', 'double')).toBe('Winners Final');
-    expect(roundLabel(2, 3, 'winners', 'double')).toBe('Winners Semifinal');
-    expect(roundLabel(1, 3, 'winners', 'double')).toBe('Winners Round 1');
+    expect(roundLabel(3, 3, 'winners', 'double')).toBe('Winners final');
+    expect(roundLabel(2, 3, 'winners', 'double')).toBe('Winners semifinal');
+    expect(roundLabel(1, 3, 'winners', 'double')).toBe('Winners round 1');
 
-    expect(roundLabel(4, 4, 'losers', 'double')).toBe('Losers Final');
-    expect(roundLabel(3, 4, 'losers', 'double')).toBe('Losers Semifinal');
-    expect(roundLabel(1, 4, 'losers', 'double')).toBe('Losers Round 1');
+    expect(roundLabel(4, 4, 'losers', 'double')).toBe('Losers final');
+    expect(roundLabel(3, 4, 'losers', 'double')).toBe('Losers semifinal');
+    expect(roundLabel(1, 4, 'losers', 'double')).toBe('Losers round 1');
   });
 
   it('names the grand final and the match that follows a losers-bracket win', () => {
-    expect(roundLabel(1, 2, 'grand_final', 'double')).toBe('Grand Final');
-    expect(roundLabel(2, 2, 'grand_final', 'double')).toBe('Deciding Match');
+    expect(roundLabel(1, 2, 'grand_final', 'double')).toBe('Grand final');
+    expect(roundLabel(2, 2, 'grand_final', 'double')).toBe('Deciding match');
   });
 
   it('labels by position, so a losers bracket starting at round 2 reads normally', () => {
     // With byes the first losers round collapses away entirely. Positions stay 1..n.
-    expect(roundLabel(1, 3, 'losers', 'double')).toBe('Losers Round 1');
+    expect(roundLabel(1, 3, 'losers', 'double')).toBe('Losers round 1');
   });
 });
 

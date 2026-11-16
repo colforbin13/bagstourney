@@ -21,7 +21,6 @@ interface SportGroup {
   template: `
     <div class="page">
       <header class="intro">
-        <p class="eyebrow">Sports &amp; games</p>
         <h1>If it's two-player teams, it runs here.</h1>
         <p class="lede">
           Bracketway doesn't know or care what game you're playing. It draws teams of two,
@@ -69,14 +68,6 @@ interface SportGroup {
   `,
   styles: [`
     .intro { margin-bottom: 40px; }
-    .eyebrow {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
 

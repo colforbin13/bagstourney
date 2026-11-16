@@ -151,7 +151,7 @@ The tag-building is pure and lives in `api/lib/LinkPreview.php` (tested in `test
 
 Private tournaments are described like public ones — knowing the link already grants full access to the bracket, so withholding the name would protect nothing while making a deliberately shared link look broken.
 
-`og:image` is a static brand card at `frontend/src/assets/og-card.png`, generated once with GD from the favicon's geometry and Bebas Neue. Production needs neither GD nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
+`og:image` is a static brand card at `frontend/src/assets/og-card.png`, rendered once by headless Chrome from `frontend/scripts/og-card.html` (the command is in that file's header). Production needs neither Chrome nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
 
 ### Traffic
 
