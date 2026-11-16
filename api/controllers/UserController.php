@@ -97,8 +97,8 @@ class UserController {
             $params[] = $body['status'];
         }
         if (isset($body['plan'])) {
-            // FEATURE_TRACKER item 12 plumbing: no billing exists yet, so this is a
-            // manual stand-in for what Stripe will flip automatically once it ships.
+            // FEATURE_TRACKER item 12: the manual lever for an account plan, which Stripe
+            // billing otherwise sets (BillingController).
             if (!in_array($body['plan'], ['free', 'paid'], true)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid plan']);

@@ -14,7 +14,7 @@ export BB_JWT_SECRET="a_long_random_string_here"
 export BB_POSTMARK_TOKEN="your_postmark_server_api_token"
 export BB_POSTMARK_FROM="notifications@yourdomain.example"
 export BB_POSTMARK_MESSAGE_STREAM="outbound"
-export BB_APP_PUBLIC_URL="https://yourdomain.example/bags"
+export BB_APP_PUBLIC_URL="https://yourdomain.example"
 export BB_NOTIFICATION_TOKEN_SECRET="a_long_random_string_here"
 export BB_POSTMARK_WEBHOOK_USER="postmark"
 export BB_POSTMARK_WEBHOOK_PASS="a_long_random_string_here"
@@ -51,7 +51,7 @@ $POSTMARK_API_TOKEN = 'your_postmark_server_api_token';
 $POSTMARK_FROM_EMAIL = 'notifications@yourdomain.example';
 $POSTMARK_MESSAGE_STREAM = 'outbound';
 // Base URL used to build links (bracket view, confirm/unsubscribe) inside emails.
-$APP_PUBLIC_URL = 'https://yourdomain.example/bags';
+$APP_PUBLIC_URL = 'https://yourdomain.example';
 // Secret used to derive deterministic per-participant "manage my preferences" links
 // (HMAC — see api/middleware/auth.php::notificationManageToken()). No token is stored;
 // changing this secret invalidates every previously issued manage/unsubscribe link.

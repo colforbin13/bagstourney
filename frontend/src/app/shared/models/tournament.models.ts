@@ -93,8 +93,8 @@ export interface Tournament {
   // bracket is generated. Optional so responses predating migration 016 still parse.
   format?: 'single' | 'double';
   created_at: string;
-  // FEATURE_TRACKER item 13 plumbing: a per-tournament plan unlock, settable only by a
-  // super admin (see TournamentController::update()) until real billing exists.
+  // FEATURE_TRACKER item 13: a per-tournament plan unlock, set by a Stripe purchase or by
+  // hand by a super admin (see TournamentController::update()).
   paid_override: boolean;
   // Only present via GET /tournaments/deleted (super admin recovery screen) — active
   // tournaments never carry this field.
@@ -128,8 +128,8 @@ export interface UserAccount {
   email: string;
   role: 'super_admin' | 'organizer';
   status: 'active' | 'disabled';
-  // FEATURE_TRACKER item 12 plumbing: account-level plan, settable only by a super admin
-  // until real billing exists.
+  // FEATURE_TRACKER item 12: account-level plan, set by a Stripe subscription or by hand
+  // by a super admin.
   plan: 'free' | 'paid';
   created_at?: string;
 }

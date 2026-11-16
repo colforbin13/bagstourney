@@ -376,8 +376,8 @@ class TournamentController {
             $params[] = $body['format'];
         }
         if (isset($body['paid_override'])) {
-            // FEATURE_TRACKER item 13 plumbing: a one-time per-tournament unlock, set
-            // manually by a super admin until real billing exists. Super-admin only —
+            // FEATURE_TRACKER item 13: the manual lever for a per-tournament unlock, which
+            // Stripe billing otherwise sets (BillingController). Super-admin only —
             // requireTournamentRole() lets an owner/manager reach update() too, and
             // letting either self-grant this would let any organizer unlock their own cap.
             if ($actor['role'] !== 'super_admin') {

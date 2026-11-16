@@ -139,10 +139,9 @@ function tournamentCapabilities(PDO $db, int $tournamentId, ?array $user): array
     ];
 }
 
-// Freemium participant cap (FEATURE_TRACKER.md item 12/13 plumbing). No billing exists
-// yet — users.plan and tournaments.paid_override (migration 013) are both set manually
-// by a super admin for now, standing in for what Stripe will flip automatically once
-// payment integration ships; either one raised to 'paid'/1 lifts the cap.
+// Freemium participant cap (FEATURE_TRACKER.md items 12/13). users.plan and
+// tournaments.paid_override (migration 013) are set by Stripe billing (BillingController)
+// or by hand by a super admin; either one raised to 'paid'/1 lifts the cap.
 const FREEMIUM_FREE_TIER_MAX_PARTICIPANTS = 32;
 const FREEMIUM_PAID_TIER_MAX_PARTICIPANTS = 256;
 

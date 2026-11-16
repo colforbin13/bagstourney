@@ -48,7 +48,8 @@ and RxJS 7.8.
   authorization. Do not rely on frontend role checks as security controls.
 - Tournament mutations should record sensitive actions with `writeAuditLog()` where the
   surrounding feature already does so.
-- Preserve the existing `/bags/api` deployment prefix handling in `api/index.php`.
+- Production serves the API at `/api`. `api/index.php` also strips a legacy `/bags/api`
+  prefix; leave that handling in place.
 - Configuration and secrets belong in environment variables or local untracked config;
   never commit production database credentials or JWT secrets.
 - Every integration must degrade to *off* when unconfigured, never to broken. Empty mail
@@ -83,8 +84,9 @@ and RxJS 7.8.
   `localStorage`; do not add alternate token storage without documenting the security impact.
 - Keep component styles scoped. Shared colors, spacing, typography, and radii belong in
   `frontend/src/assets/styles/global.scss` and should use the existing CSS variables.
-- Production is deployed below `/bags/`; keep `baseHref` and the production API URL as
-  configured in `angular.json` and `environment.prod.ts`.
+- Production is served from the domain root (`https://bracketway.com`, API at `/api`),
+  despite the `bags` folder name on the server; keep `baseHref` and the production API URL
+  as configured in `angular.json` and `environment.prod.ts`.
 
 ## Unit testing requirements
 
