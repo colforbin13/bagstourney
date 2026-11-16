@@ -171,7 +171,7 @@ A two-colour print job: saturated green paper and black toner, with white stock 
 ### Named Rules
 **The One Ink Rule.** Type, links and primary actions are toner. A link is marked by its underline (1.5px, thickening to 2.5px on hover), never by a colour. Marker green and correction red are the only other inks, and each has one job.
 
-**The Highlighter Rule.** Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. Text selection is toner turned inside out for the same reason.
+**The Highlighter Rule.** Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. A made-up example tournament is never live, whatever its seeded state, so an example in progress gets an outlined "In progress" badge instead. Text selection is toner turned inside out for the same reason.
 
 **The Sheet and Stock Rule.** Persuade surfaces print on the green sheet. Working screens are white stock under the green header. The header is what makes a working page recognisably Bracketway without colouring the work.
 
@@ -186,7 +186,7 @@ A two-colour print job: saturated green paper and black toner, with white stock 
 Loaded from Google Fonts with the width axis 62 to 125 and weight axis 100 to 900.
 
 ### Hierarchy
-- **Display** (900, width 106%, clamp(2.7rem, min(7.6vw, 10.6vh), 6rem), line-height 0.93, tracking -0.04em): the home headline only. Step numerals on the home page use the same weight at width 112%.
+- **Display** (900, width 106%, clamp(2.7rem, min(7.6vw, 10.6vh), 6rem), line-height 0.93, tracking -0.04em): the home headline only. The home page's step numerals, step titles and list title share its 106% width, so the display voice runs at one width; only the wordmark goes wider.
 - **Headline** (800, width 108%, 1.9rem, line-height 1.05, tracking -0.025em, balanced wrap): page titles on working screens. Marketing page titles run larger (pricing: clamp(2rem, 7vw, 2.8rem)).
 - **Title** (800, width 108%, 1.4 to 1.7rem): card and panel headings, pricing tier names, the sign-up sheet title (900).
 - **Body** (400, 1rem, line-height 1.5): running copy. Ledes cap at about 62ch, step copy at 56ch. Emphasis within body is weight 600 to 800, not colour.

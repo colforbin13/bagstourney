@@ -231,6 +231,8 @@ describe('TournamentListComponent', () => {
     expect(component.statusLabel(makeTournament({ status: 'active' }))).toBe('Live');
     expect(component.statusLabel(makeTournament({ status: 'complete' }))).toBe('Final');
     expect(component.statusLabel(makeTournament({ status: 'setup' }))).toBe('Setup');
+    // A made-up example is never live right now, so it never claims the pink "Live".
+    expect(component.statusLabel(makeTournament({ status: 'active' }), true)).toBe('In progress');
   });
 
   it('should not offer the filter on a short list', () => {

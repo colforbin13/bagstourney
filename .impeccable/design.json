@@ -18,7 +18,7 @@
       "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#5F685F", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The home headline only. Step numerals use the same weight at width 112%." },
+      "display": { "displayName": "Display", "purpose": "The home headline only. Step numerals, step titles and the list title share its 106% width." },
       "headline": { "displayName": "Headline", "purpose": "Page titles on working screens; marketing page titles run larger." },
       "title": { "displayName": "Title", "purpose": "Card and panel headings, pricing tier names, the sign-up sheet title." },
       "body": { "displayName": "Body", "purpose": "Running copy. Emphasis comes from weight, not colour." },

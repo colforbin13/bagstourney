@@ -180,11 +180,11 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
             }
             <div class="list">
               @for (t of group.items; track t.id) {
-                <a class="row" [class.is-live]="t.status === 'active'" [routerLink]="['/bracket', t.uuid]">
+                <a class="row" [routerLink]="['/bracket', t.uuid]">
                   <div class="row-body">
                     <div class="row-top">
                       <span class="row-name">{{ t.name }}</span>
-                      <span class="badge badge-{{ t.status }}">{{ statusLabel(t) }}</span>
+                      <span class="badge badge-{{ t.status }}" [class.badge-quiet]="group.key === 'example'">{{ statusLabel(t, group.key === 'example') }}</span>
                       @if (group.key === 'example') {
                         <span class="row-example">Example</span>
                       }
@@ -264,6 +264,7 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
       font-size: clamp(1rem, 1.35vw, 1.2rem);
       line-height: 1.5;
       font-weight: 500;
+      text-wrap: pretty;
     }
     .hero-sports {
       max-width: 52ch;
@@ -393,13 +394,8 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
     /* ── Steps: one full-width ruled band each ── */
     .steps {
       background: var(--surface);
-      padding: clamp(32px, 5vw, 64px) clamp(16px, 4vw, 56px) clamp(28px, 4vw, 48px);
+      padding: clamp(32px, 5vw, 64px) var(--page-gutter) clamp(28px, 4vw, 48px);
       border-bottom: 1px solid var(--border);
-    }
-    .steps-inner, .features, .walkthrough-link {
-      max-width: 1100px;
-      margin-left: auto;
-      margin-right: auto;
     }
     .steps-inner { list-style: none; border-top: 3px solid var(--text); }
     .step {
@@ -413,12 +409,12 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
     .step-num {
       font-size: clamp(2.6rem, 6vw, 4.6rem);
       font-weight: 900;
-      font-stretch: 112%;
+      font-stretch: 106%;
       line-height: .8;
       letter-spacing: -.04em;
     }
-    .step-title { font-size: clamp(1.5rem, 3.2vw, 2.4rem); font-weight: 900; }
-    .step-body { font-size: 1.02rem; line-height: 1.55; max-width: 56ch; color: var(--text-dim); }
+    .step-title { font-size: clamp(1.5rem, 3.2vw, 2.4rem); font-weight: 900; font-stretch: 106%; }
+    .step-body { font-size: 1.02rem; line-height: 1.55; max-width: 56ch; color: var(--text-dim); text-wrap: pretty; }
 
     .features {
       display: flex;
@@ -457,9 +453,9 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
       gap: 12px;
       margin-bottom: 22px;
     }
-    /* On the landing page the list lines up with the steps above it. */
-    .page-landing { max-width: calc(1100px + 2 * clamp(16px, 4vw, 56px)); padding: clamp(32px, 5vw, 56px) clamp(16px, 4vw, 56px) 56px; }
-    .list-title { font-size: 1.9rem; }
+    /* On the landing page the list shares the header's margins, like the hero and steps. */
+    .page-landing { max-width: none; padding: clamp(32px, 5vw, 56px) var(--page-gutter) 56px; }
+    .list-title { font-size: 1.9rem; font-stretch: 106%; }
     .filter { width: auto; max-width: 220px; font-size: 0.875rem; padding: 7px 10px; }
 
     .group + .group { margin-top: 32px; }
@@ -471,6 +467,8 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
     }
 
     .group-note { margin-top: 8px; font-size: 0.9rem; color: var(--text-dim); }
+    /* An example's status, never the highlighter: see statusLabel(). */
+    .badge.badge-quiet { background: var(--surface); color: var(--text); border: 1px solid var(--text); }
     .row-example { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
 
     .list { display: flex; flex-direction: column; }
@@ -499,6 +497,10 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
     }
     .row-arrow { color: var(--text); flex-shrink: 0; }
 
+    /* Seven features as aligned columns, four then three, so none is left alone on a line. */
+    @media (min-width: 861px) {
+      .features { display: grid; grid-template-columns: repeat(4, max-content); gap: 10px 40px; }
+    }
     @media (max-width: 860px) {
       .hero { min-height: 0; }
       .hero-inner { grid-template-columns: minmax(0, 1fr); grid-template-areas: "copy" "sheet" "extra"; }
@@ -513,6 +515,10 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
       .hero-go { flex: 1; justify-content: center; padding: 0 16px; }
       .hero-what { font-size: 1rem; margin-top: 14px; }
       .hero-lede { font-size: .98rem; }
+      /* Tighter sheet so the draw bar and its caption stay on the first screen. */
+      .sheet { margin-top: 16px; padding: 14px 18px 12px; }
+      .sheet-title { font-size: 1.35rem; padding-bottom: 6px; }
+      .sheet-lines { --line: 2.3rem; }
     }
     @media (prefers-reduced-motion: reduce) {
       .sheet-line.is-drawn { animation: none; }
@@ -581,8 +587,10 @@ export class TournamentListComponent implements OnInit {
     });
   }
 
-  statusLabel(t: Tournament): string {
-    if (t.status === 'active') return 'Live';
+  // The pink "Live" badge means a real game is being played right now. A made-up example
+  // is never that, however its seeded state reads, so it says where it stands instead.
+  statusLabel(t: Tournament, example = false): string {
+    if (t.status === 'active') return example ? 'In progress' : 'Live';
     if (t.status === 'complete') return 'Final';
     return 'Setup';
   }
