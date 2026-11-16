@@ -445,7 +445,7 @@ Status: Built and browser-verified 2026-08-17 against the `run-bag-bracket` loca
 plus one new lazy-loaded frontend route. 311/311 frontend tests passing (9 new — 7 for the
 new component, plus one each locking the hero sports link and the how-it-works link),
 `npm run build:prod` clean with `sports-component` as its own lazy chunk (4.77 kB),
-`git diff --check` clean. **Not yet deployed.**
+`git diff --check` clean. Deployed by 2026-11-16.
 
 ### Landing content and richer tournament list on the main page
 
@@ -524,7 +524,7 @@ final, confirmed to report `champion_name`, screenshotted, and then soft-deleted
 Anonymous and signed-in views were both checked in a real browser at desktop width;
 **the narrow/mobile layout was not browser-verified** — `resize_window` reported success
 but the viewport stayed at 1920px, so the responsive rules (grid collapse, hidden
-watermark, wrapping header) are CSS review only. **Not yet deployed.**
+watermark, wrapping header) are CSS review only. Deployed by 2026-11-16.
 
 ### Score-entry screen and spectator bracket QR
 
