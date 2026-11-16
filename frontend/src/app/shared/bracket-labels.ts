@@ -17,6 +17,8 @@ export type BracketSideName = 'winners' | 'losers' | 'grand_final';
  * position hides a gap that would otherwise read as a missing round.
  *
  * `total` is how many rounds that side has.
+ *
+ * Mirrored for notification emails by api/lib/RoundLabel.php — keep the two in step.
  */
 export function roundLabel(
   pos: number,

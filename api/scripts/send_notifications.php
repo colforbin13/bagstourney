@@ -26,6 +26,7 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../services/BrevoClient.php';
+require_once __DIR__ . '/../lib/RoundLabel.php';
 
 const MAX_ATTEMPTS = 5;
 const BATCH_SIZE = 50;
@@ -403,8 +404,8 @@ function buildConfirmationEmail(PDO $db, array $row): ?array {
 function buildMatchCompletedEmail(PDO $db, array $row, array $participant): ?array {
     $stmt = $db->prepare('
         SELECT
-            m.round, m.team1_score, m.team2_score,
-            t.name AS tournament_name,
+            m.round, m.bracket_side, m.team1_score, m.team2_score,
+            t.name AS tournament_name, t.format,
             team1.name AS team1_name, team2.name AS team2_name, winner.name AS winner_name
         FROM matches m
         JOIN tournaments t ON m.tournament_id = t.id
@@ -417,40 +418,70 @@ function buildMatchCompletedEmail(PDO $db, array $row, array $participant): ?arr
     $m = $stmt->fetch();
     if (!$m) return null;
 
-    $subject = "{$m['tournament_name']}: Round {$m['round']} match complete — {$m['winner_name']} wins";
+    $round = roundName($db, (int)$row['tournament_id'], (int)$m['round'], $m['bracket_side'], $m['format']);
+    $subject = "{$m['tournament_name']}: {$round} match complete — {$m['winner_name']} wins";
     $summary = "{$m['team1_name']} {$m['team1_score']} – {$m['team2_score']} {$m['team2_name']} ({$m['winner_name']} wins)";
 
-    $body = emailEyebrow('Round ' . (int)$m['round'] . ' · Match complete') .
+    $body = emailEyebrow($round . ' · Match complete') .
         emailHeading($m['tournament_name']) .
         emailScoreBox($m['team1_name'], (int)$m['team1_score'], $m['team2_name'], (int)$m['team2_score'], $m['winner_name']);
-    $text = "Round {$m['round']} match complete in {$m['tournament_name']}:\n{$summary}";
+    $text = "{$round} match complete in {$m['tournament_name']}:\n{$summary}";
 
     return withFooter($body, $text, $subject, $row, $participant);
 }
 
+// Stored round numbers on one bracket side, ascending.
+function sideRounds(PDO $db, int $tournamentId, string $side): array {
+    $stmt = $db->prepare('SELECT DISTINCT round FROM matches WHERE tournament_id = ? AND bracket_side = ? ORDER BY round');
+    $stmt->execute([$tournamentId, $side]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+// The round's name as the bracket page shows it ("Winners round 2", "Semifinal", "Grand final").
+function roundName(PDO $db, int $tournamentId, int $round, string $side, string $format): string {
+    return RoundLabel::forRound($round, sideRounds($db, $tournamentId, $side), $side, $format);
+}
+
 function buildRoundCompletedEmail(PDO $db, array $row, array $participant): ?array {
-    $stmt = $db->prepare('SELECT name FROM tournaments WHERE id = ?');
+    $stmt = $db->prepare('SELECT name, format FROM tournaments WHERE id = ?');
     $stmt->execute([$row['tournament_id']]);
     $tournament = $stmt->fetch();
     if (!$tournament) return null;
 
+    // Round numbers restart per bracket side, so the side comes from the match that finished
+    // the round. Rows queued before match_id was recorded have none; those predate double
+    // elimination being sold, so they are read as the winners side.
+    $side = 'winners';
+    if (!empty($row['match_id'])) {
+        $stmt = $db->prepare('SELECT bracket_side FROM matches WHERE id = ?');
+        $stmt->execute([$row['match_id']]);
+        $side = $stmt->fetchColumn() ?: 'winners';
+    }
+
+    $tournamentId = (int)$row['tournament_id'];
     $round = (int)$row['round'];
-    $nextRound = $round + 1;
+    $rounds = sideRounds($db, $tournamentId, $side);
+    $roundLabel = RoundLabel::forRound($round, $rounds, $side, $tournament['format']);
+    $nextRound = RoundLabel::nextRound($round, $rounds);
+    $nextLabel = $nextRound === null ? null : RoundLabel::forRound($nextRound, $rounds, $side, $tournament['format']);
 
-    $stmt = $db->prepare('
-        SELECT team1.name AS team1_name, team2.name AS team2_name
-        FROM matches m
-        LEFT JOIN teams team1 ON m.team1_id = team1.id
-        LEFT JOIN teams team2 ON m.team2_id = team2.id
-        WHERE m.tournament_id = ? AND m.round = ?
-        ORDER BY m.match_number ASC
-    ');
-    $stmt->execute([$row['tournament_id'], $nextRound]);
-    $nextMatches = $stmt->fetchAll();
+    $nextMatches = [];
+    if ($nextRound !== null) {
+        $stmt = $db->prepare('
+            SELECT team1.name AS team1_name, team2.name AS team2_name
+            FROM matches m
+            LEFT JOIN teams team1 ON m.team1_id = team1.id
+            LEFT JOIN teams team2 ON m.team2_id = team2.id
+            WHERE m.tournament_id = ? AND m.round = ? AND m.bracket_side = ?
+            ORDER BY m.match_number ASC
+        ');
+        $stmt->execute([$tournamentId, $nextRound, $side]);
+        $nextMatches = $stmt->fetchAll();
+    }
 
-    $subject = "{$tournament['name']}: Round {$round} complete";
-    $body = emailEyebrow('Round ' . $round . ' complete') . emailHeading($tournament['name']);
-    $text = "Round {$round} is complete in {$tournament['name']}.";
+    $subject = "{$tournament['name']}: {$roundLabel} complete";
+    $body = emailEyebrow($roundLabel . ' complete') . emailHeading($tournament['name']);
+    $text = "{$roundLabel} is complete in {$tournament['name']}.";
 
     if ($nextMatches) {
         $matchupRows = '';
@@ -463,9 +494,9 @@ function buildRoundCompletedEmail(PDO $db, array $row, array $participant): ?arr
             $matchupLines[] = $line;
         }
         if ($matchupRows !== '') {
-            $body .= emailEyebrow('Round ' . $nextRound . ' matchups') .
+            $body .= emailEyebrow('Up next · ' . $nextLabel) .
                 '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';"><tr><td style="padding:0 16px;">' . $matchupRows . '</td></tr></table>';
-            $text .= "\n\nRound {$nextRound} matchups:\n- " . implode("\n- ", $matchupLines);
+            $text .= "\n\nUp next, {$nextLabel}:\n- " . implode("\n- ", $matchupLines);
         }
     }
 

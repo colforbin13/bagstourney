@@ -184,7 +184,7 @@ class MatchController {
                 if ($championId !== null) {
                     $this->enqueueTournamentFinalizedNotifications($match, $matchId);
                 } else {
-                    $this->enqueueRoundCompletedNotifications($match);
+                    $this->enqueueRoundCompletedNotifications($match, $matchId);
                 }
             }
 
@@ -464,7 +464,7 @@ class MatchController {
     // double elimination, so winners round 2 and losers round 2 are different rounds that
     // finish at different times; matching on round alone would treat them as one and
     // suppress both notifications until the later of the two completed.
-    private function enqueueRoundCompletedNotifications(array $match): void {
+    private function enqueueRoundCompletedNotifications(array $match, int $matchId): void {
         if (!NOTIFY_ROUND_COMPLETED_ENABLED) return;
         $bracketSide = isset($match['bracket_side']) ? $match['bracket_side'] : 'winners';
         $remaining = $this->db->prepare('
@@ -480,12 +480,14 @@ class MatchController {
             WHERE tournament_id = ? AND notification_lifecycle = "confirmed" AND notify_round_completed = 1
         ');
         $stmt->execute([$match['tournament_id']]);
+        // match_id is the match that finished the round. The email reads its bracket_side
+        // from it: round numbers restart per side, so `round` alone can't say which round.
         $insert = $this->db->prepare('
-            INSERT INTO notification_queue (tournament_id, round, participant_id, email, event_type)
-            VALUES (?, ?, ?, ?, "round_completed")
+            INSERT INTO notification_queue (tournament_id, match_id, round, participant_id, email, event_type)
+            VALUES (?, ?, ?, ?, ?, "round_completed")
         ');
         foreach ($stmt->fetchAll() as $recipient) {
-            $insert->execute([$match['tournament_id'], (int)$match['round'], $recipient['id'], $recipient['email']]);
+            $insert->execute([$match['tournament_id'], $matchId, (int)$match['round'], $recipient['id'], $recipient['email']]);
         }
     }
 
