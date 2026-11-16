@@ -45,6 +45,13 @@ grid. Declined: "Won by" in black (see above). Verdict pass on recaptures: `ship
 those fixes. Separately, Matt made the Apple Lane tournament private, whose real winning
 team, "Sponsored by Xfinity", read as an endorsement on the home page.
 
+**Phone fold, after deploy.** On a real iPhone 16 Pro the six names fit but Safari's bottom
+toolbar covered "Draw the teams": the 844px viewport used in review is not what Safari leaves
+clear on first load (about 680px on a 402px-wide phone). The phone rules were tightened
+again (headline, call to action, sheet line height, draw bar) so the bar ends at 655px at
+402x680. At 390px wide the lede wraps one line longer and the bar ends at 679px, mostly
+clear. Check the fold against Safari's visible height, not the device viewport.
+
 **Recapturing for review.** The Chrome extension window can't be resized when maximised, so
 review captures were taken with headless Chrome over the DevTools protocol at a real
 viewport (1440x900, 390x844 mobile) and captured full page, saved as

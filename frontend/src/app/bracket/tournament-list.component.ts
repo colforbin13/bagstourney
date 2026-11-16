@@ -512,13 +512,23 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
     @media (max-width: 520px) {
       .tab { height: 138px; }
       .tab span { font-size: .9rem; }
-      .hero-go { flex: 1; justify-content: center; padding: 0 16px; }
-      .hero-what { font-size: 1rem; margin-top: 14px; }
+      /* Phone first screen: the draw bar and its caption have to clear Safari's bottom
+         toolbar, which leaves about 680px of an iPhone 16 Pro clear on first load. Every
+         step below buys part of that; the sheet keeps all six names. */
+      .hero-inner { padding-top: 16px; }
+      .hero-title { font-size: 2.45rem; }
+      .hero-actions { margin-top: 14px; }
+      .hero-go { flex: 1; justify-content: center; padding: 0 16px; min-height: 48px; font-size: 1.1rem; }
+      .hero-alt { padding: 8px 0; }
+      .hero-what { font-size: 1rem; margin-top: 12px; }
       .hero-lede { font-size: .98rem; }
-      /* Tighter sheet so the draw bar and its caption stay on the first screen. */
-      .sheet { margin-top: 16px; padding: 14px 18px 12px; }
-      .sheet-title { font-size: 1.35rem; padding-bottom: 6px; }
-      .sheet-lines { --line: 2.3rem; }
+      .sheet { margin-top: 14px; padding: 12px 18px 10px; }
+      .sheet-title { font-size: 1.25rem; padding-bottom: 4px; }
+      .sheet-lines { --line: 1.95rem; }
+      .sheet-line { font-size: 1.02rem; padding-bottom: 4px; }
+      .sheet-line.is-drawn { font-size: 1.12rem; }
+      .sheet-draw { min-height: 46px; margin-top: 12px; font-size: 1.1rem; }
+      .sheet-foot { margin-top: 8px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .sheet-line.is-drawn { animation: none; }
