@@ -78,7 +78,7 @@ import { UserAccount } from '../shared/models/tournament.models';
                       (change)="changePlan(user, $event)"
                       [disabled]="isUpdating(user.id)"
                       class="role-select"
-                      title="Manual plan override — no billing exists yet">
+                      title="Manual plan override — a plan set here is not revoked by Stripe">
                       <option value="free">Free</option>
                       <option value="paid">Paid</option>
                     </select>
@@ -142,7 +142,7 @@ import { UserAccount } from '../shared/models/tournament.models';
                   (change)="changePlan(user, $event)"
                   [disabled]="isUpdating(user.id)"
                   class="role-select"
-                  title="Manual plan override — no billing exists yet">
+                  title="Manual plan override — a plan set here is not revoked by Stripe">
                   <option value="free">Free</option>
                   <option value="paid">Paid</option>
                 </select>
@@ -413,8 +413,9 @@ export class UserManagementComponent implements OnInit {
     this.updateUser(user.id, { role: newRole });
   }
 
-  // FEATURE_TRACKER item 12 plumbing: no billing exists yet, so this is a manual stand-in
-  // for what Stripe will flip automatically once payment integration ships.
+  // FEATURE_TRACKER item 12: the manual lever for an account plan, which Stripe billing
+  // otherwise sets. The server records a plan set here as 'manual', so a later
+  // cancellation does not revoke it.
   changePlan(user: UserAccount, event: Event) {
     const target = event.target as HTMLSelectElement;
     const newPlan = target.value as 'free' | 'paid';
