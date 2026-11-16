@@ -189,6 +189,12 @@ class TournamentController {
     }
 
     public function update(int $id, array $body, array $actor): void {
+        // Several settings below lock when the tournament leaves setup. Nothing is written
+        // until every field has been validated, so one read serves them all.
+        $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+        $stmt->execute([$id]);
+        $inSetup = $stmt->fetchColumn() === 'setup';
+
         $fields = [];
         $params = [];
         if (isset($body['name'])) { $fields[] = 'name = ?'; $params[] = trim($body['name']); }
@@ -227,17 +233,12 @@ class TournamentController {
             // Only changeable before teams exist — once teams are drawn, flipping modes
             // would leave a half-formed manual seed order or silently skip the seeding
             // step the organizer already committed to.
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
-            $stmt->execute([$id]);
-            $t = $stmt->fetch();
-            if (!$t || $t['status'] !== 'setup') {
+            if (!$inSetup) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Seeding mode can only be changed during setup']);
                 return;
             }
-            $teamCount = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
-            $teamCount->execute([$id]);
-            if ((int)$teamCount->fetchColumn() > 0) {
+            if ($this->hasTeams($id)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Cannot change seeding mode after teams have been drawn']);
                 return;
@@ -253,10 +254,7 @@ class TournamentController {
                 return;
             }
             // Fixed once the pool is scheduled, which is when the tournament leaves setup.
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
-            $stmt->execute([$id]);
-            $t = $stmt->fetch();
-            if (!$t || $t['status'] !== 'setup') {
+            if (!$inSetup) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Pool games can only be changed before pool play starts']);
                 return;
@@ -303,17 +301,12 @@ class TournamentController {
                 return;
             }
             // Same reasoning as seeding_mode above: only changeable before teams exist.
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
-            $stmt->execute([$id]);
-            $t = $stmt->fetch();
-            if (!$t || $t['status'] !== 'setup') {
+            if (!$inSetup) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Team entry mode can only be changed during setup']);
                 return;
             }
-            $teamCount = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
-            $teamCount->execute([$id]);
-            if ((int)$teamCount->fetchColumn() > 0) {
+            if ($this->hasTeams($id)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Cannot change team entry mode after teams have been created']);
                 return;
@@ -329,10 +322,7 @@ class TournamentController {
             }
             // Only matters at the moment teams are drawn, and a redraw is allowed while the
             // tournament is in setup, so it stays changeable for exactly that long.
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
-            $stmt->execute([$id]);
-            $t = $stmt->fetch();
-            if (!$t || $t['status'] !== 'setup') {
+            if (!$inSetup) {
                 http_response_code(400);
                 echo json_encode(['error' => 'The draw can only be changed during setup']);
                 return;
@@ -357,10 +347,7 @@ class TournamentController {
             // nor drop back to single elimination.
             // A pool-play tournament is 'active' during its pool but has no bracket yet, so
             // its format stays open until the bracket is generated from the standings.
-            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
-            $stmt->execute([$id]);
-            $t = $stmt->fetch();
-            if (!$t || ($t['status'] !== 'setup' && !PoolController::inPoolStage($this->db, $id))) {
+            if (!$inSetup && !PoolController::inPoolStage($this->db, $id)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Tournament format can only be changed before the bracket is generated']);
                 return;
@@ -406,14 +393,20 @@ class TournamentController {
         $this->get($id, $actor);
     }
 
-    // Version-4 (random) UUID, same random_bytes()-based approach as the password-reset
-    // token in UserController::resetPassword() — no ext-uuid dependency needed.
+    private function hasTeams(int $id): bool {
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM teams WHERE tournament_id = ?');
+        $stmt->execute([$id]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
     private function parsePoolGames($value): ?int {
         if (!is_numeric($value)) return null;
         $n = (int)$value;
         return $n >= PoolPlay::MIN_GAMES && $n <= PoolPlay::MAX_GAMES ? $n : null;
     }
 
+    // Version-4 (random) UUID, same random_bytes()-based approach as the password-reset
+    // token in UserController::resetPassword() — no ext-uuid dependency needed.
     private function generateUuidV4(): string {
         $data = random_bytes(16);
         $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
