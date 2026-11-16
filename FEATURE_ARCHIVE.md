@@ -4,6 +4,52 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### New look: "The Door Flyer"
+
+The cream, brick-red and Bebas Neue look read as generic. The replacement came out of the
+Impeccable direction round (seed `387d4f9edd498049`, candidate 4 of 7, built code-led with no
+comp round): the flyer taped to the bar door, one bright green sheet and one black ink. The
+direction contract is `.impeccable/surfaces/app-bracket-tournament-list-component-ts-8fa58068.md`;
+the rules are `DESIGN.md`, the product framing `PRODUCT.md`. Commit `9bf7b48` is the build.
+
+**Rules worth not re-deriving.** Pink means live right now and nothing else, so a made-up
+example tournament never takes it, whatever its seeded state ("In progress", outlined).
+Marker green means won or confirmed, including "Won by" lines on the home page; the finish
+review asked for those in black and Matt declined, because it is documented. Shadows exist
+only at a sheet's edge: the sign-up sheet, and the menu edge on every dropdown and modal. The
+display voice runs at one width (106%); only the wordmark goes wider.
+
+**Signed-in screens** (`e76a563`). Reviewed in a browser at desktop and phone width.
+Fixes: admin tables (users, audit log, traffic) ran to the window edge and now use
+`.page-table` on the header's `--page-gutter`; `.field-hint` lived only in the dashboard, so
+the manage page's hints rendered at 16px, and it is now global; Billing and Deleted
+tournaments had their title right-aligned beside the back link; Restore buttons were solid
+black on every row; the Actions menu and both modals used an off-rule shadow; change
+password overrode the global input, losing the focus ring and dropping to 0.9rem (iOS zooms
+below 16px); QR modal titles were title case.
+
+**Emails** (`e76a563`, `f24540f`). Notification and verification emails take the palette:
+green header band, white card under a toner rule, square black button, sentence-case labels.
+While restyling, the round labels turned out wrong for double elimination: "Round 2" doesn't
+say which bracket, and the round-complete email's "next round" query mixed winners and losers
+matches that share a number. `api/lib/RoundLabel.php` mirrors the frontend's `roundLabel()`
+(`tests/RoundLabelTest.php`); round-complete queue rows now record the finishing match in the
+existing `match_id` column so the email can read `bracket_side`. Rows queued before that
+deploy have no match and read as the winners side. Verified with a read-only dry run of the
+builders against tournament 67; nothing was sent.
+
+**Finish review** (`3ce9f54`). First pass: `fix`, five findings. Applied: examples off pink,
+the phone sheet tightened so the draw bar and caption clear the 844px fold, steps and list
+moved onto `--page-gutter`, one display width, `text-wrap: pretty`, and a 4+3 features
+grid. Declined: "Won by" in black (see above). Verdict pass on recaptures: `ship`, covering
+those fixes. Separately, Matt made the Apple Lane tournament private, whose real winning
+team, "Sponsored by Xfinity", read as an endorsement on the home page.
+
+**Recapturing for review.** The Chrome extension window can't be resized when maximised, so
+review captures were taken with headless Chrome over the DevTools protocol at a real
+viewport (1440x900, 390x844 mobile) and captured full page, saved as
+`.impeccable/review/desktop.png` and `mobile.png`.
+
 ### Traffic page for super admins
 
 Matt asked (2026-10-23, after the AlternativeTo listing went live) how to see what traffic the

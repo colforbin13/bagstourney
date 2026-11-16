@@ -31,4 +31,4 @@ Signature interaction: tapping "Draw the teams" shuffles the listed names into r
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
-Unresolved: sheet colours for pages other than home; whether the Open Graph card and favicon are redrawn to match.
+Unresolved: sheet colours for pages other than home. (The Open Graph card and favicon were redrawn to match; the finish review confirmed both.)
