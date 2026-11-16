@@ -692,7 +692,7 @@
   @if (qrKind(); as kind) {
     <div class="qr-modal-backdrop" (click)="closeQrModal()">
       <div class="qr-modal" (click)="$event.stopPropagation()">
-        <div class="qr-modal-title">{{ kind === 'bracket' ? 'Bracket QR Code' : 'Registration QR Code' }}</div>
+        <div class="qr-modal-title">{{ kind === 'bracket' ? 'Bracket QR code' : 'Registration QR code' }}</div>
         <div class="qr-modal-sub">{{ tournament()?.name }}</div>
         <canvas #qrCanvas class="qr-canvas"></canvas>
         <div class="qr-modal-hint">

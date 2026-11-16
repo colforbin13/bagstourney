@@ -36,7 +36,7 @@ import { Subscription } from 'rxjs';
       border-radius: 0;
       min-width: 320px;
       max-width: 90%;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+      box-shadow: 0 10px 18px -8px rgba(0, 0, 0, .35);
     }
     .cb-modal-body { padding: 20px; }
     .cb-modal-message { margin-bottom: 16px; font-size: 0.95rem; }

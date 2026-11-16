@@ -31,7 +31,7 @@ const PAGE_NAMES: Record<string, string> = {
   selector: 'app-traffic',
   standalone: true,
   template: `
-    <div class="page-wide">
+    <div class="page-table">
       <div class="page-header">
         <h1>Traffic</h1>
         <div class="ranges" role="group" aria-label="Date range">

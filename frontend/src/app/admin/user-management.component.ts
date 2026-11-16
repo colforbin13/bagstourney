@@ -11,7 +11,7 @@ import { UserAccount } from '../shared/models/tournament.models';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="page-wide">
+    <div class="page-table">
       <div class="page-header">
         <h1>User management</h1>
       </div>

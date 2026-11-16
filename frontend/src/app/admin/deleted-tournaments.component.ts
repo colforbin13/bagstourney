@@ -12,8 +12,10 @@ import { confirmService } from '../shared/services/confirm.service';
   template: `
     <div class="page">
       <div class="page-header">
-        <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Admin</a>
-        <h1 style="margin-top:4px;">Deleted tournaments</h1>
+        <div>
+          <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Admin</a>
+          <h1 style="margin-top:4px;">Deleted tournaments</h1>
+        </div>
       </div>
 
       @if (loading()) {
@@ -28,7 +30,7 @@ import { confirmService } from '../shared/services/confirm.service';
                 <span class="list-item-name">{{ t.name }}</span>
                 <span class="deleted-at">Deleted {{ formatDate(t.deleted_at) }}</span>
               </div>
-              <button class="btn btn-sm btn-primary" [disabled]="restoringId() === t.id" (click)="restore(t)">
+              <button class="btn btn-sm" [disabled]="restoringId() === t.id" (click)="restore(t)">
                 @if (restoringId() === t.id) {
                   <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
                 } @else {

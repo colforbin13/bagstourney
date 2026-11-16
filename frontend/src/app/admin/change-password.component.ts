@@ -84,22 +84,7 @@ import { TournamentService } from '../shared/services/tournament.service';
       margin-bottom: 6px;
       color: var(--text);
     }
-    .input {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 0.9rem;
-      
-      &:disabled { opacity: 0.5; cursor: not-allowed; }
-      &:focus { outline: none; border-color: var(--accent); }
-    }
-    .btn {
-      padding: 8px 16px;
-      font-size: 0.85rem;
-    }
+    .input:disabled { opacity: 0.5; cursor: not-allowed; }
     .form-error {
       font-size: 0.8rem;
       color: var(--danger);

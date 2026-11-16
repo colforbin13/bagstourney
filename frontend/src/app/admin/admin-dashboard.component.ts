@@ -147,7 +147,6 @@ import { confirmService } from '../shared/services/confirm.service';
       flex: 1;
       min-width: 160px;
     }
-    .field-hint { font-size: 0.78rem; line-height: 1.4; color: var(--muted); }
     .form-error { font-size: 0.8rem; color: var(--danger); margin-top: 8px; }
     .list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
     .list-item {

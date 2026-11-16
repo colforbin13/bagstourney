@@ -35,21 +35,22 @@ const BATCH_SIZE = 50;
 // plain top-level `const` statements execute in file position, not hoisted like function
 // declarations. Placed after those functions, they'd still be undefined the first time a
 // scheduled job (which can run before any of the per-row email building below) needs them.
-// Colors/type below are pulled straight from frontend/src/assets/styles/global.scss so
-// notification emails read as the same product as the web app rather than a generic
-// transactional template.
-const EMAIL_COLOR_BG         = '#EAE3D3';
-const EMAIL_COLOR_SURFACE    = '#FAF7F0';
-const EMAIL_COLOR_SURFACE_2  = '#F1ECDF';
-const EMAIL_COLOR_BORDER     = '#D9D0BC';
-const EMAIL_COLOR_MUTED      = '#8A8371';
-const EMAIL_COLOR_TEXT       = '#22261F';
-const EMAIL_COLOR_TEXT_DIM   = '#5B5A4E';
-const EMAIL_COLOR_ACCENT     = '#BC3A1C';
-const EMAIL_COLOR_ACCENT_INK = '#FFF8EF';
-const EMAIL_COLOR_MARKER     = '#3F7A52';
-const EMAIL_FONT_SANS = "Arial,Helvetica,sans-serif";
-const EMAIL_FONT_MONO = "Consolas,'Courier New',monospace";
+// Colors/type below mirror frontend/src/assets/styles/global.scss so notification emails
+// read as the same product as the web app rather than a generic transactional template.
+// The Door Flyer (DESIGN.md): a green sheet header over white stock, black toner type,
+// square corners. Archivo can't be relied on in mail clients, so the type falls back to
+// Arial at the same weights.
+const EMAIL_COLOR_SHEET      = '#1FBF6B';
+const EMAIL_COLOR_BG         = '#EDF0EB';
+const EMAIL_COLOR_SURFACE    = '#FFFFFF';
+const EMAIL_COLOR_BORDER     = '#868E86';
+const EMAIL_COLOR_MUTED      = '#5F685F';
+const EMAIL_COLOR_TEXT       = '#141414';
+const EMAIL_COLOR_TEXT_DIM   = '#3C423D';
+const EMAIL_COLOR_ACCENT     = '#141414';
+const EMAIL_COLOR_ACCENT_INK = '#FFFFFF';
+const EMAIL_COLOR_MARKER     = '#0B7A43';
+const EMAIL_FONT_SANS = "Archivo,Arial,Helvetica,sans-serif";
 
 $db = getDB();
 
@@ -294,15 +295,15 @@ function buildOrganizerDigestEmail(string $username, array $tournaments): array 
         $url = rtrim(APP_PUBLIC_URL, '/') . '/admin/tournament/' . $t['tournament_id'];
         $label = $t['pending_count'] == 1 ? '1 pending registration' : "{$t['pending_count']} pending registrations";
         $rows .= '<div style="padding:10px 0;border-top:1px solid ' . EMAIL_COLOR_BORDER . ';font-family:' . EMAIL_FONT_SANS . ';font-size:14px;color:' . EMAIL_COLOR_TEXT . ';">' .
-            '<a href="' . htmlspecialchars($url) . '" style="color:' . EMAIL_COLOR_ACCENT . ';text-decoration:none;font-weight:700;">' . htmlspecialchars($t['tournament_name']) . '</a>' .
+            '<a href="' . htmlspecialchars($url) . '" style="color:' . EMAIL_COLOR_TEXT . ';text-decoration:underline;font-weight:700;">' . htmlspecialchars($t['tournament_name']) . '</a>' .
             ' &mdash; ' . htmlspecialchars($label) . '</div>';
         $lines[] = "{$t['tournament_name']} — {$label}: {$url}";
     }
 
-    $inner = emailEyebrow('Pending Approvals') .
+    $inner = emailEyebrow('Pending approvals') .
         emailHeading('Hi ' . $username) .
         '<p style="margin:0 0 16px;">The following tournaments have self-registered participants waiting for your approval:</p>' .
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE_2 . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';border-radius:4px;"><tr><td style="padding:0 16px;">' . $rows . '</td></tr></table>';
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';"><tr><td style="padding:0 16px;">' . $rows . '</td></tr></table>';
     $html = emailLayout($inner, 'Bracketway · This is a daily reminder while approvals remain pending.');
     $text = "Hi {$username},\n\nThe following tournaments have self-registered participants waiting for your approval:\n\n" .
         implode("\n", $lines) . "\n\nThis is a daily reminder while approvals remain pending.\n\n— Bracketway";
@@ -328,28 +329,27 @@ function buildEmailContent(PDO $db, array $row, array $participant): ?array {
 // ---------------------------------------------------------------------------
 // Email visual layer. Inline styles only — Gmail strips <style> blocks and most
 // clients ignore linked/@imported fonts, so this can't lean on the app's actual
-// stylesheet. Colors/type below are pulled straight from
-// frontend/src/assets/styles/global.scss so notification emails read as the same
-// product as the web app rather than a generic transactional template.
+// stylesheet. Colors/type are the EMAIL_* constants at the top of this file, mirroring
+// frontend/src/assets/styles/global.scss.
 // ---------------------------------------------------------------------------
 
 function emailWordmark(): string {
-    return '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' . EMAIL_COLOR_ACCENT . ';margin-right:7px;"></span>' .
-        '<span style="font-family:' . EMAIL_FONT_SANS . ';font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:' . EMAIL_COLOR_TEXT . ';">Bracketway</span>';
+    return '<span style="font-family:' . EMAIL_FONT_SANS . ';font-size:20px;font-weight:800;letter-spacing:-0.3px;color:' . EMAIL_COLOR_TEXT . ';">Bracketway</span>';
 }
 
-// Small uppercase mono label, matching the app's status-badge styling (e.g. the
-// "SETUP"/"ACTIVE" tournament badges in tournament-manage.component.ts).
+// Small sentence-case label carrying the square mark, matching the app's section labels.
 function emailEyebrow(string $label): string {
-    return '<div style="font-family:' . EMAIL_FONT_MONO . ';font-size:11px;letter-spacing:1px;text-transform:uppercase;color:' . EMAIL_COLOR_MUTED . ';margin:0 0 6px;">' . htmlspecialchars($label) . '</div>';
+    return '<div style="font-family:' . EMAIL_FONT_SANS . ';font-size:12px;color:' . EMAIL_COLOR_TEXT_DIM . ';margin:0 0 6px;">' .
+        '<span style="display:inline-block;width:7px;height:7px;background:' . EMAIL_COLOR_TEXT . ';margin-right:7px;vertical-align:1px;"></span>' .
+        htmlspecialchars($label) . '</div>';
 }
 
 function emailHeading(string $text): string {
-    return '<div style="font-family:' . EMAIL_FONT_SANS . ';font-size:19px;font-weight:700;color:' . EMAIL_COLOR_TEXT . ';margin:0 0 16px;">' . htmlspecialchars($text) . '</div>';
+    return '<div style="font-family:' . EMAIL_FONT_SANS . ';font-size:22px;line-height:1.2;font-weight:800;color:' . EMAIL_COLOR_TEXT . ';margin:0 0 16px;">' . htmlspecialchars($text) . '</div>';
 }
 
 function emailButton(string $url, string $label): string {
-    return '<a href="' . htmlspecialchars($url) . '" style="display:inline-block;background:' . EMAIL_COLOR_ACCENT . ';color:' . EMAIL_COLOR_ACCENT_INK . ';font-family:' . EMAIL_FONT_SANS . ';font-size:14px;font-weight:700;text-decoration:none;padding:11px 22px;border-radius:4px;">' . htmlspecialchars($label) . '</a>';
+    return '<a href="' . htmlspecialchars($url) . '" style="display:inline-block;background:' . EMAIL_COLOR_ACCENT . ';color:' . EMAIL_COLOR_ACCENT_INK . ';font-family:' . EMAIL_FONT_SANS . ';font-size:14px;font-weight:700;text-decoration:none;padding:12px 22px;">' . htmlspecialchars($label) . '</a>';
 }
 
 // A boxed "Team A 12 – 8 Team B" line, with an optional winner call-out below in the
@@ -358,7 +358,7 @@ function emailScoreBox(string $team1, int $score1, string $team2, int $score2, ?
     $winnerLine = $winner
         ? '<div style="margin-top:8px;font-family:' . EMAIL_FONT_SANS . ';font-size:13px;font-weight:700;color:' . EMAIL_COLOR_MARKER . ';">' . htmlspecialchars($winner) . ' wins</div>'
         : '';
-    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE_2 . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';border-radius:4px;margin:0 0 20px;">' .
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';margin:0 0 20px;">' .
         '<tr><td style="padding:16px 18px;font-family:' . EMAIL_FONT_SANS . ';font-size:15px;color:' . EMAIL_COLOR_TEXT . ';">' .
         htmlspecialchars($team1) . ' <strong>' . $score1 . '</strong> &ndash; <strong>' . $score2 . '</strong> ' . htmlspecialchars($team2) .
         $winnerLine . '</td></tr></table>';
@@ -369,8 +369,8 @@ function emailScoreBox(string $team1, int $score1, string $team2, int $score2, ?
 function emailLayout(string $innerHtml, string $footerHtml): string {
     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_BG . ';padding:32px 16px;">' .
         '<tr><td align="center">' .
-        '<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background:' . EMAIL_COLOR_SURFACE . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';border-radius:6px;">' .
-        '<tr><td style="padding:22px 28px;border-bottom:1px solid ' . EMAIL_COLOR_BORDER . ';">' . emailWordmark() . '</td></tr>' .
+        '<table role="presentation" width="480" cellpadding="0" cellspacing="0" style="width:480px;max-width:100%;background:' . EMAIL_COLOR_SURFACE . ';border:2px solid ' . EMAIL_COLOR_TEXT . ';">' .
+        '<tr><td style="padding:16px 28px;background:' . EMAIL_COLOR_SHEET . ';border-bottom:2px solid ' . EMAIL_COLOR_TEXT . ';">' . emailWordmark() . '</td></tr>' .
         '<tr><td style="padding:28px;font-family:' . EMAIL_FONT_SANS . ';font-size:15px;line-height:1.6;color:' . EMAIL_COLOR_TEXT . ';">' . $innerHtml . '</td></tr>' .
         '<tr><td style="padding:16px 28px 22px;border-top:1px solid ' . EMAIL_COLOR_BORDER . ';font-family:' . EMAIL_FONT_SANS . ';font-size:12px;line-height:1.6;color:' . EMAIL_COLOR_MUTED . ';">' . $footerHtml . '</td></tr>' .
         '</table>' .
@@ -389,7 +389,7 @@ function buildConfirmationEmail(PDO $db, array $row): ?array {
     $confirmUrl = rtrim(APP_PUBLIC_URL, '/') . '/notifications/confirm?pid=' . $row['participant_id'] . '&token=' . $row['token_plaintext'];
     $subject = "Confirm your {$tournament['name']} match update emails";
 
-    $inner = emailEyebrow('Confirm Subscription') .
+    $inner = emailEyebrow('Confirm subscription') .
         emailHeading($tournament['name']) .
         '<p style="margin:0 0 20px;">Confirm you want match update emails for this tournament.</p>' .
         '<p style="margin:0 0 20px;">' . emailButton($confirmUrl, 'Confirm subscription') . '</p>' .
@@ -420,7 +420,7 @@ function buildMatchCompletedEmail(PDO $db, array $row, array $participant): ?arr
     $subject = "{$m['tournament_name']}: Round {$m['round']} match complete — {$m['winner_name']} wins";
     $summary = "{$m['team1_name']} {$m['team1_score']} – {$m['team2_score']} {$m['team2_name']} ({$m['winner_name']} wins)";
 
-    $body = emailEyebrow('Round ' . (int)$m['round'] . ' · Match Complete') .
+    $body = emailEyebrow('Round ' . (int)$m['round'] . ' · Match complete') .
         emailHeading($m['tournament_name']) .
         emailScoreBox($m['team1_name'], (int)$m['team1_score'], $m['team2_name'], (int)$m['team2_score'], $m['winner_name']);
     $text = "Round {$m['round']} match complete in {$m['tournament_name']}:\n{$summary}";
@@ -449,7 +449,7 @@ function buildRoundCompletedEmail(PDO $db, array $row, array $participant): ?arr
     $nextMatches = $stmt->fetchAll();
 
     $subject = "{$tournament['name']}: Round {$round} complete";
-    $body = emailEyebrow('Round ' . $round . ' · Complete') . emailHeading($tournament['name']);
+    $body = emailEyebrow('Round ' . $round . ' complete') . emailHeading($tournament['name']);
     $text = "Round {$round} is complete in {$tournament['name']}.";
 
     if ($nextMatches) {
@@ -463,8 +463,8 @@ function buildRoundCompletedEmail(PDO $db, array $row, array $participant): ?arr
             $matchupLines[] = $line;
         }
         if ($matchupRows !== '') {
-            $body .= emailEyebrow('Round ' . $nextRound . ' Matchups') .
-                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE_2 . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';border-radius:4px;"><tr><td style="padding:0 16px;">' . $matchupRows . '</td></tr></table>';
+            $body .= emailEyebrow('Round ' . $nextRound . ' matchups') .
+                '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' . EMAIL_COLOR_SURFACE . ';border:1px solid ' . EMAIL_COLOR_BORDER . ';"><tr><td style="padding:0 16px;">' . $matchupRows . '</td></tr></table>';
             $text .= "\n\nRound {$nextRound} matchups:\n- " . implode("\n- ", $matchupLines);
         }
     }
@@ -492,7 +492,7 @@ function buildTournamentFinalizedEmail(PDO $db, array $row, array $participant):
     $subject = "{$m['tournament_name']} is complete — {$m['winner_name']} wins!";
     $summary = "{$m['team1_name']} {$m['team1_score']} – {$m['team2_score']} {$m['team2_name']}";
 
-    $body = emailEyebrow('Tournament Complete') .
+    $body = emailEyebrow('Tournament complete') .
         emailHeading($m['tournament_name']) .
         '<p style="margin:0 0 16px;">Champion: <strong style="color:' . EMAIL_COLOR_MARKER . ';">' . htmlspecialchars($m['winner_name']) . '</strong></p>' .
         emailScoreBox($m['team1_name'], (int)$m['team1_score'], $m['team2_name'], (int)$m['team2_score']) .

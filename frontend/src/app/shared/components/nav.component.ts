@@ -74,7 +74,7 @@ import { AuthService } from '../services/auth.service';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 max(clamp(16px, 4vw, 56px), calc((100% - 1320px) / 2 + 56px));
+      padding: 0 var(--page-gutter);
       height: 52px;
       /* The header is the green sheet on every screen: it is what makes a working page
          recognisably Bracketway without colouring the work itself. */

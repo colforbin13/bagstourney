@@ -45,7 +45,7 @@ const PAGE_SIZES = [25, 50, 100, 200];
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <div class="page-wide">
+    <div class="page-table">
       <div class="page-header">
         <h1>Audit log</h1>
       </div>

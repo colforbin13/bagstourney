@@ -220,7 +220,7 @@ Flat, with paper depth only. Surfaces are separated by rules and by the change f
 
 ### Shadow Vocabulary
 - **Sheet edge** (`box-shadow: 0 1px 0 rgba(0, 0, 0, .22), 0 14px 22px -16px rgba(0, 0, 0, .45)`): the white sign-up sheet resting on the green hero.
-- **Menu edge** (`box-shadow: 0 10px 18px -8px rgba(0, 0, 0, .35)`): the header dropdown menu, a white sheet with a 1.5px toner rule.
+- **Menu edge** (`box-shadow: 0 10px 18px -8px rgba(0, 0, 0, .35)`): any dropdown menu or modal, a white sheet with a 1.5px toner rule.
 - **Lifted** (`box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18)`): a row while it is being dragged.
 
 ### Named Rules
@@ -320,8 +320,6 @@ A drawn chevron in the 2px square stroke replaces the browser triangle and turns
 
 Not yet decided or not yet brought into this system. These are gaps, not rules.
 
-- The email templates in `api/` still use the previous colours.
-- The signed-in screens (manage, score entry, admin pages) and hover and focus states have not been reviewed in a browser under this system; they inherit it by token only.
+- The signed-in screens were reviewed in a browser on 2026-11-16 at desktop and phone width. Admin tables (users, audit log, traffic) use `.page-table`, which holds them to the header's `--page-gutter` instead of the window edge.
 - Outside the home page the world is mostly a green header over white stock. Carrying more of the flyer (rule weights, cut lines, a second type width) to other pages is undecided.
 - Other sheet colours (yellow or pink stock for other Persuade pages) are undecided. Only the green sheet is established.
-- A few admin screens still carry rounded corners from the previous look (confirm dialog, score entry, user management, change password, audit log).

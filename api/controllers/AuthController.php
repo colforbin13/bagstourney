@@ -144,17 +144,18 @@ class AuthController {
     }
 
     private function buildVerificationEmail(string $username, string $verifyUrl): array {
-        $accent = '#BC3A1C';
-        $ink = '#FFF8EF';
-        $text = '#22261F';
-        $textDim = '#5B5A4E';
-        $font = "Arial,Helvetica,sans-serif";
+        // The Door Flyer palette (DESIGN.md), same as the notification emails.
+        $accent = '#141414';
+        $ink = '#FFFFFF';
+        $text = '#141414';
+        $textDim = '#3C423D';
+        $font = "Archivo,Arial,Helvetica,sans-serif";
 
         $html = '<div style="font-family:' . $font . ';font-size:15px;line-height:1.6;color:' . $text . ';max-width:480px;">' .
-            '<p style="margin:0 0 16px;font-weight:700;">Bracketway</p>' .
+            '<p style="margin:0 0 16px;font-size:20px;font-weight:800;">Bracketway</p>' .
             '<p style="margin:0 0 16px;">Hi ' . htmlspecialchars($username) . ',</p>' .
             '<p style="margin:0 0 20px;">Confirm your email address to activate your organizer account.</p>' .
-            '<p style="margin:0 0 20px;"><a href="' . htmlspecialchars($verifyUrl) . '" style="display:inline-block;background:' . $accent . ';color:' . $ink . ';font-weight:700;text-decoration:none;padding:11px 22px;border-radius:4px;">Verify email address</a></p>' .
+            '<p style="margin:0 0 20px;"><a href="' . htmlspecialchars($verifyUrl) . '" style="display:inline-block;background:' . $accent . ';color:' . $ink . ';font-weight:700;text-decoration:none;padding:12px 22px;">Verify email address</a></p>' .
             '<p style="margin:0;font-size:13px;color:' . $textDim . ';">This link expires in 72 hours. If you did not create this account, you can ignore this email.</p>' .
             '</div>';
 

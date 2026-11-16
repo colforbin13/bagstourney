@@ -781,6 +781,17 @@ Built and verified. The top entries are **built but not yet deployed** — they'
 since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
 Everything below them is live in production.
 
+- **New look: "The Door Flyer"** (2026-11-16) — replaced the cream, brick-red and Bebas Neue look, which read as
+  generic. Green sheet header on every screen, white pages, black type in one typeface (Archivo), pink for
+  "Live" only, square corners, sentence case throughout (round names are now "Winners round 1", "Grand
+  final"). The home page is rebuilt as a flyer: a working example sign-up sheet that draws teams, and a strip
+  of tear-off tabs. Seeded example tournaments (owned by user id 5, `shared/examples.ts`) are listed apart as
+  "Example brackets" and labelled on their bracket page. New share card, sourced from
+  `frontend/scripts/og-card.html`. Frontend only, no migration. Product and design records are `PRODUCT.md`
+  and `DESIGN.md`. **Not yet deployed.** Signed-in screens (manage, score entry, admin) checked in a browser
+  2026-11-16. The notification and verification emails moved to the new palette the same day (green header
+  band, square black button). Other leftovers are under Open Items in `DESIGN.md`.
+
 - **Traffic page for super admins** (2026-10-23) — Admin → Traffic: visits per day, top
   pages, where visits came from (referring site or a `?utm_source=` tag), and organizer
   activity (signups, tournaments, players, Pro subscribers) from the real tables. Self-hosted

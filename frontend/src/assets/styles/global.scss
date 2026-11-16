@@ -35,6 +35,9 @@
   --lose: var(--muted);
 
   --radius: 0px;
+  /* The side margin the header sets for its wordmark and links. Pages that run wider
+     than the reading column use it too, so their edges line up with the header's. */
+  --page-gutter: max(clamp(16px, 4vw, 56px), calc((100% - 1320px) / 2 + 56px));
   --sans:    'Archivo', 'Helvetica Neue', Arial, sans-serif;
   --display: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
   /* Small labels used to be set in a monospace. They are plain text, so they take the
@@ -188,6 +191,16 @@ h1, h2, h3 {
   padding: 24px 16px 80px;
   overflow-x: auto;
 }
+
+/* Admin tables: wider than the reading column, but held to the header's margins
+   rather than running to the window edge. The bracket keeps .page-wide's full width. */
+.page-table {
+  padding: 24px var(--page-gutter) 80px;
+  overflow-x: auto;
+}
+
+/* Small help text under a form control. */
+.field-hint { font-size: 0.78rem; line-height: 1.4; color: var(--muted); }
 
 .page-header {
   display: flex;
