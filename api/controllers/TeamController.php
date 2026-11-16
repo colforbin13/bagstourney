@@ -4,19 +4,30 @@
 class TeamController {
     public function __construct(private readonly PDO $db) {}
 
-    public function listByTournament(int $tournamentId): void {
-        $stmt = $this->db->prepare('
-            SELECT t.*, 
-                   p1.name as participant1_name, 
-                   p2.name as participant2_name
-            FROM teams t
-            JOIN participants p1 ON t.participant1_id = p1.id
-            JOIN participants p2 ON t.participant2_id = p2.id
-            WHERE t.tournament_id = ?
-            ORDER BY t.seed ASC
-        ');
+    // Every team response carries its two players' names; this is the one query for it.
+    private const TEAM_SELECT = '
+        SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
+        FROM teams t
+        JOIN participants p1 ON t.participant1_id = p1.id
+        JOIN participants p2 ON t.participant2_id = p2.id
+    ';
+
+    /** A tournament's teams in seed order. */
+    private function teamsWithNames(int $tournamentId): array {
+        $stmt = $this->db->prepare(self::TEAM_SELECT . ' WHERE t.tournament_id = ? ORDER BY t.seed');
         $stmt->execute([$tournamentId]);
-        echo json_encode($stmt->fetchAll());
+        return $stmt->fetchAll();
+    }
+
+    /** One team, or false if it does not exist. */
+    private function teamWithNames(int $id): array|false {
+        $stmt = $this->db->prepare(self::TEAM_SELECT . ' WHERE t.id = ?');
+        $stmt->execute([$id]);
+        return $stmt->fetch();
+    }
+
+    public function listByTournament(int $tournamentId): void {
+        echo json_encode($this->teamsWithNames($tournamentId));
     }
 
     /**
@@ -112,16 +123,7 @@ class TeamController {
             $this->db->commit();
 
             // Return teams
-            $stmt = $this->db->prepare('
-                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
-                FROM teams t
-                JOIN participants p1 ON t.participant1_id = p1.id
-                JOIN participants p2 ON t.participant2_id = p2.id
-                WHERE t.tournament_id = ?
-                ORDER BY t.seed
-            ');
-            $stmt->execute([$tournamentId]);
-            echo json_encode($stmt->fetchAll());
+            echo json_encode($this->teamsWithNames($tournamentId));
 
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -194,15 +196,7 @@ class TeamController {
 
             $this->db->commit();
 
-            $stmt = $this->db->prepare('
-                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
-                FROM teams t
-                JOIN participants p1 ON t.participant1_id = p1.id
-                JOIN participants p2 ON t.participant2_id = p2.id
-                WHERE t.id = ?
-            ');
-            $stmt->execute([$teamId]);
-            echo json_encode($stmt->fetch());
+            echo json_encode($this->teamWithNames($teamId));
 
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -260,16 +254,7 @@ class TeamController {
 
             $this->db->commit();
 
-            $stmt = $this->db->prepare('
-                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
-                FROM teams t
-                JOIN participants p1 ON t.participant1_id = p1.id
-                JOIN participants p2 ON t.participant2_id = p2.id
-                WHERE t.tournament_id = ?
-                ORDER BY t.seed
-            ');
-            $stmt->execute([$tournamentId]);
-            echo json_encode($stmt->fetchAll());
+            echo json_encode($this->teamsWithNames($tournamentId));
 
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -328,16 +313,7 @@ class TeamController {
 
             $this->db->commit();
 
-            $stmt = $this->db->prepare('
-                SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
-                FROM teams t
-                JOIN participants p1 ON t.participant1_id = p1.id
-                JOIN participants p2 ON t.participant2_id = p2.id
-                WHERE t.tournament_id = ?
-                ORDER BY t.seed
-            ');
-            $stmt->execute([$tournamentId]);
-            echo json_encode($stmt->fetchAll());
+            echo json_encode($this->teamsWithNames($tournamentId));
 
         } catch (Exception $e) {
             $this->db->rollBack();
@@ -362,9 +338,7 @@ class TeamController {
             return;
         }
         $this->db->prepare('UPDATE teams SET name = ? WHERE id = ?')->execute([$name, $id]);
-        $stmt = $this->db->prepare('SELECT t.*, p1.name as participant1_name, p2.name as participant2_name FROM teams t JOIN participants p1 ON t.participant1_id = p1.id JOIN participants p2 ON t.participant2_id = p2.id WHERE t.id = ?');
-        $stmt->execute([$id]);
-        echo json_encode($stmt->fetch());
+        echo json_encode($this->teamWithNames($id));
     }
 
     /**

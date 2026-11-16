@@ -10,10 +10,10 @@ import { TournamentService } from '../shared/services/tournament.service';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="card" style="margin-bottom:24px">
-      <div class="section-label">Change Password</div>
+      <div class="section-label">Change password</div>
       <div style="max-width: 400px;">
         <div class="form-group">
-          <label>Current Password</label>
+          <label>Current password</label>
           <input 
             class="input" 
             type="password" 
@@ -24,7 +24,7 @@ import { TournamentService } from '../shared/services/tournament.service';
         </div>
 
         <div class="form-group">
-          <label>New Password</label>
+          <label>New password</label>
           <input 
             class="input" 
             type="password" 
@@ -35,7 +35,7 @@ import { TournamentService } from '../shared/services/tournament.service';
         </div>
 
         <div class="form-group">
-          <label>Confirm New Password</label>
+          <label>Confirm new password</label>
           <input 
             class="input" 
             type="password" 
@@ -52,7 +52,7 @@ import { TournamentService } from '../shared/services/tournament.service';
           @if (loading()) { 
             <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> 
           } @else {
-            Change Password
+            Change password
           }
         </button>
 
@@ -69,9 +69,8 @@ import { TournamentService } from '../shared/services/tournament.service';
   styles: [`
     .section-label {
       font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text-dim);
       margin-bottom: 10px;
     }
@@ -85,29 +84,14 @@ import { TournamentService } from '../shared/services/tournament.service';
       margin-bottom: 6px;
       color: var(--text);
     }
-    .input {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 0.9rem;
-      
-      &:disabled { opacity: 0.5; cursor: not-allowed; }
-      &:focus { outline: none; border-color: var(--accent); }
-    }
-    .btn {
-      padding: 8px 16px;
-      font-size: 0.85rem;
-    }
+    .input:disabled { opacity: 0.5; cursor: not-allowed; }
     .form-error {
       font-size: 0.8rem;
       color: var(--danger);
       margin-top: 8px;
       padding: 8px;
       background: rgba(var(--danger-rgb), 0.1);
-      border-radius: 4px;
+      border-radius: 0;
     }
   `]
 })

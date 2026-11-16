@@ -4,6 +4,27 @@
 class MatchController {
     public function __construct(private readonly PDO $db) {}
 
+    // A match row with its teams' and players' names attached, as every response returns it.
+    private const MATCH_SELECT = '
+        SELECT
+            m.*,
+            t1.name as team1_name,
+            t2.name as team2_name,
+            tw.name as winner_name,
+            t1p1.name as team1_participant1_name,
+            t1p2.name as team1_participant2_name,
+            t2p1.name as team2_participant1_name,
+            t2p2.name as team2_participant2_name
+        FROM matches m
+        LEFT JOIN teams t1 ON m.team1_id = t1.id
+        LEFT JOIN teams t2 ON m.team2_id = t2.id
+        LEFT JOIN teams tw ON m.winner_id = tw.id
+        LEFT JOIN participants t1p1 ON t1.participant1_id = t1p1.id
+        LEFT JOIN participants t1p2 ON t1.participant2_id = t1p2.id
+        LEFT JOIN participants t2p1 ON t2.participant1_id = t2p1.id
+        LEFT JOIN participants t2p2 ON t2.participant2_id = t2p2.id
+    ';
+
     // Resolves a uuid to its tournament before delegating to bracket() — no visibility
     // check here, matching TournamentController::getByUuid(): knowing the uuid is itself
     // the access grant for a private tournament.
@@ -20,27 +41,7 @@ class MatchController {
     }
 
     public function bracket(int $tournamentId): void {
-        $stmt = $this->db->prepare('
-            SELECT
-                m.*,
-                t1.name as team1_name,
-                t2.name as team2_name,
-                tw.name as winner_name,
-                t1p1.name as team1_participant1_name,
-                t1p2.name as team1_participant2_name,
-                t2p1.name as team2_participant1_name,
-                t2p2.name as team2_participant2_name
-            FROM matches m
-            LEFT JOIN teams t1 ON m.team1_id  = t1.id
-            LEFT JOIN teams t2 ON m.team2_id  = t2.id
-            LEFT JOIN teams tw ON m.winner_id  = tw.id
-            LEFT JOIN participants t1p1 ON t1.participant1_id = t1p1.id
-            LEFT JOIN participants t1p2 ON t1.participant2_id = t1p2.id
-            LEFT JOIN participants t2p1 ON t2.participant1_id = t2p1.id
-            LEFT JOIN participants t2p2 ON t2.participant2_id = t2p2.id
-            WHERE m.tournament_id = ?
-            ORDER BY m.round ASC, m.match_number ASC
-        ');
+        $stmt = $this->db->prepare(self::MATCH_SELECT . ' WHERE m.tournament_id = ? ORDER BY m.round ASC, m.match_number ASC');
         $stmt->execute([$tournamentId]);
         $matches = $stmt->fetchAll();
 
@@ -183,7 +184,7 @@ class MatchController {
                 if ($championId !== null) {
                     $this->enqueueTournamentFinalizedNotifications($match, $matchId);
                 } else {
-                    $this->enqueueRoundCompletedNotifications($match);
+                    $this->enqueueRoundCompletedNotifications($match, $matchId);
                 }
             }
 
@@ -212,26 +213,7 @@ class MatchController {
             );
 
             // Return updated match
-            $stmt = $this->db->prepare('
-                SELECT
-                    m.*,
-                    t1.name as team1_name,
-                    t2.name as team2_name,
-                    tw.name as winner_name,
-                    t1p1.name as team1_participant1_name,
-                    t1p2.name as team1_participant2_name,
-                    t2p1.name as team2_participant1_name,
-                    t2p2.name as team2_participant2_name
-                FROM matches m
-                LEFT JOIN teams t1 ON m.team1_id = t1.id
-                LEFT JOIN teams t2 ON m.team2_id = t2.id
-                LEFT JOIN teams tw ON m.winner_id = tw.id
-                LEFT JOIN participants t1p1 ON t1.participant1_id = t1p1.id
-                LEFT JOIN participants t1p2 ON t1.participant2_id = t1p2.id
-                LEFT JOIN participants t2p1 ON t2.participant1_id = t2p1.id
-                LEFT JOIN participants t2p2 ON t2.participant2_id = t2p2.id
-                WHERE m.id = ?
-            ');
+            $stmt = $this->db->prepare(self::MATCH_SELECT . ' WHERE m.id = ?');
             $stmt->execute([$matchId]);
             echo json_encode($stmt->fetch());
 
@@ -482,7 +464,7 @@ class MatchController {
     // double elimination, so winners round 2 and losers round 2 are different rounds that
     // finish at different times; matching on round alone would treat them as one and
     // suppress both notifications until the later of the two completed.
-    private function enqueueRoundCompletedNotifications(array $match): void {
+    private function enqueueRoundCompletedNotifications(array $match, int $matchId): void {
         if (!NOTIFY_ROUND_COMPLETED_ENABLED) return;
         $bracketSide = isset($match['bracket_side']) ? $match['bracket_side'] : 'winners';
         $remaining = $this->db->prepare('
@@ -498,12 +480,14 @@ class MatchController {
             WHERE tournament_id = ? AND notification_lifecycle = "confirmed" AND notify_round_completed = 1
         ');
         $stmt->execute([$match['tournament_id']]);
+        // match_id is the match that finished the round. The email reads its bracket_side
+        // from it: round numbers restart per side, so `round` alone can't say which round.
         $insert = $this->db->prepare('
-            INSERT INTO notification_queue (tournament_id, round, participant_id, email, event_type)
-            VALUES (?, ?, ?, ?, "round_completed")
+            INSERT INTO notification_queue (tournament_id, match_id, round, participant_id, email, event_type)
+            VALUES (?, ?, ?, ?, ?, "round_completed")
         ');
         foreach ($stmt->fetchAll() as $recipient) {
-            $insert->execute([$match['tournament_id'], (int)$match['round'], $recipient['id'], $recipient['email']]);
+            $insert->execute([$match['tournament_id'], $matchId, (int)$match['round'], $recipient['id'], $recipient['email']]);
         }
     }
 

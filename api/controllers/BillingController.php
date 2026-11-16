@@ -716,10 +716,17 @@ class BillingController {
     }
 
     private function grantSubscription(int $userId, ?string $subscriptionId, ?string $customerId, ?int $periodEnd): void {
+        // Same rule as grantTournamentUnlock() below: an account a super admin already
+        // comped stays 'manual', so the subscription ending later does not take the comp
+        // with it. Paying for a plan already comped is a wasted purchase, not a bug.
+        //
+        // The source must be assigned before the plan, for the reason given there: MySQL
+        // evaluates SET left to right, and with the plan first the CASE would always see
+        // 'paid' and never record a Stripe grant at all.
         $stmt = $this->db->prepare("
             UPDATE users
-            SET plan = 'paid',
-                plan_source = 'stripe',
+            SET plan_source = CASE WHEN plan = 'paid' AND plan_source = 'manual' THEN 'manual' ELSE 'stripe' END,
+                plan = 'paid',
                 stripe_subscription_id = COALESCE(?, stripe_subscription_id),
                 stripe_customer_id = COALESCE(stripe_customer_id, ?),
                 plan_expires_at = COALESCE(?, plan_expires_at)

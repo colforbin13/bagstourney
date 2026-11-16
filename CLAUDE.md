@@ -81,7 +81,7 @@ Match/tournament state transitions live in `MatchController`:
 - `cascadePropagate()` advances the winner and, in double elimination, drops the loser. It stops short of the reset match when the winners-bracket side wins the grand final, since the reset is then moot.
 - `cascadeClearDownstream()` unwinds results when a completed match is re-scored, following **both** edges; it recurses only where a team was actually withdrawn.
 - `championOf()` answers "is this tournament decided", replacing the old `next_match_id IS NULL` rule — in double elimination that no longer means "the end". `syncTournamentStatus()` just writes what it returns.
-- `enqueueRoundCompletedNotifications()` scopes its round by `bracket_side`; round numbers restart per side.
+- `enqueueRoundCompletedNotifications()` scopes its round by `bracket_side`; round numbers restart per side. It records the match that finished the round as the queue row's `match_id`, which is how the email learns the side. The emails name rounds with `api/lib/RoundLabel.php` (`tests/RoundLabelTest.php`), the server-side mirror of `roundLabel()`.
 - `bracket()` returns `{ format, sides: [{ side, rounds: [{ round, matches }] }] }`, grouped by bracket side and *then* round — grouping on `round` alone merged winners round 2 with losers round 2 into one column. It also still emits the legacy `rounds` map, but **only for single elimination**, where it is exactly right; there is no correct single-tree shape for a two-tree bracket, so it is omitted rather than shipped wrong.
 
 On the frontend, `shared/bracket-labels.ts` owns the derived presentation all three screens share: `roundLabel()` (which labels by a round's *position within its side*, hiding the gap left when a losers round collapses away) and `championName()` — which mirrors `championOf()` and must be kept in step with it. `bracket-view` renders single elimination through its existing mirrored/column layouts untouched, and double elimination through `sideLayouts()`: stacked winners → losers → grand final sections whose rows are apportioned from each round's real match count, since the losers bracket halves every *two* rounds rather than every round.
@@ -126,7 +126,9 @@ Four invariants worth knowing before changing any of it:
 
 - **`plan_source` / `paid_override_source` (migration `017`) record who granted a plan.**
   Stripe may only revoke what Stripe granted, so a cancellation or refund can never strip a
-  super-admin comped account or tournament.
+  super-admin comped account or tournament. Every writer has to keep the marker honest: the
+  super-admin levers set it to `manual`, and a Stripe grant leaves an existing `manual`
+  grant alone. `tests/PlanSourceTest.php` covers this against in-memory SQLite.
 - **Fulfilment runs from both the webhook and the return page, idempotently.** The redirect
   and the webhook race and either can win; whichever is second is a no-op. Don't "simplify"
   one away — dropping the return page means a paying organizer stares at an unchanged screen.
@@ -149,7 +151,7 @@ The tag-building is pure and lives in `api/lib/LinkPreview.php` (tested in `test
 
 Private tournaments are described like public ones — knowing the link already grants full access to the bracket, so withholding the name would protect nothing while making a deliberately shared link look broken.
 
-`og:image` is a static brand card at `frontend/src/assets/og-card.png`, generated once with GD from the favicon's geometry and Bebas Neue. Production needs neither GD nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
+`og:image` is a static brand card at `frontend/src/assets/og-card.png`, rendered once by headless Chrome from `frontend/scripts/og-card.html` (the command is in that file's header). Production needs neither Chrome nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
 
 ### Traffic
 

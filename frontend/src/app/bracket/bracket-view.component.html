@@ -19,7 +19,7 @@
         <span class="team-name">
             {{ match.team1_name ?? ((match.status === 'bye' && !match.team1_id && match.team2_id) ? 'Bye' : 'TBD') }}
             @if (crownsChampion(match) && match.winner_id === match.team1_id) {
-            <span class="champion-icon" aria-hidden="true">🏆</span>
+            <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
             }
         </span>
         @if (teamParticipants(match.team1_name, match.team1_participant1_name, match.team1_participant2_name); as participants) {
@@ -45,7 +45,7 @@
         <span class="team-name">
             {{ match.team2_name ?? ((match.status === 'bye' && !match.team2_id && match.team1_id) ? 'Bye' : 'TBD') }}
             @if (crownsChampion(match) && match.winner_id === match.team2_id) {
-            <span class="champion-icon" aria-hidden="true">🏆</span>
+            <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
             }
         </span>
         @if (teamParticipants(match.team2_name, match.team2_participant1_name, match.team2_participant2_name); as participants) {
@@ -130,20 +130,23 @@
     <div class="kiosk-bar">
         <h1 class="kiosk-title">{{ tournament()?.name }}</h1>
         @if (tournament()) {
-        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
+        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status === 'active' ? 'Live' : tournament()!.status === 'complete' ? 'Final' : 'Setup' }}</span>
         }
         <button type="button" class="btn btn-sm kiosk-exit" (click)="setKiosk(false)">Exit TV mode</button>
     </div>
     } @else {
     <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div style="min-width:0;">
-        <a routerLink="/" style="color:var(--text-dim);font-size:.8rem;">← All tournaments</a>
+        <a routerLink="/" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> All tournaments</a>
         <h1 style="margin-top:4px;">{{ tournament()?.name }}</h1>
+        @if (isExample()) {
+        <p class="example-note">An example tournament with made-up teams, here to show what a bracket looks like.</p>
+        }
     </div>
 
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         @if (tournament()) {
-        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status }}</span>
+        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status === 'active' ? 'Live' : tournament()!.status === 'complete' ? 'Final' : 'Setup' }}</span>
         }
 
         @if (!auth.isLoggedIn()) {
@@ -222,7 +225,7 @@
         @if (tournament()?.status === 'complete' && champion()) {
         <div class="champion">
             <div class="champion-name">
-            <span class="champion-icon" aria-hidden="true">🏆</span>
+            <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
             {{ champion() }}
             </div>
         </div>
@@ -250,7 +253,7 @@
             @if (tournament()?.status === 'complete') {
             <div class="champion">
                 <div class="champion-name">
-                <span class="champion-icon" aria-hidden="true">🏆</span>
+                <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
                 {{ champion() }}
                 </div>
             </div>
@@ -304,7 +307,7 @@
         @if (tournament()?.status === 'complete') {
         <div class="champion">
             <div class="champion-name">
-            <span class="champion-icon" aria-hidden="true">🏆</span>
+            <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
             {{ champion() }}
             </div>
         </div>

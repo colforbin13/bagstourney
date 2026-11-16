@@ -33,6 +33,23 @@ require_once __DIR__ . '/controllers/AuditLogController.php';
 require_once __DIR__ . '/controllers/BillingController.php';
 require_once __DIR__ . '/controllers/AnalyticsController.php';
 
+function notFound(): void {
+    http_response_code(404);
+    echo json_encode(['error' => 'Not found']);
+}
+
+// The tournament a child row belongs to, for requireTournamentRole() on endpoints addressed
+// by the child's own id. 0 when the row does not exist, which requireTournamentRole()
+// answers with a 404. $table is only ever a literal from the routes below.
+function tournamentIdFor(PDO $db, string $table, int $id): int {
+    if (!in_array($table, ['participants', 'teams', 'matches', 'pool_matches'], true)) {
+        throw new InvalidArgumentException("Unexpected table: {$table}");
+    }
+    $stmt = $db->prepare("SELECT tournament_id FROM {$table} WHERE id = ?");
+    $stmt->execute([$id]);
+    return (int)($stmt->fetch()['tournament_id'] ?? 0);
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $uri    = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
@@ -74,8 +91,7 @@ try {
             } elseif ($action === 'verify-email' && $method === 'POST') {
                 $ctrl->verifyEmail($body);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -104,8 +120,7 @@ try {
                 $actor = requireTournamentRole($db, $id, ['owner']);
                 $ctrl->delete($id, $actor);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -132,28 +147,19 @@ try {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->create($body);
             } elseif ($method === 'PUT' && $id && $action === 'notification-email') {
-                $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
-                $stmt->execute([$id]);
-                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                $actor = requireTournamentRole($db, tournamentIdFor($db, 'participants', $id), ['owner', 'manager']);
                 $ctrl->setNotificationEmail($id, $body, $actor);
             } elseif ($method === 'PUT' && $id && $action === 'approve') {
-                $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
-                $stmt->execute([$id]);
-                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                $actor = requireTournamentRole($db, tournamentIdFor($db, 'participants', $id), ['owner', 'manager']);
                 $ctrl->approve($id, $actor);
             } elseif ($method === 'PUT' && $id) {
-                $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
-                $stmt->execute([$id]);
-                requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                requireTournamentRole($db, tournamentIdFor($db, 'participants', $id), ['owner', 'manager']);
                 $ctrl->update($id, $body);
             } elseif ($method === 'DELETE' && $id) {
-                $stmt = $db->prepare('SELECT tournament_id FROM participants WHERE id = ?');
-                $stmt->execute([$id]);
-                requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                requireTournamentRole($db, tournamentIdFor($db, 'participants', $id), ['owner', 'manager']);
                 $ctrl->delete($id);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -177,18 +183,13 @@ try {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->reorder($body); // manual seeding: persist drag-and-drop seed order
             } elseif ($method === 'PUT' && $id) {
-                $stmt = $db->prepare('SELECT tournament_id FROM teams WHERE id = ?');
-                $stmt->execute([$id]);
-                requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                requireTournamentRole($db, tournamentIdFor($db, 'teams', $id), ['owner', 'manager']);
                 $ctrl->update($id, $body);
             } elseif ($method === 'DELETE' && $id) {
-                $stmt = $db->prepare('SELECT tournament_id FROM teams WHERE id = ?');
-                $stmt->execute([$id]);
-                requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager']);
+                requireTournamentRole($db, tournamentIdFor($db, 'teams', $id), ['owner', 'manager']);
                 $ctrl->delete($id); // direct team entry: undo a mistakenly-entered team
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -207,13 +208,10 @@ try {
                 requireTournamentVisible($db, $id, currentUserOrNull($db));
                 $ctrl->bracket($id); // GET /matches/{tournamentId}
             } elseif ($method === 'PUT' && $id) {
-                $stmt = $db->prepare('SELECT tournament_id FROM matches WHERE id = ?');
-                $stmt->execute([$id]);
-                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager', 'scorekeeper']);
+                $actor = requireTournamentRole($db, tournamentIdFor($db, 'matches', $id), ['owner', 'manager', 'scorekeeper']);
                 $ctrl->updateScore($id, $body, $actor);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -227,13 +225,10 @@ try {
                 $actor = requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->startAction($body, $actor);
             } elseif ($method === 'PUT' && $id) {
-                $stmt = $db->prepare('SELECT tournament_id FROM pool_matches WHERE id = ?');
-                $stmt->execute([$id]);
-                $actor = requireTournamentRole($db, (int)($stmt->fetch()['tournament_id'] ?? 0), ['owner', 'manager', 'scorekeeper']);
+                $actor = requireTournamentRole($db, tournamentIdFor($db, 'pool_matches', $id), ['owner', 'manager', 'scorekeeper']);
                 $ctrl->updateScore($id, $body, $actor);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -248,8 +243,7 @@ try {
                 $actor = requireTournamentRole($db, $id, ['owner', 'manager', 'scorekeeper']);
                 (new BoardController($db))->moveAction($id, $body, $actor);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -267,8 +261,7 @@ try {
             } elseif ($method === 'DELETE' && $id && $memberId) {
                 $ctrl->removeMember($id, $memberId);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -276,8 +269,7 @@ try {
             if ($method === 'PUT' && $id) {
                 (new TournamentAccessController(getDB()))->transferOwnership($id, $body);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -303,8 +295,7 @@ try {
                 // single URL rather than one per event the way Postmark does.
                 $ctrl->webhookBrevo($body);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -322,8 +313,7 @@ try {
             } elseif ($method === 'POST' && $id && $action === 'password-reset') {
                 $ctrl->resetPassword($id);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -355,8 +345,7 @@ try {
             } elseif ($method === 'POST' && $billingAction === 'portal') {
                 $ctrl->openPortal(requireCurrentUser(getDB()));
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -364,8 +353,7 @@ try {
             if ($method === 'GET' && !$id) {
                 (new AuditLogController(getDB()))->list($_GET);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
@@ -377,14 +365,12 @@ try {
             } elseif ($action === null && $method === 'GET' && !$id) {
                 $ctrl->summary($_GET);
             } else {
-                http_response_code(404);
-                echo json_encode(['error' => 'Not found']);
+                notFound();
             }
             break;
 
         default:
-            http_response_code(404);
-            echo json_encode(['error' => 'Not found']);
+            notFound();
     }
 } catch (Throwable $e) {
     // Throwable, not Exception: PHP 8 raises TypeError/ValueError/ArgumentCountError as

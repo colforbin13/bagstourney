@@ -23,7 +23,6 @@ export type LegalDoc = 'terms' | 'refunds' | 'privacy';
       @switch (doc) {
         @case ('terms') {
           <header class="intro">
-            <p class="eyebrow">Legal</p>
             <h1>Terms of service</h1>
             <p class="effective">Effective {{ L.effectiveDate }}</p>
           </header>
@@ -131,7 +130,6 @@ export type LegalDoc = 'terms' | 'refunds' | 'privacy';
 
         @case ('refunds') {
           <header class="intro">
-            <p class="eyebrow">Legal</p>
             <h1>Refund policy</h1>
             <p class="effective">Effective {{ L.effectiveDate }}</p>
           </header>
@@ -186,7 +184,6 @@ export type LegalDoc = 'terms' | 'refunds' | 'privacy';
 
         @case ('privacy') {
           <header class="intro">
-            <p class="eyebrow">Legal</p>
             <h1>Privacy policy</h1>
             <p class="effective">Effective {{ L.effectiveDate }}</p>
           </header>
@@ -286,16 +283,8 @@ export type LegalDoc = 'terms' | 'refunds' | 'privacy';
   `,
   styles: [`
     .intro { margin-bottom: 28px; }
-    .eyebrow {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 10px; }
-    .effective { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+    .effective { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
 
     section { border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 24px; }
     h2 { font-size: 1.3rem; margin-bottom: 8px; }

@@ -5,12 +5,18 @@ import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
 import { Tournament } from '../shared/models/tournament.models';
+import { DrawnTeam, pairTeams, shuffle } from '../shared/blind-draw';
+import { isExampleTournament } from '../shared/examples';
 
 interface TournamentGroup {
-  key: Tournament['status'];
+  key: Tournament['status'] | 'example';
   label: string;
   items: Tournament[];
 }
+
+// The names on the hero's example sign-up sheet. Made up, and labelled as an example on the
+// page: the point is to let a visitor press the button and watch a blind draw happen.
+const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
 
 @Component({
   selector: 'app-tournament-list',
@@ -22,54 +28,82 @@ interface TournamentGroup {
          skip straight to the list. -->
     @if (showLanding()) {
       <header class="hero">
-        <div class="hero-mark" aria-hidden="true">
-          <svg width="300" height="244" viewBox="0 0 160 130" fill="none">
-            <g stroke="currentColor" stroke-width="1.5" fill="none">
-              <path d="M4 10H24C30 10 30 30 36 30" />
-              <path d="M4 50H24C30 50 30 30 36 30" />
-              <path d="M4 80H24C30 80 30 100 36 100" />
-              <path d="M4 120H24C30 120 30 100 36 100" />
-              <path d="M36 30H56C62 30 62 65 68 65" />
-              <path d="M36 100H56C62 100 62 65 68 65" />
-              <path d="M68 65H96" />
-            </g>
-            <circle cx="102" cy="65" r="6" fill="currentColor" />
-          </svg>
-        </div>
         <div class="hero-inner">
-          <p class="hero-eyebrow">Tournament manager for two-player teams</p>
-          <h1 class="hero-title">Set it up in minutes.<br />Settle it at the venue.</h1>
-          <p class="hero-lede">
-            Sign-ups, team draws, seeding, and live scoring in one place — so you can run the
-            tournament instead of redrawing a whiteboard bracket every round.
-          </p>
-          <!-- The one place a sport gets named on this page. Everything else stays neutral,
-               because the app genuinely doesn't care which game it is — but a visitor who
-               can't see their own game in the copy assumes it isn't supported. -->
-          <p class="hero-sports">
-            Bags, KanJam, pickleball, horseshoes, darts, euchre — any bracket of two-person
-            teams. <a routerLink="/sports">See what people run →</a>
-          </p>
-          <!-- The page itself is identical for everyone; only these two destinations move,
-               since sending a signed-in organizer to the register/sign-in screens would be
-               a dead end. -->
-          <div class="hero-actions">
-            @if (auth.isLoggedIn()) {
-              <a class="btn btn-primary" routerLink="/admin">Create a tournament</a>
-              <a class="btn" routerLink="/tournaments">Your tournaments</a>
-            } @else {
-              <a class="btn btn-primary" routerLink="/admin/register">Create a tournament</a>
-              <a class="btn" routerLink="/admin/login">Sign in</a>
-            }
+          <div class="hero-copy">
+            <h1 class="hero-title">Set it up in minutes. Settle it at the venue.</h1>
+            <p class="hero-what">Tournament manager for two-player teams</p>
+            <p class="hero-lede">
+              Sign-ups, team draws, seeding, and live scoring in one place — so you can run the
+              tournament instead of redrawing a whiteboard bracket every round.
+            </p>
+            <!-- The page itself is identical for everyone; only these two destinations move,
+                 since sending a signed-in organizer to the register/sign-in screens would be
+                 a dead end. -->
+            <div class="hero-actions">
+              @if (auth.isLoggedIn()) {
+                <a class="hero-go" routerLink="/admin">Create a tournament</a>
+                <a class="hero-alt" routerLink="/tournaments">Your tournaments</a>
+              } @else {
+                <a class="hero-go" routerLink="/admin/register">Create a tournament</a>
+                <a class="hero-alt" routerLink="/admin/login">Sign in</a>
+              }
+            </div>
           </div>
-          <p class="hero-note"><a routerLink="/pricing">Free to start</a> · Nothing to install · Works on the phone in your pocket</p>
+
+          <!-- The blind draw, working. Same shuffle and pairing as the free generator and a
+               real tournament; the names are an example and nothing leaves the page. -->
+          <section class="sheet" aria-labelledby="sheet-title">
+            <h2 class="sheet-title" id="sheet-title">{{ teams() ? 'Teams' : 'Sign-up sheet' }}</h2>
+            <ol class="sheet-lines" aria-live="polite">
+              @if (teams(); as drawn) {
+                @for (team of drawn; track team.players[0] + draws()) {
+                  <li class="sheet-line is-drawn" [style.--i]="$index">
+                    <span class="sheet-n">{{ team.seed }}</span>
+                    <span>{{ team.players[0] }} <span class="sheet-and">and</span> {{ team.players[1] }}</span>
+                  </li>
+                }
+              } @else {
+                @for (name of players; track name) {
+                  <li class="sheet-line"><span class="sheet-n">{{ $index + 1 }}</span><span>{{ name }}</span></li>
+                }
+              }
+            </ol>
+            <button type="button" class="sheet-draw" (click)="draw()">
+              {{ teams() ? 'Draw again' : 'Draw the teams' }}
+            </button>
+            <p class="sheet-foot">
+              An example blind draw. <a routerLink="/blind-draw-generator">Try it with your own names</a>
+            </p>
+          </section>
+          <!-- Below the sheet on a phone, so the working draw is on the first screen. -->
+          <div class="hero-extra">
+          <!-- The one place a sport gets named on this page. Everything else stays neutral,
+                 because the app genuinely doesn't care which game it is — but a visitor who
+                 can't see their own game in the copy assumes it isn't supported. -->
+            <p class="hero-sports">
+              Bags, KanJam, pickleball, horseshoes, darts, euchre — any bracket of two-person
+              teams. <a routerLink="/sports">See what people run</a>
+            </p>
+            <p class="hero-note"><a routerLink="/pricing">Free to start</a> · Nothing to install · Works on the phone in your pocket</p>
+          </div>
         </div>
+
+        <!-- The strip of tear-off tabs along the bottom of the flyer. -->
+        <nav class="tabs" aria-label="Start here">
+          <a class="tab tab-go" [routerLink]="auth.isLoggedIn() ? '/admin' : '/admin/register'"><span>Start free</span></a>
+          <a class="tab" routerLink="/blind-draw-generator"><span>Blind draw</span></a>
+          <a class="tab" routerLink="/how-it-works"><span>How it works</span></a>
+          <a class="tab" routerLink="/pricing"><span>Pricing</span></a>
+          <a class="tab" routerLink="/cornhole-fundraiser"><span>Fundraisers</span></a>
+          <a class="tab" routerLink="/sports"><span>Sports</span></a>
+          <a class="tab" routerLink="/" fragment="tournaments"><span>Live brackets</span></a>
+        </nav>
       </header>
 
       <section class="steps">
         <ol class="steps-inner">
           <li class="step">
-            <span class="step-num">Step 01</span>
+            <span class="step-num" aria-hidden="true">1</span>
             <h2 class="step-title">Get everyone in</h2>
             <p class="step-body">
               Paste in your list of players, or share a link and QR code at the door and let them
@@ -77,7 +111,7 @@ interface TournamentGroup {
             </p>
           </li>
           <li class="step">
-            <span class="step-num">Step 02</span>
+            <span class="step-num" aria-hidden="true">2</span>
             <h2 class="step-title">Draw the teams</h2>
             <p class="step-body">
               Blind draw random pairs or enter teams directly, then let the seeding fall where it
@@ -85,7 +119,7 @@ interface TournamentGroup {
             </p>
           </li>
           <li class="step">
-            <span class="step-num">Step 03</span>
+            <span class="step-num" aria-hidden="true">3</span>
             <h2 class="step-title">Score it live</h2>
             <p class="step-body">
               Tap scores in as each game finishes. Winners advance on their own, and everyone
@@ -105,11 +139,11 @@ interface TournamentGroup {
           <li>Scorekeeper accounts</li>
           <li>Board assignments</li>
         </ul>
-        <a class="walkthrough-link" routerLink="/how-it-works">Read the full walkthrough →</a>
+        <a class="walkthrough-link" routerLink="/how-it-works">Read the full walkthrough</a>
       </section>
     }
 
-    <div class="page">
+    <div class="page" [class.page-landing]="showLanding()" id="tournaments">
       <div class="list-head">
         @if (showLanding()) {
           <h2 class="list-title">Tournaments in play</h2>
@@ -140,17 +174,23 @@ interface TournamentGroup {
       } @else {
         @for (group of groups(); track group.key) {
           <section class="group">
-            <div class="group-label section-label">{{ group.label }}</div>
+            <div class="group-label">{{ group.label }}</div>
+            @if (group.key === 'example') {
+              <p class="group-note">Made-up events that show how different formats look. Open one to see its bracket.</p>
+            }
             <div class="list">
               @for (t of group.items; track t.id) {
-                <a class="row" [class.is-live]="t.status === 'active'" [routerLink]="['/bracket', t.uuid]">
+                <a class="row" [routerLink]="['/bracket', t.uuid]">
                   <div class="row-body">
                     <div class="row-top">
                       <span class="row-name">{{ t.name }}</span>
-                      <span class="badge badge-{{ t.status }}">{{ statusLabel(t) }}</span>
+                      <span class="badge badge-{{ t.status }}" [class.badge-quiet]="group.key === 'example'">{{ statusLabel(t, group.key === 'example') }}</span>
+                      @if (group.key === 'example') {
+                        <span class="row-example">Example</span>
+                      }
                     </div>
                     @if (t.stats?.champion_name; as champion) {
-                      <div class="row-champion"><span aria-hidden="true">🏆</span> {{ champion }}</div>
+                      <div class="row-champion">Won by {{ champion }}</div>
                     }
                     @if (meta(t); as metaLine) {
                       <div class="row-meta">{{ metaLine }}</div>
@@ -159,7 +199,9 @@ interface TournamentGroup {
                       <div class="row-progress"><span [style.width.%]="progress(t)"></span></div>
                     }
                   </div>
-                  <span class="row-arrow" aria-hidden="true">→</span>
+                  <svg class="row-arrow" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                    <path d="M3 9h11M9.5 4l5 5-5 5" stroke="currentColor" stroke-width="2"/>
+                  </svg>
                 </a>
               }
             </div>
@@ -169,193 +211,328 @@ interface TournamentGroup {
     </div>
   `,
   styles: [`
-    /* ── Landing ── */
+    /* ── Landing: the flyer ──
+       The hero is one green sheet. It runs straight on from the nav, which is the same
+       paper, and ends in a strip of tear-off tabs. */
     .hero {
-      position: relative;
-      overflow: hidden;
-      padding: 56px 16px 48px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      background: var(--sheet);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: min(calc(100dvh - 52px), 900px);
     }
-    /* Bracket watermark, same geometry as the nav mark. Sits behind the copy and bleeds
-       off the right edge; hidden on narrow screens where it would collide with the text. */
-    .hero-mark {
-      position: absolute;
-      top: 50%;
-      right: -56px;
-      transform: translateY(-50%);
-      color: var(--border);
-      pointer-events: none;
-    }
-    .hero-inner, .steps-inner, .features {
-      position: relative;
-      max-width: 680px;
+    .hero-inner {
+      flex: 1;
+      width: 100%;
+      max-width: 1320px;
       margin: 0 auto;
+      padding: clamp(24px, 3.2vw, 44px) clamp(16px, 4vw, 56px) clamp(24px, 2.6vw, 36px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+      grid-template-areas: "copy sheet" "extra sheet";
+      grid-template-rows: auto 1fr;
+      gap: 0 clamp(24px, 3vw, 44px);
+      align-items: start;
     }
-    .hero-eyebrow {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 14px;
+    .hero-copy { grid-area: copy; }
+    .sheet { grid-area: sheet; }
+    .hero-extra {
+      grid-area: extra;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px 28px;
+      margin-top: 18px;
     }
     .hero-title {
-      font-size: clamp(2.5rem, 9vw, 3.9rem);
-      line-height: .95;
-      margin-bottom: 18px;
+      font-size: clamp(2.7rem, min(7.6vw, 10.6vh), 6rem);
+      font-weight: 900;
+      font-stretch: 106%;
+      line-height: .93;
+      letter-spacing: -.04em;
+      text-wrap: balance;
+    }
+    .hero-what {
+      margin-top: clamp(18px, 2.4vw, 30px);
+      font-size: clamp(1.1rem, 1.7vw, 1.4rem);
+      font-weight: 800;
+      letter-spacing: -.01em;
     }
     .hero-lede {
-      max-width: 46ch;
-      font-size: 1rem;
-      line-height: 1.6;
-      color: var(--text-dim);
+      max-width: 62ch;
+      margin-top: 8px;
+      font-size: clamp(1rem, 1.35vw, 1.2rem);
+      line-height: 1.5;
+      font-weight: 500;
+      text-wrap: pretty;
     }
     .hero-sports {
-      max-width: 46ch;
-      font-size: 0.85rem;
-      line-height: 1.6;
-      color: var(--text-dim);
-      margin-top: 14px;
-
-      a { white-space: nowrap; }
+      max-width: 52ch;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      a { white-space: nowrap; font-weight: 700; }
     }
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 26px;
+      align-items: center;
+      gap: 12px 24px;
+      margin-top: 22px;
     }
-    .hero-note {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .04em;
-      color: var(--muted);
-      margin-top: 18px;
+    .hero-go {
+      display: inline-flex;
+      align-items: center;
+      min-height: 56px;
+      padding: 0 28px;
+      background: var(--text);
+      color: var(--surface);
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      text-decoration: none;
+      transition: transform .18s cubic-bezier(.16, 1, .3, 1), background .15s;
+      &:hover { background: var(--accent-dim); transform: translateY(-2px); }
+      &:active { transform: translateY(0); }
     }
-    .hero-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    .hero-alt { font-size: 1.05rem; font-weight: 700; padding: 12px 0; }
+    .hero-note { font-size: 0.9rem; font-weight: 500; }
 
+    /* The sign-up sheet: white stock, ruled lines, set down slightly crooked. */
+    .sheet {
+      background: var(--surface);
+      padding: 22px 24px 18px;
+      transform: rotate(1.2deg);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, .22), 0 14px 22px -16px rgba(0, 0, 0, .45);
+    }
+    .sheet-title {
+      font-size: 1.7rem;
+      font-weight: 900;
+      padding-bottom: 10px;
+      border-bottom: 3px solid var(--text);
+    }
+    /* Six name lines or three team lines: the same height either way, so the draw bar
+       stays under the finger. */
+    .sheet-lines { list-style: none; --line: 2.9rem; }
+    .sheet-line {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      height: var(--line);
+      padding-bottom: 6px;
+      border-bottom: 1.5px solid var(--text);
+      font-size: 1.12rem;
+      font-weight: 600;
+    }
+    .sheet-n { width: 1.2em; font-weight: 400; color: var(--text-dim); }
+    .sheet-and { font-weight: 400; }
+    .sheet-line.is-drawn {
+      height: calc(var(--line) * 2);
+      font-size: 1.3rem;
+      animation: set-down .5s cubic-bezier(.16, 1, .3, 1) both;
+      animation-delay: calc(var(--i) * 70ms);
+    }
+    @keyframes set-down {
+      /* Rows stay readable the whole time: they only slide and settle, never hide. */
+      from { transform: translate(-18px, -12px) rotate(-3deg); }
+      to   { transform: none; }
+    }
+    .sheet-draw {
+      display: block;
+      width: 100%;
+      min-height: 54px;
+      margin-top: 18px;
+      border: none;
+      background: var(--text);
+      color: var(--surface);
+      font-family: var(--sans);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      cursor: pointer;
+      transition: background .15s;
+      &:hover { background: var(--accent-dim); }
+      &:active { background: #000; }
+    }
+    .sheet-foot { margin-top: 12px; font-size: 0.85rem; color: var(--text-dim); }
+
+    /* Tear-off tabs. Dashed cut lines, lettering turned on its side, the first one inked. */
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      border-top: 2.5px dashed var(--text);
+    }
+    .tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: clamp(128px, 16vh, 160px);
+      border-right: 2.5px dashed var(--text);
+      color: var(--text);
+      text-decoration: none;
+      transition: background .15s;
+      &:last-child { border-right: none; }
+      span {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        font-size: clamp(.9rem, min(1.5vw, 2vh), 1.3rem);
+        font-weight: 800;
+        letter-spacing: -.01em;
+        white-space: nowrap;
+        transition: transform .25s cubic-bezier(.16, 1, .3, 1);
+      }
+      &:hover { background: var(--sheet-deep); }
+      &:hover span { transform: rotate(180deg) translateY(6px); }
+      &:focus-visible { outline-offset: -5px; }
+    }
+    .tab-go {
+      background: var(--text);
+      color: var(--sheet);
+      &:hover { background: var(--accent-dim); }
+      &:focus-visible { outline-color: var(--sheet); }
+    }
+
+    /* ── Steps: one full-width ruled band each ── */
     .steps {
-      padding: 40px 16px 8px;
+      background: var(--surface);
+      padding: clamp(32px, 5vw, 64px) var(--page-gutter) clamp(28px, 4vw, 48px);
       border-bottom: 1px solid var(--border);
     }
-    .steps-inner {
+    .steps-inner { list-style: none; border-top: 3px solid var(--text); }
+    .step {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 24px;
-      list-style: none;
+      grid-template-columns: clamp(48px, 8vw, 110px) minmax(0, 5fr) minmax(0, 6fr);
+      gap: 8px clamp(16px, 3vw, 40px);
+      align-items: baseline;
+      padding: clamp(18px, 2.6vw, 30px) 0;
+      border-bottom: 1.5px solid var(--text);
     }
-    .step { border-top: 2px solid var(--border); padding-top: 14px; }
     .step-num {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      color: var(--accent);
+      font-size: clamp(2.6rem, 6vw, 4.6rem);
+      font-weight: 900;
+      font-stretch: 106%;
+      line-height: .8;
+      letter-spacing: -.04em;
     }
-    .step-title { font-size: 1.4rem; margin: 8px 0 8px; }
-    .step-body { font-size: 0.875rem; line-height: 1.55; color: var(--text-dim); }
+    .step-title { font-size: clamp(1.5rem, 3.2vw, 2.4rem); font-weight: 900; font-stretch: 106%; }
+    .step-body { font-size: 1.02rem; line-height: 1.55; max-width: 56ch; color: var(--text-dim); text-wrap: pretty; }
 
     .features {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px 20px;
-      margin-top: 32px;
-      padding-top: 18px;
-      padding-bottom: 16px;
-      border-top: 1px solid var(--border);
+      gap: 10px 26px;
+      margin-top: clamp(24px, 3vw, 36px);
       list-style: none;
     }
     .features li {
       display: flex;
       align-items: center;
-      gap: 7px;
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--muted);
+      gap: 9px;
+      font-size: 0.98rem;
+      font-weight: 700;
     }
     .features li::before {
       content: '';
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--accent);
+      width: 8px;
+      height: 8px;
+      background: var(--sheet);
+      outline: 1.5px solid var(--text);
       flex-shrink: 0;
     }
     .walkthrough-link {
       display: block;
-      max-width: 680px;
-      margin: 0 auto;
-      padding-bottom: 28px;
-      font-size: 0.85rem;
-      color: var(--accent);
+      margin-top: 22px;
+      font-weight: 700;
     }
 
-    /* ── Tournament list ── */
+    /* ── Tournament list: a ruled sheet ── */
     .list-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
-    .list-title { font-size: 1.9rem; }
+    /* On the landing page the list shares the header's margins, like the hero and steps. */
+    .page-landing { max-width: none; padding: clamp(32px, 5vw, 56px) var(--page-gutter) 56px; }
+    .list-title { font-size: 1.9rem; font-stretch: 106%; }
     .filter { width: auto; max-width: 220px; font-size: 0.875rem; padding: 7px 10px; }
 
-    .group + .group { margin-top: 28px; }
+    .group + .group { margin-top: 32px; }
     .group-label {
-      font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      margin-bottom: 10px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--text);
     }
 
-    .list { display: flex; flex-direction: column; gap: 8px; }
+    .group-note { margin-top: 8px; font-size: 0.9rem; color: var(--text-dim); }
+    /* An example's status, never the highlighter: see statusLabel(). */
+    .badge.badge-quiet { background: var(--surface); color: var(--text); border: 1px solid var(--text); }
+    .row-example { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
+
+    .list { display: flex; flex-direction: column; }
     .row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 14px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      padding: 14px 4px;
+      border-bottom: 1px solid var(--border);
       text-decoration: none;
       color: var(--text);
-      transition: border-color .15s;
-      &:hover { border-color: var(--muted); text-decoration: none; }
-      /* A running tournament earns a marker-coloured edge so it reads as live at a glance,
-         without the row itself shouting. */
-      &.is-live { border-left: 3px solid var(--marker); }
+      transition: background .15s, padding .2s cubic-bezier(.16, 1, .3, 1);
+      &:hover { background: var(--surface-2); padding-left: 12px; padding-right: 12px; text-decoration: none; }
     }
-    .row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
     .row-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .row-name { font-weight: 500; }
-    .row-champion { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
-    .row-meta {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      letter-spacing: .03em;
-      color: var(--muted);
-    }
+    .row-name { font-weight: 700; font-size: 1.05rem; }
+    .row-champion { font-size: 0.9rem; font-weight: 600; color: var(--marker); }
+    .row-meta { font-size: 0.82rem; color: var(--muted); }
     .row-progress {
-      height: 4px;
-      border-radius: 2px;
+      height: 5px;
       background: var(--surface-2);
       overflow: hidden;
-      span { display: block; height: 100%; background: var(--marker); }
+      span { display: block; height: 100%; background: var(--text); }
     }
-    .row-arrow { color: var(--muted); font-size: 0.9rem; flex-shrink: 0; }
+    .row-arrow { color: var(--text); flex-shrink: 0; }
 
-    @media (max-width: 720px) {
-      .hero-mark { display: none; }
-      .hero { padding: 40px 16px 36px; }
-      .steps { padding-top: 32px; }
+    /* Seven features as aligned columns, four then three, so none is left alone on a line. */
+    @media (min-width: 861px) {
+      .features { display: grid; grid-template-columns: repeat(4, max-content); gap: 10px 40px; }
+    }
+    @media (max-width: 860px) {
+      .hero { min-height: 0; }
+      .hero-inner { grid-template-columns: minmax(0, 1fr); grid-template-areas: "copy" "sheet" "extra"; }
+      .sheet { max-width: 420px; margin-top: 26px; transform: rotate(.8deg); }
+      .hero-extra { margin-top: 26px; }
+      .step { grid-template-columns: clamp(40px, 12vw, 64px) minmax(0, 1fr); }
+      .step-body { grid-column: 2; }
+    }
+    @media (max-width: 520px) {
+      .tab { height: 138px; }
+      .tab span { font-size: .9rem; }
+      /* Phone first screen: the draw bar and its caption have to clear Safari's bottom
+         toolbar, which leaves about 680px of an iPhone 16 Pro clear on first load. Every
+         step below buys part of that; the sheet keeps all six names. */
+      .hero-inner { padding-top: 16px; }
+      .hero-title { font-size: 2.45rem; }
+      .hero-actions { margin-top: 14px; }
+      .hero-go { flex: 1; justify-content: center; padding: 0 16px; min-height: 48px; font-size: 1.1rem; }
+      .hero-alt { padding: 8px 0; }
+      .hero-what { font-size: 1rem; margin-top: 12px; }
+      .hero-lede { font-size: .98rem; }
+      .sheet { margin-top: 14px; padding: 12px 18px 10px; }
+      .sheet-title { font-size: 1.25rem; padding-bottom: 4px; }
+      .sheet-lines { --line: 1.95rem; }
+      .sheet-line { font-size: 1.02rem; padding-bottom: 4px; }
+      .sheet-line.is-drawn { font-size: 1.12rem; }
+      .sheet-draw { min-height: 46px; margin-top: 12px; font-size: 1.1rem; }
+      .sheet-foot { margin-top: 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sheet-line.is-drawn { animation: none; }
+      .tab span, .hero-go, .row { transition: none; }
     }
   `]
 })
@@ -363,6 +540,17 @@ export class TournamentListComponent implements OnInit {
   tournaments = signal<Tournament[]>([]);
   loading = signal(true);
   filter = signal('');
+
+  // The hero's example sign-up sheet. `teams` is null until the visitor presses the button;
+  // `draws` only exists so a redraw re-keys the rows and replays their entrance.
+  readonly players = SAMPLE_PLAYERS;
+  readonly teams = signal<DrawnTeam[] | null>(null);
+  readonly draws = signal(0);
+
+  draw() {
+    this.teams.set(pairTeams(shuffle(this.players)));
+    this.draws.update(n => n + 1);
+  }
 
   // Set from route data, not from the session: `/` is the full landing page for everyone,
   // signed in or not, while `/tournaments` is the slimmed-down list the nav points at.
@@ -382,11 +570,15 @@ export class TournamentListComponent implements OnInit {
   // looking for the one happening right now, not the archive. 'setup' only ever appears
   // for a signed-in user; the public list endpoint filters those out.
   readonly groups = computed<TournamentGroup[]>(() => {
-    const rows = this.matching();
+    // Seeded examples are not real activity, so they never sit under "Live now" or
+    // "Completed"; they get their own labelled group at the end.
+    const all = this.matching();
+    const rows = all.filter(t => !isExampleTournament(t));
     return ([
       { key: 'active',   label: 'Live now',   items: rows.filter(t => t.status === 'active') },
       { key: 'setup',    label: 'In setup',   items: rows.filter(t => t.status === 'setup') },
       { key: 'complete', label: 'Completed',  items: rows.filter(t => t.status === 'complete') },
+      { key: 'example',  label: 'Example brackets', items: all.filter(t => isExampleTournament(t)) },
     ] as TournamentGroup[]).filter(g => g.items.length > 0);
   });
 
@@ -405,8 +597,10 @@ export class TournamentListComponent implements OnInit {
     });
   }
 
-  statusLabel(t: Tournament): string {
-    if (t.status === 'active') return 'Live';
+  // The pink "Live" badge means a real game is being played right now. A made-up example
+  // is never that, however its seeded state reads, so it says where it stands instead.
+  statusLabel(t: Tournament, example = false): string {
+    if (t.status === 'active') return example ? 'In progress' : 'Live';
     if (t.status === 'complete') return 'Final';
     return 'Setup';
   }

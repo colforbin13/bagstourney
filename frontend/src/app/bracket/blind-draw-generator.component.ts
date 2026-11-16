@@ -23,7 +23,6 @@ import {
   template: `
     <div class="page">
       <header class="intro">
-        <p class="eyebrow">Free tool</p>
         <h1>Blind draw generator</h1>
         <p class="lede">
           Paste in your players and get random two-player teams and a seeded bracket, ready for
@@ -133,10 +132,6 @@ import {
   `,
   styles: [`
     .intro { margin-bottom: 24px; }
-    .eyebrow {
-      font-family: var(--mono); font-size: 0.68rem; letter-spacing: .16em;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
     .tool textarea { width: 100%; resize: vertical; font: inherit; }
@@ -146,12 +141,12 @@ import {
     h2 { font-size: 1.15rem; margin: 28px 0 12px; }
     .teams { list-style: none; padding: 0; display: grid; gap: 6px; }
     .teams li { display: flex; gap: 10px; align-items: baseline; }
-    .seed { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); min-width: 22px; text-align: right; }
+    .seed { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); min-width: 22px; text-align: right; }
     .bracket { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
     .round { display: flex; flex-direction: column; justify-content: space-around; gap: 8px; min-width: 170px; }
     .round h3 {
-      font-family: var(--mono); font-size: 0.68rem; letter-spacing: .12em;
-      text-transform: uppercase; color: var(--muted); font-weight: 400;
+      font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0;
+      color: var(--muted); font-weight: 400;
     }
     .match {
       display: grid; background: var(--surface); border: 1px solid var(--border);

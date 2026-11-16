@@ -41,7 +41,6 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
   template: `
     <div class="page">
       <header class="intro">
-        <p class="eyebrow">Pricing</p>
         <h1>Free to run. Pro when it gets big.</h1>
         <p class="lede">
           Most tournaments never need to pay for anything. Upgrade when your field outgrows the
@@ -123,7 +122,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
 
       <div class="closing">
         @if (auth.isLoggedIn()) {
-          <a class="btn btn-primary" routerLink="/admin/billing">Go to Billing</a>
+          <a class="btn btn-primary" routerLink="/admin/billing">Go to billing</a>
           <a class="btn" routerLink="/admin">Your tournaments</a>
         } @else {
           <a class="btn btn-primary" routerLink="/admin/register">Create a free account</a>
@@ -134,14 +133,6 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
   `,
   styles: [`
     .intro { margin-bottom: 32px; }
-    .eyebrow {
-      font-family: var(--mono);
-      font-size: 0.68rem;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 12px;
-    }
     .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
     .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
 
@@ -165,7 +156,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       flex-direction: column;
       padding: 20px;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
     }
     .tier-featured { border: 2px solid var(--accent); }
@@ -187,18 +178,22 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       position: relative;
     }
     .tier-list li::before {
-      content: '✓';
+      content: '';
       position: absolute;
-      left: 0;
-      color: var(--marker);
-      font-weight: 600;
+      left: 2px;
+      top: .62em;
+      width: 5px;
+      height: 9px;
+      border-right: 2px solid var(--text);
+      border-bottom: 2px solid var(--text);
+      transform: rotate(45deg);
     }
     .tax-note { font-size: 0.78rem; color: var(--muted); margin-top: 12px; }
 
     .faq { margin-top: 40px; }
     .faq-title { font-size: 1.4rem; margin-bottom: 8px; }
-    .faq-item { border-top: 1px solid var(--border); }
-    .faq-item:last-child { border-bottom: 1px solid var(--border); }
+    .faq-item { border-top: 1.5px solid var(--text); }
+    .faq-item:last-child { border-bottom: 1.5px solid var(--text); }
     .faq-item summary {
       cursor: pointer;
       padding: 14px 0;

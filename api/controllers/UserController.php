@@ -97,8 +97,8 @@ class UserController {
             $params[] = $body['status'];
         }
         if (isset($body['plan'])) {
-            // FEATURE_TRACKER item 12 plumbing: no billing exists yet, so this is a
-            // manual stand-in for what Stripe will flip automatically once it ships.
+            // FEATURE_TRACKER item 12: the manual lever for an account plan, which Stripe
+            // billing otherwise sets (BillingController).
             if (!in_array($body['plan'], ['free', 'paid'], true)) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Invalid plan']);
@@ -106,6 +106,10 @@ class UserController {
             }
             $fields[] = 'plan = ?';
             $params[] = $body['plan'];
+            // A plan set here is a super admin's decision, whatever it was before, so it is
+            // recorded as theirs: Stripe may only revoke what Stripe granted, and a
+            // cancellation must not undo this (tests/PlanSourceTest.php).
+            $fields[] = "plan_source = 'manual'";
         }
         if (!$fields) {
             http_response_code(400);

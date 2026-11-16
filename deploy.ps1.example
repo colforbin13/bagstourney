@@ -70,4 +70,5 @@ if (-not (Test-Path -LiteralPath $destinationDatabaseConfig)) {
 
 Write-Host "==> Deployment finished." -ForegroundColor Green
 Write-Host "    * Remember to set your credentials in $DEPLOY_API_PATH\config\database.php" -ForegroundColor Green
+Write-Host "    * Ensure Apache serves the app from the domain root and the API from /api" -ForegroundColor Green
 Write-Host "    * Adjust DEPLOY_PATH and DEPLOY_API_PATH in deploy.ps1 for your environment, or set environment variables." -ForegroundColor Green

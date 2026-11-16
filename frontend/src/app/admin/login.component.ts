@@ -12,8 +12,7 @@ import { AuthService } from '../shared/services/auth.service';
     <div class="login-wrap">
       <div class="login-card">
         <div class="login-header">
-          <span class="login-icon">◈</span>
-          <h1>Organizer Sign In</h1>
+          <h1>Organizer sign in</h1>
         </div>
 
         <div class="form-group">
@@ -60,7 +59,7 @@ import { AuthService } from '../shared/services/auth.service';
       width: 100%;
       max-width: 360px;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
       padding: 32px 24px;
       display: flex;

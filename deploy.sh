@@ -31,7 +31,7 @@ if [ -n "$DEPLOY_HOST" ]; then
 
   echo "==> Done. Remember to:"
   echo "    1. Set credentials in $DEPLOY_API_PATH/config/database.php"
-  echo "    2. Ensure Apache serves the app from /bags and the API from /bags/api"
+  echo "    2. Ensure Apache serves the app from the domain root and the API from /api"
 else
   echo ""
   echo "==> Local build only (no DEPLOY_HOST set)."

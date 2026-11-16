@@ -27,13 +27,13 @@ interface ScoreEntry { team1: string; team2: string; }
       @if (loadError()) {
         <div class="empty" style="padding:48px 24px">
           {{ loadError() }}
-          <div style="margin-top:16px"><a routerLink="/admin" class="btn btn-sm">Back to Admin</a></div>
+          <div style="margin-top:16px"><a routerLink="/admin" class="btn btn-sm">Back to admin</a></div>
         </div>
       } @else {
         <div class="page-header" style="margin-bottom:16px">
           <div style="min-width:0">
-            <a [routerLink]="['/admin/tournament', tournamentId]" style="color:var(--text-dim);font-size:.8rem;">← Manage</a>
-            <h1 style="margin-top:4px">Enter Scores</h1>
+            <a [routerLink]="['/admin/tournament', tournamentId]" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Manage</a>
+            <h1 style="margin-top:4px">Enter scores</h1>
             <div class="sub">{{ tournament()?.name }}</div>
           </div>
           <a class="btn btn-sm" [routerLink]="['/bracket', tournamentId]">View bracket</a>
@@ -188,9 +188,8 @@ interface ScoreEntry { team1: string; team2: string; }
     .sub { font-size: .85rem; color: var(--text-dim); margin-top: 4px; }
     .section-label {
       font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--text-dim);
       margin-bottom: 10px;
       display: flex;
@@ -198,17 +197,18 @@ interface ScoreEntry { team1: string; team2: string; }
       gap: 8px;
     }
     .count {
-      background: var(--border);
+      background: var(--surface);
       color: var(--text);
-      border-radius: 10px;
-      padding: 1px 7px;
-      font-size: .65rem;
+      border: 1px solid var(--border);
+      border-radius: 0;
+      padding: 0 6px;
+      font-size: 0.78rem;
     }
     .match-list { display: flex; flex-direction: column; gap: 12px; }
     .score-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
+      border-top: 3px solid var(--text);
       border-radius: var(--radius);
       padding: 14px 16px;
       display: flex;
@@ -220,19 +220,20 @@ interface ScoreEntry { team1: string; team2: string; }
       display: inline-block;
       background: var(--accent);
       color: #fff;
-      border-radius: 4px;
-      padding: 2px 6px;
+      border: 1px solid var(--accent);
+      border-radius: 0;
+      padding: 1px 6px;
       margin-right: 6px;
-      letter-spacing: .06em;
+      letter-spacing: 0;
     }
-    .board-tag.waiting { background: var(--border); color: var(--text); }
+    /* Waiting games are the outlined counterpart of the filled board tag: same ink, no fill. */
+    .board-tag.waiting { background: var(--surface); color: var(--text); border-color: var(--text); }
     .move-board { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--text-dim); }
     .move-board select { flex: 1; padding: 6px 8px; font-size: .85rem; }
     .score-card-round {
       font-family: var(--mono);
-      font-size: .65rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: 0.78rem;
+      letter-spacing: 0;
       color: var(--muted);
     }
     .score-row { display: flex; align-items: center; gap: 12px; }
@@ -240,7 +241,7 @@ interface ScoreEntry { team1: string; team2: string; }
     .score-team { flex: 1; min-width: 0; }
     .score-team-name { font-weight: 500; font-size: .95rem; }
     .score-team-name.won { color: var(--marker); font-weight: 600; }
-    .score-team-members { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+    .score-team-members { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
     /* Wide and tall on purpose — this gets tapped on a phone, outdoors, one-handed. */
     .score-input { width: 76px; flex-shrink: 0; text-align: center; font-size: 1.1rem; padding: 12px 8px; }
     .final-score { font-family: var(--mono); font-size: 1rem; }

@@ -130,7 +130,7 @@ API (key endpoints)
 
 Authorization
 - Existing `admins` are copied to active `super_admin` users by migration `001_access_control.sql`.
-- Migration `002_backfill_legacy_admins.sql` re-checks legacy admins, so apply migrations again after deploying this change if an existing account was missed.
+- A legacy admin missed by that migration is copied across on its first successful login (`AuthController::login`).
 - New registrations create `organizer` accounts. An organizer becomes the `owner` of each tournament they create.
 - Tournament owners can grant `manager` and `scorekeeper` access. Managers can manage setup; scorekeepers can submit scores.
 - Existing tournaments have no inferred owner because the original schema did not record one; super admins retain access and can assign ownership.

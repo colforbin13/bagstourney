@@ -51,17 +51,17 @@ import { teamParticipants } from '../bracket-labels';
   `,
   styles: [`
     .pool-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-    .pool-title { font-family: var(--mono); font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
-    .pool-progress { font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+    .pool-title { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--text-dim); }
+    .pool-progress { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); }
     .standings { width: 100%; border-collapse: collapse; font-size: .85rem; }
-    .standings th { font-family: var(--mono); font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    .standings th { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--muted); font-weight: 500; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
     .standings td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
     .standings tr:last-child td { border-bottom: none; }
     .num { text-align: right !important; font-family: var(--mono); white-space: nowrap; width: 1%; }
     .rank { color: var(--muted); }
     .team { font-weight: 500; }
-    .members { font-size: .75rem; color: var(--muted); margin-top: 2px; }
-    .tiebreak-note { font-size: .72rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+    .members { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .tiebreak-note { font-size: 0.78rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
     /* TV/kiosk: read from across a room. The pool view is not scaled like the bracket. */
     .standings.large { font-size: 2rem; }
     .standings.large th { font-size: 1rem; padding: 8px 12px; }

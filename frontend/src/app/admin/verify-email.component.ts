@@ -12,8 +12,7 @@ import { TournamentService } from '../shared/services/tournament.service';
     <div class="login-wrap">
       <div class="login-card">
         <div class="login-header">
-          <span class="login-icon">◈</span>
-          <h1>Verify Email</h1>
+          <h1>Verify email</h1>
         </div>
 
         @if (loading()) {
@@ -39,7 +38,7 @@ import { TournamentService } from '../shared/services/tournament.service';
       width: 100%;
       max-width: 360px;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
       padding: 32px 24px;
       display: flex;

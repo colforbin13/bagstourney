@@ -18,7 +18,6 @@ const CATEGORY_LABELS: Record<string, string> = {
     <div class="notif-wrap">
       <div class="notif-card">
         <div class="notif-header">
-          <span class="notif-icon">◈</span>
           <h1>Unsubscribe</h1>
         </div>
 

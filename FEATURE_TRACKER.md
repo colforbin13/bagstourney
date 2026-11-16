@@ -316,7 +316,7 @@ flatly as a "single-elimination tournament manager", which stops being accurate.
 
 Status: **Feature complete — all 5 slices done (2026-08-21/22).** Double elimination can be
 chosen, generated, scored, and rendered. Migration `016` is applied to production and slices
-2–3 are deployed; **slices 4 and 5 are built and verified but not yet deployed.**
+2–3 are deployed; slices 4 and 5 were deployed by 2026-11-16.
 
 Slice 4 added the paid-tier gate: `formatRequiresPaidPlan()` +
 `tournamentHasPaidFeatures()` / `userHasPaidPlan()` in `api/middleware/auth.php`, reusing
@@ -447,7 +447,7 @@ tournament to `active` (the pre-existing status bug fixed by `syncTournamentStat
 replaying re-completes it. All test data hard-deleted afterwards — row counts and max ids
 back to baseline, and a SHA-256 fingerprint of every pre-existing row in `tournaments` /
 `participants` / `teams` / `matches` was identical before and after, with no orphans left
-in `tournament_members`, `audit_log`, or `notification_queue`. **Not yet deployed.**
+in `tournament_members`, `audit_log`, or `notification_queue`. Deployed by 2026-11-16.
 
 Priority note: placed after items 12/13 because it's the feature that gives their paid tier
 something worth paying for, but it is **not blocked by them** — it can ship against the
@@ -777,9 +777,20 @@ than a product, so it needs its own monetization answer before it becomes an ite
 
 ## Done
 
-Built and verified. The top entries are **built but not yet deployed** — they've accumulated
-since the 2026-08-13/14 `deploy.ps1` run, and the next deploy should carry all of them.
-Everything below them is live in production.
+Built and verified. Everything below is live in production as of the 2026-11-16 `deploy.ps1`
+run, which shipped the whole current build. New entries go at the top, marked **not yet
+deployed** until the next deploy carries them.
+
+- **New look: "The Door Flyer"** (2026-11-16) — replaced the cream, brick-red and Bebas Neue look, which read as
+  generic. Green sheet header on every screen, white pages, black type in one typeface (Archivo), pink for
+  "Live" only, square corners, sentence case throughout (round names are now "Winners round 1", "Grand
+  final"). The home page is rebuilt as a flyer: a working example sign-up sheet that draws teams, and a strip
+  of tear-off tabs. Seeded example tournaments (owned by user id 5, `shared/examples.ts`) are listed apart as
+  "Example brackets" and labelled on their bracket page. New share card, sourced from
+  `frontend/scripts/og-card.html`. Emails moved to the new palette, and match/round emails now name rounds
+  like the bracket ("Winners round 2", not "Round 2"; `api/lib/RoundLabel.php`). No migration. Product and
+  design records are `PRODUCT.md` and `DESIGN.md`. Finish review: ship. Deployed 2026-11-16.
+  [Full notes](FEATURE_ARCHIVE.md#new-look-the-door-flyer)
 
 - **Traffic page for super admins** (2026-10-23) — Admin → Traffic: visits per day, top
   pages, where visits came from (referring site or a `?utm_source=` tag), and organizer
@@ -873,19 +884,19 @@ Everything below them is live in production.
   `/how-it-works`); the hero now says "tournament manager for two-player teams", names six
   example games once, and links to a new public `/sports` page listing 21 games across
   yard, racket, bar, and partner-card groups. Copy and one new route only — no backend
-  change, no migration. Built and browser-verified 2026-08-17; **not yet deployed**.
+  change, no migration. Built and browser-verified 2026-08-17; deployed by 2026-11-16.
   [Full notes](FEATURE_ARCHIVE.md#sport-neutral-copy-and-the-sports-page)
 - **Score-entry screen, spectator bracket QR, and printable signs** — a scorekeeper screen
   at `/admin/tournament/:id/score` listing only the matches playable right now, a bracket
   QR code spectators can scan to follow along without signing up, and a print-ready venue
   sign at `/poster/:uuid/:kind` for both QRs. Built and
-  browser-verified 2026-08-14; **not yet deployed**.
+  browser-verified 2026-08-14; deployed by 2026-11-16.
   [Full notes](FEATURE_ARCHIVE.md#score-entry-screen-and-spectator-bracket-qr)
 - **Mirrored bracket layout and TV/kiosk mode** — the bracket now plays inward from both
   edges to a final in the middle, halving its height and roughly doubling its width, and a
   new `?kiosk=1` mode scales the whole thing to fill a screen for a TV at the venue. Also
   fixes auto-refresh never actually starting on page load. Phone layout unchanged. Built
-  and browser-verified 2026-08-14; **not yet deployed**.
+  and browser-verified 2026-08-14; deployed by 2026-11-16.
   [Full notes](FEATURE_ARCHIVE.md#follow-on-mirrored-bracket-layout)
 - **Landing content and richer tournament list on the main page** — `/` now shows a hero,
   how-it-works strip, and feature row to every visitor (a new `/tournaments` route, which

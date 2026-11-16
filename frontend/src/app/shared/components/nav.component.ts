@@ -11,9 +11,9 @@ import { AuthService } from '../services/auth.service';
     <nav class="nav">
       <a class="nav-brand" routerLink="/" (click)="closeMenu()">
         <svg class="nav-mark" width="20" height="18" viewBox="0 0 30 26" fill="none" aria-hidden="true">
-          <circle cx="4" cy="4" r="3.2" fill="var(--accent)"/>
-          <circle cx="4" cy="22" r="3.2" fill="var(--accent)"/>
-          <circle cx="26" cy="13" r="3.6" fill="var(--text)"/>
+          <circle cx="4" cy="4" r="3.2" fill="var(--text)"/>
+          <circle cx="4" cy="22" r="3.2" fill="var(--text)"/>
+          <circle cx="26" cy="13" r="3" fill="var(--surface)" stroke="var(--text)" stroke-width="1.6"/>
           <path d="M7 4H14C16 4 16 13 18 13" stroke="var(--accent)" stroke-width="1.6" fill="none"/>
           <path d="M7 22H14C16 22 16 13 18 13" stroke="var(--accent)" stroke-width="1.6" fill="none"/>
         </svg>
@@ -30,17 +30,17 @@ import { AuthService } from '../services/auth.service';
 
           <div class="nav-dropdown" [class.open]="adminMenuOpen()">
             <button type="button" class="nav-dropdown-trigger" (click)="toggleAdminMenu($event)">
-              Admin <span class="caret" aria-hidden="true">▾</span>
+              Admin <svg class="caret" width="10" height="7" viewBox="0 0 10 7" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="2"/></svg>
             </button>
             @if (adminMenuOpen()) {
               <div class="nav-dropdown-backdrop" (click)="closeAdminMenu()"></div>
             }
             <div class="nav-dropdown-menu">
-              <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeAdminMenu()">Active Tournaments</a>
+              <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="closeAdminMenu()">Active tournaments</a>
               @if (auth.isSuperAdmin()) {
                 <a routerLink="/admin/users" routerLinkActive="active" (click)="closeAdminMenu()">Users</a>
-                <a routerLink="/admin/deleted-tournaments" routerLinkActive="active" (click)="closeAdminMenu()">Deleted Tournaments</a>
-                <a routerLink="/admin/audit-log" routerLinkActive="active" (click)="closeAdminMenu()">Audit Log</a>
+                <a routerLink="/admin/deleted-tournaments" routerLinkActive="active" (click)="closeAdminMenu()">Deleted tournaments</a>
+                <a routerLink="/admin/audit-log" routerLinkActive="active" (click)="closeAdminMenu()">Audit log</a>
                 <a routerLink="/admin/traffic" routerLinkActive="active" (click)="closeAdminMenu()">Traffic</a>
               }
             </div>
@@ -48,7 +48,7 @@ import { AuthService } from '../services/auth.service';
 
           <div class="nav-dropdown" [class.open]="profileMenuOpen()">
             <button type="button" class="nav-dropdown-trigger" (click)="toggleProfileMenu($event)">
-              {{ auth.username() }} <span class="caret" aria-hidden="true">▾</span>
+              {{ auth.username() }} <svg class="caret" width="10" height="7" viewBox="0 0 10 7" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="2"/></svg>
             </button>
             @if (profileMenuOpen()) {
               <div class="nav-dropdown-backdrop" (click)="closeProfileMenu()"></div>
@@ -74,12 +74,13 @@ import { AuthService } from '../services/auth.service';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
+      padding: 0 var(--page-gutter);
       height: 52px;
-      border-bottom: 1px solid var(--border);
+      /* The header is the green sheet on every screen: it is what makes a working page
+         recognisably Bracketway without colouring the work itself. */
       position: sticky;
       top: 0;
-      background: var(--bg);
+      background: var(--sheet);
       z-index: 100;
     }
     .nav-brand {
@@ -94,8 +95,10 @@ import { AuthService } from '../services/auth.service';
     }
     .nav-title {
       font-family: var(--display);
-      font-size: 1.15rem;
-      letter-spacing: .02em;
+      font-size: clamp(1.3rem, 1.9vw, 1.6rem);
+      font-weight: 900;
+      font-stretch: 112%;
+      letter-spacing: -.03em;
       color: var(--text);
       line-height: 1;
     }
@@ -105,23 +108,26 @@ import { AuthService } from '../services/auth.service';
       gap: 16px;
     }
     .nav-links a {
-      font-size: 0.85rem;
-      color: var(--text-dim);
+      font-size: clamp(0.92rem, 1.15vw, 1.05rem);
+      font-weight: 600;
+      color: var(--text);
       text-decoration: none;
-      &:hover, &.active { color: var(--text); }
+      padding: 6px 0;
+      &:hover, &.active { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: .25em; }
     }
     .nav-dropdown { position: relative; }
     .nav-dropdown-trigger {
       display: flex;
       align-items: center;
       gap: 4px;
-      font-size: 0.8rem;
-      color: var(--text-dim);
-      font-family: var(--mono);
-      padding: 0 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text);
+      font-family: var(--sans);
+      padding: 6px 10px;
       border: none;
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
+      border-left: 1.5px solid var(--text);
+      border-right: 1.5px solid var(--text);
       background: transparent;
       cursor: pointer;
       /* Above the sibling backdrop (z-index 105) so a second dropdown's trigger stays
@@ -129,13 +135,13 @@ import { AuthService } from '../services/auth.service';
          and just closing it. */
       position: relative;
       z-index: 106;
-      &:hover { color: var(--text); }
+      &:hover { background: var(--sheet-deep); }
     }
     /* Two dropdowns sit side by side (Admin, then Profile) — the shared border would
        otherwise double up between them. */
     .nav-dropdown + .nav-dropdown .nav-dropdown-trigger { border-left: none; }
-    .nav-dropdown.open .nav-dropdown-trigger { color: var(--text); }
-    .caret { font-size: 0.6rem; }
+    .nav-dropdown.open .nav-dropdown-trigger { background: var(--sheet-deep); }
+    .caret { flex-shrink: 0; }
     .nav-dropdown-backdrop { position: fixed; inset: 0; z-index: 105; }
     .nav-dropdown-menu {
       display: none;
@@ -147,9 +153,9 @@ import { AuthService } from '../services/auth.service';
       min-width: 180px;
       padding: 4px;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+      box-shadow: 0 10px 18px -8px rgba(0, 0, 0, .35);
       z-index: 110;
     }
     .nav-dropdown.open .nav-dropdown-menu { display: flex; }
@@ -162,19 +168,21 @@ import { AuthService } from '../services/auth.service';
       padding: 8px 10px;
       border-radius: calc(var(--radius) - 1px);
       font-family: var(--sans);
-      font-size: 0.8rem;
+      font-size: 0.9rem;
+      font-weight: 500;
       color: var(--text);
       text-decoration: none;
       cursor: pointer;
-      &:hover, &.active { background: var(--surface-2); color: var(--text); }
+      &:hover, &.active { background: var(--surface-2); color: var(--text); text-decoration: none; }
     }
     .nav-toggle {
       display: none;
       flex-direction: column;
       justify-content: center;
       gap: 5px;
-      width: 32px;
-      height: 32px;
+      align-items: flex-end;
+      width: 44px;
+      height: 44px;
       padding: 0;
       border: none;
       background: transparent;
@@ -199,11 +207,14 @@ import { AuthService } from '../services/auth.service';
         left: 0;
         right: 0;
         flex-direction: column;
-        align-items: flex-start;
-        gap: 14px;
-        padding: 16px;
-        background: var(--bg);
-        border-bottom: 1px solid var(--border);
+        align-items: stretch;
+        gap: 0;
+        padding: 8px 16px 12px;
+
+        a, .nav-dropdown-item { display: flex; align-items: center; min-height: 44px; }
+        background: var(--sheet);
+        border-top: 2.5px dashed var(--text);
+        border-bottom: 2.5px solid var(--text);
 
         &.open { display: flex; }
       }
@@ -212,7 +223,8 @@ import { AuthService } from '../services/auth.service';
       .nav-dropdown-trigger {
         border: none;
         padding: 0;
-        font-size: 0.85rem;
+        font-size: 0.92rem;
+        font-weight: 800;
         pointer-events: none;
       }
       .caret { display: none; }
@@ -227,14 +239,14 @@ import { AuthService } from '../services/auth.service';
         min-width: 0;
         padding: 14px 0 0;
         border: none;
-        border-top: 1px solid var(--border);
+        border-top: 1.5px solid var(--text);
         box-shadow: none;
         background: transparent;
       }
       .nav-dropdown-menu a, .nav-dropdown-menu .nav-dropdown-item {
         padding: 0;
-        font-size: 0.85rem;
-        color: var(--text-dim);
+        font-size: 0.92rem;
+        color: var(--text);
         &:hover, &.active { background: transparent; color: var(--text); }
       }
     }
