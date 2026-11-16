@@ -106,6 +106,10 @@ class UserController {
             }
             $fields[] = 'plan = ?';
             $params[] = $body['plan'];
+            // A plan set here is a super admin's decision, whatever it was before, so it is
+            // recorded as theirs: Stripe may only revoke what Stripe granted, and a
+            // cancellation must not undo this (tests/PlanSourceTest.php).
+            $fields[] = "plan_source = 'manual'";
         }
         if (!$fields) {
             http_response_code(400);

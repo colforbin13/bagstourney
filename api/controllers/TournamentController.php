@@ -374,6 +374,9 @@ class TournamentController {
             }
             $fields[] = 'paid_override = ?';
             $params[] = !empty($body['paid_override']) ? 1 : 0;
+            // Recorded as the super admin's grant even on a tournament Stripe once unlocked,
+            // so a later refund cannot clear it (tests/PlanSourceTest.php).
+            $fields[] = "paid_override_source = 'manual'";
         }
         if (!$fields) { http_response_code(400); echo json_encode(['error' => 'Nothing to update']); return; }
         $params[] = $id;

@@ -126,7 +126,9 @@ Four invariants worth knowing before changing any of it:
 
 - **`plan_source` / `paid_override_source` (migration `017`) record who granted a plan.**
   Stripe may only revoke what Stripe granted, so a cancellation or refund can never strip a
-  super-admin comped account or tournament.
+  super-admin comped account or tournament. Every writer has to keep the marker honest: the
+  super-admin levers set it to `manual`, and a Stripe grant leaves an existing `manual`
+  grant alone. `tests/PlanSourceTest.php` covers this against in-memory SQLite.
 - **Fulfilment runs from both the webhook and the return page, idempotently.** The redirect
   and the webhook race and either can win; whichever is second is a no-op. Don't "simplify"
   one away — dropping the return page means a paying organizer stares at an unchanged screen.
