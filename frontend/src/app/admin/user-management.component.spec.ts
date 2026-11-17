@@ -215,6 +215,117 @@ describe('UserManagementComponent', () => {
     expect(component.toastType()).toBe('success');
   });
 
+  it('should keep the reset token on screen when the clipboard is unavailable', async () => {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/users`).flush(mockUsers);
+    const user = mockUsers[1];
+
+    spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.reject(new Error('denied')));
+
+    await component.resetPassword(user);
+    httpMock.expectOne(`${environment.apiUrl}/users/${user.id}/password-reset`)
+      .flush({ token: 'tok-789', expires_at: '2026-08-06T15:00:00Z' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    fixture.detectChanges();
+
+    expect(component.resetToken()).toEqual({ userId: user.id, username: 'user1', token: 'tok-789', copied: false });
+    const input = fixture.nativeElement.querySelector('.token-input') as HTMLInputElement;
+    expect(input.value).toBe('tok-789');
+    expect(fixture.nativeElement.textContent).toContain('Copy it and send it to them.');
+    // No toast is the only record of it any more.
+    expect(component.toast()).not.toContain('tok-789');
+  });
+
+  it('should keep the reset token panel after a successful copy until dismissed', async () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[1];
+    spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+
+    await component.resetPassword(user);
+    httpMock.expectOne(`${environment.apiUrl}/users/${user.id}/password-reset`)
+      .flush({ token: 'tok-1', expires_at: '2026-08-06T15:00:00Z' });
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(component.resetToken()?.copied).toBeTrue();
+  });
+
+  it('should put a select back when the server refuses the change', () => {
+    component.users.set(mockUsers);
+    const user = mockUsers[0]; // super_admin, plan free
+    const select = document.createElement('select');
+    ['free', 'paid'].forEach(v => select.add(new Option(v, v)));
+    select.value = 'paid';
+
+    component.changePlan(user, { target: select } as unknown as Event);
+    httpMock.expectOne(`${environment.apiUrl}/users/${user.id}`)
+      .flush({ error: 'Not allowed' }, { status: 409, statusText: 'Conflict' });
+
+    expect(select.value).toBe('free');
+    expect(component.toast()).toBe('Not allowed');
+  });
+
+  it('should keep one status region on the page for toasts', () => {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/users`).flush(mockUsers);
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    const region = el.querySelector('[role="status"].sr-only');
+    expect(region).not.toBeNull();
+    expect(region!.textContent!.trim()).toBe('');
+
+    component['showToast']('User updated.', 'success');
+    fixture.detectChanges();
+    expect(el.querySelector('[role="status"].sr-only')).toBe(region);
+    expect(region!.textContent!.trim()).toBe('User updated.');
+    expect(el.querySelector('.toast')!.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('should move focus to the token and back to its button when done', async () => {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/users`).flush(mockUsers);
+    fixture.detectChanges();
+    document.body.appendChild(fixture.nativeElement);
+
+    spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+    spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
+    await component.resetPassword(mockUsers[1]);
+    httpMock.expectOne(`${environment.apiUrl}/users/2/password-reset`).flush({ token: 'tok', expires_at: '' });
+    fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect((document.activeElement as HTMLElement).classList).toContain('token-input');
+
+    component.dismissToken();
+    fixture.detectChanges();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect((document.activeElement as HTMLElement).getAttribute('data-reset-for')).toBe('2');
+    fixture.nativeElement.remove();
+  });
+
+  it('should give every row control an accessible name', () => {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/users`).flush(mockUsers);
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    const selects = Array.from(el.querySelectorAll('.users-table select'));
+    expect(selects.length).toBe(6);
+    expect(selects.every(s => !!s.getAttribute('aria-label'))).toBeTrue();
+    expect(selects[0].getAttribute('aria-label')).toBe('Role for admin1');
+    const unlabelled = Array.from(el.querySelectorAll('.create-user input, .create-user select'))
+      .filter(i => !(i as HTMLInputElement).labels?.length);
+    expect(unlabelled.length).toBe(0);
+  });
+
+  it('should offer a retry instead of an empty list when loading fails', () => {
+    fixture.detectChanges();
+    httpMock.expectOne(`${environment.apiUrl}/users`).error(new ErrorEvent('Network error'));
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Failed to load users.');
+    expect(text).not.toContain('No users');
+  });
+
   it('should handle error when generating reset token', async () => {
     component.users.set(mockUsers);
     const user = mockUsers[1];

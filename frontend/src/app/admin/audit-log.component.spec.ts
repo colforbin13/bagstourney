@@ -132,9 +132,70 @@ describe('AuditLogComponent', () => {
     expect(component.totalPages()).toBe(3);
   });
 
-  it('should format details as key: value lines', () => {
-    expect(component.formatDetails({ role: 'manager', name: 'Test' })).toBe('role: "manager"\nname: "Test"');
+  it('should format details as readable Key: value lines', () => {
+    expect(component.formatDetails({ role: 'manager', paid_override: true, ids: [1, 2] }))
+      .toBe('Role: manager\nPaid override: true\nIds: [1,2]');
     expect(component.formatDetails(null)).toBe('—');
     expect(component.formatDetails({})).toBe('—');
+  });
+
+  it('should name actions in sentence case', () => {
+    expect(component.actionLabel('tournament_member_granted')).toBe('Tournament member granted');
+  });
+
+  it('should report the sorted column to assistive tech', () => {
+    flushInitialLoad();
+    fixture.detectChanges();
+    const sorted = fixture.nativeElement.querySelectorAll('th[aria-sort]');
+    expect(sorted.length).toBe(1);
+    expect(sorted[0].getAttribute('aria-sort')).toBe('descending');
+    expect(sorted[0].querySelector('button')).not.toBeNull();
+    expect(component.ariaSort('action')).toBeNull();
+  });
+
+  it('should keep the rows on screen while the next page loads', () => {
+    flushInitialLoad({ rows: [mockEntry], total: 120, page: 1, page_size: 50 });
+    component.goToPage(2);
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.results.is-refreshing')).not.toBeNull();
+    expect(el.querySelector('.audit-table')).not.toBeNull();
+
+    httpMock.expectOne(r => r.url === `${environment.apiUrl}/audit-log`).flush(mockResponse);
+    fixture.detectChanges();
+    expect(el.querySelector('.results.is-refreshing')).toBeNull();
+  });
+
+  it('should bring the top of the rows back into view after Next', async () => {
+    flushInitialLoad({ rows: [mockEntry], total: 120, page: 1, page_size: 50 });
+    fixture.detectChanges();
+    const results: HTMLElement = fixture.nativeElement.querySelector('.results');
+    spyOn(results, 'getBoundingClientRect').and.returnValue({ top: -400 } as DOMRect);
+    const scroll = spyOn(results, 'scrollIntoView');
+
+    component.goToPage(2);
+    httpMock.expectOne(r => r.url === `${environment.apiUrl}/audit-log`).flush(mockResponse);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+  });
+
+  it('should not scroll after a sort, which starts at the top already', async () => {
+    flushInitialLoad();
+    fixture.detectChanges();
+    const results: HTMLElement = fixture.nativeElement.querySelector('.results');
+    const scroll = spyOn(results, 'scrollIntoView');
+    component.setSort('action');
+    httpMock.expectOne(r => r.url === `${environment.apiUrl}/audit-log`).flush(mockResponse);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(scroll).not.toHaveBeenCalled();
+  });
+
+  it("should not link to a deleted tournament's management page", () => {
+    flushInitialLoad({ ...mockResponse, rows: [{ ...mockEntry, tournament_deleted_at: '2026-08-15T00:00:00Z' }] });
+    fixture.detectChanges();
+    const links: HTMLAnchorElement[] = Array.from(fixture.nativeElement.querySelectorAll('.audit-table a'));
+    expect(links.some(a => a.getAttribute('href')?.startsWith('/admin/tournament/'))).toBeFalse();
+    expect(links.some(a => a.getAttribute('href') === '/admin/deleted-tournaments')).toBeTrue();
   });
 });

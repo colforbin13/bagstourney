@@ -1,6 +1,5 @@
 // src/app/admin/deleted-tournaments.component.ts
 import { Component, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament } from '../shared/models/tournament.models';
 import { confirmService } from '../shared/services/confirm.service';
@@ -8,70 +7,95 @@ import { confirmService } from '../shared/services/confirm.service';
 @Component({
   selector: 'app-deleted-tournaments',
   standalone: true,
-  imports: [RouterLink],
   template: `
-    <div class="page">
+    <div class="page-table">
       <div class="page-header">
-        <div>
-          <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Admin</a>
-          <h1 style="margin-top:4px;">Deleted tournaments</h1>
-        </div>
+        <h1>Deleted tournaments</h1>
       </div>
 
       @if (loading()) {
-        <div class="empty"><span class="spinner"></span></div>
+        <div class="empty"><span class="spinner" role="status" aria-label="Loading deleted tournaments"></span></div>
+      } @else if (error()) {
+        <div class="error-banner deleted-error" role="alert">
+          {{ error() }}
+          <button type="button" class="btn btn-sm" (click)="load()">Try again</button>
+        </div>
       } @else if (tournaments().length === 0) {
         <div class="empty">No deleted tournaments.</div>
       } @else {
-        <div class="list">
-          @for (t of tournaments(); track t.id) {
-            <div class="list-item">
-              <div class="list-item-main">
-                <span class="list-item-name">{{ t.name }}</span>
-                <span class="deleted-at">Deleted {{ formatDate(t.deleted_at) }}</span>
-              </div>
-              <button class="btn btn-sm" [disabled]="restoringId() === t.id" (click)="restore(t)">
-                @if (restoringId() === t.id) {
-                  <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span>
-                } @else {
-                  Restore
-                }
-              </button>
-            </div>
-          }
-        </div>
+        <section class="deleted-list" aria-labelledby="deleted-heading">
+          <h2 id="deleted-heading" class="list-heading">
+            Can be restored <span class="count">{{ tournaments().length }}</span>
+          </h2>
+          <ul>
+            @for (t of tournaments(); track t.id) {
+              <li class="list-row">
+                <div class="list-row-main">
+                  <span class="list-row-name">{{ t.name }}</span>
+                  <span class="list-row-meta">Deleted {{ formatDate(t.deleted_at) }}</span>
+                </div>
+                <button type="button" class="btn btn-sm" [disabled]="restoringId() === t.id"
+                  [attr.aria-label]="'Restore ' + t.name" (click)="restore(t)">
+                  @if (restoringId() === t.id) {
+                    <span class="spinner spinner-sm" aria-hidden="true"></span> Restoring
+                  } @else {
+                    Restore
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        </section>
       }
 
+      <div class="sr-only" role="status">{{ toast() }}</div>
       @if (toast()) {
-        <div class="toast toast-success">{{ toast() }}</div>
+        <div class="toast" aria-hidden="true" [class.toast-success]="toastType() === 'success'" [class.toast-error]="toastType() === 'error'">{{ toast() }}</div>
       }
     </div>
   `,
   styles: [`
-    .page-header { margin-bottom: 24px; }
-    .page-header h1 { margin: 0; font-size: 2rem; }
-    .list { display: flex; flex-direction: column; gap: 8px; }
-    .list-item {
+    /* A list of names reads best at the working column's width, aligned to the header's
+       gutter like the other admin screens. */
+    .deleted-list { max-width: 760px; }
+    .list-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      font-stretch: 100%;
+      letter-spacing: 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--text);
+      margin: 0;
+    }
+    .count { font-weight: 600; color: var(--text-dim); }
+    ul { list-style: none; margin: 0; padding: 0; }
+    .list-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      min-height: 56px;
+      padding: 14px 4px;
+      border-bottom: 1px solid var(--border);
     }
-    .list-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .list-item-name { font-weight: 500; }
-    .deleted-at { font-size: 0.8rem; color: var(--text-dim); }
-    .empty { text-align: center; padding: 48px 24px; color: var(--text-dim); }
+    .list-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .list-row-name { font-weight: 700; overflow-wrap: anywhere; }
+    .list-row-meta { font-size: 0.8rem; color: var(--text-dim); }
+    .deleted-error { max-width: 760px; }
   `]
 })
 export class DeletedTournamentsComponent implements OnInit {
   tournaments = signal<Tournament[]>([]);
   loading = signal(true);
+  error = signal('');
   restoringId = signal<number | null>(null);
   toast = signal('');
+  toastType = signal<'success' | 'error'>('success');
+
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private svc: TournamentService) {}
 
@@ -81,9 +105,12 @@ export class DeletedTournamentsComponent implements OnInit {
 
   load() {
     this.loading.set(true);
+    this.error.set('');
     this.svc.getDeletedTournaments().subscribe({
       next: data => { this.tournaments.set(data); this.loading.set(false); },
-      error: () => { this.loading.set(false); },
+      // Saying "No deleted tournaments" here would be untrue, and would hide a tournament
+      // someone is trying to get back.
+      error: () => { this.error.set('Could not load deleted tournaments.'); this.loading.set(false); },
     });
   }
 
@@ -96,9 +123,12 @@ export class DeletedTournamentsComponent implements OnInit {
       next: () => {
         this.restoringId.set(null);
         this.tournaments.update(list => list.filter(x => x.id !== t.id));
-        this.showToast(`"${t.name}" restored.`);
+        this.showToast(`"${t.name}" restored.`, 'success');
       },
-      error: () => { this.restoringId.set(null); },
+      error: err => {
+        this.restoringId.set(null);
+        this.showToast(err?.error?.error ?? `Could not restore "${t.name}". Try again.`, 'error');
+      },
     });
   }
 
@@ -107,8 +137,10 @@ export class DeletedTournamentsComponent implements OnInit {
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  private showToast(msg: string) {
+  private showToast(msg: string, type: 'success' | 'error') {
     this.toast.set(msg);
-    setTimeout(() => this.toast.set(''), 2500);
+    this.toastType.set(type);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toast.set(''), 3500);
   }
 }

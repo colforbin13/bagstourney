@@ -202,8 +202,92 @@ h1, h2, h3 {
   overflow-x: auto;
 }
 
+/* The admin tables (Users, Audit log, Traffic) share one ruled look: a list heading's
+   2px toner rule under the column names, 1px ruled lines between rows, no box. */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .875rem;
+
+  th {
+    text-align: left;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--text);
+    padding: 8px 12px;
+    border-bottom: 2px solid var(--text);
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  tbody tr:hover { background: var(--surface-2); }
+  .num { text-align: right; white-space: nowrap; }
+}
+
+/* A sortable column heading: the whole heading is the button, with a drawn chevron that
+   points the way the column is sorted. */
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  &:hover { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: .16em; }
+  svg { flex-shrink: 0; }
+}
+
+/* Read by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* One-handed at a venue: the admin screens' small controls reach 44px on a touch screen,
+   as the dashboard and tournament screens already do (DESIGN.md). */
+@media (pointer: coarse) {
+  .page-table {
+    .btn.btn-sm { min-height: 44px; padding-left: 14px; padding-right: 14px; }
+    .input:not(textarea), select { min-height: 44px; }
+    .sort-btn { min-height: 44px; }
+  }
+}
+
 /* Small help text under a form control. */
 .field-hint { font-size: 0.78rem; line-height: 1.4; color: var(--muted); }
+
+/* The label above a form control on the admin screens. */
+.field-label { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); }
+
+/* An error that stays until it's dealt with (DESIGN.md, Inputs: Error), with room for a
+   "Try again" button at its right. */
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  color: var(--danger);
+  font-size: 0.875rem;
+  background: rgba(var(--danger-rgb), 0.1);
+  border: 1px solid rgba(var(--danger-rgb), 0.35);
+  border-radius: var(--radius);
+}
 
 /* ── The flyer on Persuade pages (DESIGN.md, Sheet and Stock) ──
    The head prints on the green sheet edge to edge, cut from the white stock below by a
@@ -341,6 +425,8 @@ h1, h2, h3 {
   animation: spin .6s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Inside a button or beside a small control. */
+.spinner.spinner-sm { width: 13px; height: 13px; border-width: 1.5px; vertical-align: middle; }
 
 /* ── Empty state ── */
 .empty {

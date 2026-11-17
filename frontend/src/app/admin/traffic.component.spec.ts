@@ -100,6 +100,56 @@ describe('TrafficComponent', () => {
     expect(component.barHeight(0)).toBe(0);
   });
 
+  it('names the busiest day without needing a hover', () => {
+    fixture.detectChanges();
+    flush(30, summary());
+    expect(component.peak()?.day).toBe('2026-10-23');
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Busiest: 10 on Oct 23');
+    expect(fixture.nativeElement.querySelector('.chart').getAttribute('aria-label'))
+      .toBe('Visits per day, Sep 24 to Oct 23: 15 in all, busiest 10 on Oct 23.');
+  });
+
+  it('has no busiest day when nothing was visited', () => {
+    fixture.detectChanges();
+    flush(30, summary({ visits: 0, daily: [{ day: '2026-10-23', visits: 0, views: 0 }] }));
+    expect(component.peak()).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Busiest');
+  });
+
+  it('marks the chosen range and dims the old numbers while a new one loads', () => {
+    fixture.detectChanges();
+    flush(30, summary());
+    const el: HTMLElement = fixture.nativeElement;
+    const pressed = Array.from(el.querySelectorAll('.ranges button')).map(b => b.getAttribute('aria-pressed'));
+    expect(pressed).toEqual(['false', 'true', 'false']);
+
+    component.load(7);
+    fixture.detectChanges();
+    expect(el.querySelector('.results.is-refreshing')).not.toBeNull();
+    flush(7, summary({ days: 7 }));
+    expect(el.querySelector('.results.is-refreshing')).toBeNull();
+  });
+
+  it('keeps the last good numbers when a range switch fails, and retries it', () => {
+    fixture.detectChanges();
+    flush(30, summary());
+    component.load(7);
+    httpMock.expectOne(r => r.url === `${environment.apiUrl}/analytics`).flush({}, { status: 500, statusText: 'err' });
+    fixture.detectChanges();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.textContent).toContain('Could not load the last 7 days. These are the last 30.');
+    expect(el.textContent).toContain('48');
+    expect(component.days()).toBe(30);
+    expect(component.pressed()).toBe(30);
+
+    (el.querySelector('.error-banner button') as HTMLButtonElement).click();
+    flush(7, summary({ days: 7 }));
+    expect(el.querySelector('.error-banner')).toBeNull();
+    expect(component.days()).toBe(7);
+  });
+
   it('shows an error when the summary fails', () => {
     fixture.detectChanges();
     httpMock.expectOne(r => r.url === `${environment.apiUrl}/analytics`).flush({}, { status: 500, statusText: 'err' });

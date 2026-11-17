@@ -9,6 +9,8 @@ export interface AuditLogEntry {
   details: Record<string, unknown> | null;
   tournament_id: number | null;
   tournament_name: string | null;
+  /** Set when the tournament has since been soft-deleted; its management page then 404s. */
+  tournament_deleted_at?: string | null;
   actor_user_id: number | null;
   actor_username: string | null;
   actor_email: string | null;

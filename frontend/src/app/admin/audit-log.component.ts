@@ -1,5 +1,5 @@
 // src/app/admin/audit-log.component.ts
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -40,6 +40,12 @@ const KNOWN_ACTIONS = [
 
 const PAGE_SIZES = [25, 50, 100, 200];
 
+/** "tournament_member_granted" → "Tournament member granted". */
+export function humanize(code: string): string {
+  const words = code.replace(/_/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 @Component({
   selector: 'app-audit-log',
   standalone: true,
@@ -50,133 +56,194 @@ const PAGE_SIZES = [25, 50, 100, 200];
         <h1>Audit log</h1>
       </div>
 
-      <div class="card filters">
-        <input class="input" style="flex:2;min-width:200px"
-          [ngModel]="search()" (ngModelChange)="onSearchInput($event)"
-          placeholder="Search action, actor, tournament, target, details…" />
-        <select class="input" style="flex:1;min-width:160px" [ngModel]="actionFilter()" (ngModelChange)="onActionFilterChange($event)">
-          <option value="">All actions</option>
-          @for (a of actions; track a) { <option [value]="a">{{ a }}</option> }
-        </select>
-        <select class="input" style="flex:none;width:auto" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
-          @for (size of pageSizes; track size) { <option [ngValue]="size">{{ size }} / page</option> }
-        </select>
+      <div class="filters" role="search">
+        <label class="filter filter-search">
+          <span class="field-label">Search</span>
+          <input class="input" type="search"
+            [ngModel]="search()" (ngModelChange)="onSearchInput($event)"
+            placeholder="Action, person, tournament or details" />
+        </label>
+        <label class="filter filter-action">
+          <span class="field-label">Action</span>
+          <select class="input" [ngModel]="actionFilter()" (ngModelChange)="onActionFilterChange($event)">
+            <option value="">All actions</option>
+            @for (a of actions; track a) { <option [value]="a">{{ actionLabel(a) }}</option> }
+          </select>
+        </label>
+        <label class="filter filter-size">
+          <span class="field-label">Per page</span>
+          <select class="input" [ngModel]="pageSize()" (ngModelChange)="onPageSizeChange($event)">
+            @for (size of pageSizes; track size) { <option [ngValue]="size">{{ size }}</option> }
+          </select>
+        </label>
       </div>
 
-      @if (loading()) {
-        <div class="empty"><span class="spinner"></span></div>
+      @if (loading() && !loaded()) {
+        <div class="empty"><span class="spinner" role="status" aria-label="Loading audit log"></span></div>
       } @else if (error()) {
-        <div class="empty">{{ error() }}</div>
+        <div class="error-banner" role="alert">
+          {{ error() }}
+          <button type="button" class="btn btn-sm" (click)="load()">Try again</button>
+        </div>
       } @else if (entries().length === 0) {
         <div class="empty">No matching audit log entries.</div>
       } @else {
-        <div class="table-container">
-          <table class="audit-table">
-            <thead>
-              <tr>
-                <th class="sortable" (click)="setSort('created_at')">Time{{ sortIndicator('created_at') }}</th>
-                <th class="sortable" (click)="setSort('action')">Action{{ sortIndicator('action') }}</th>
-                <th class="sortable" (click)="setSort('actor')">Actor{{ sortIndicator('actor') }}</th>
-                <th class="sortable" (click)="setSort('tournament')">Tournament{{ sortIndicator('tournament') }}</th>
-                <th>Target</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (e of entries(); track e.id) {
+        <!-- Rows stay put while the next page or sort loads, dimmed, so nothing jumps. -->
+        <div class="results" [class.is-refreshing]="loading()" [attr.aria-busy]="loading()">
+          <div class="table-container">
+            <table class="data-table audit-table">
+              <thead>
                 <tr>
-                  <td class="time">{{ formatTimestamp(e.created_at) }}</td>
-                  <td><code class="action-code">{{ e.action }}</code></td>
-                  <td>
-                    @if (e.actor_username || e.actor_email) {
-                      <div class="actor">
-                        <span>{{ e.actor_username ?? e.actor_email }}</span>
-                        @if (e.actor_username && e.actor_email) { <span class="dim">{{ e.actor_email }}</span> }
-                      </div>
-                    } @else {
-                      <span class="dim">—</span>
-                    }
-                  </td>
-                  <td>
-                    @if (e.tournament_id && e.tournament_name) {
-                      <a [routerLink]="['/admin/tournament', e.tournament_id]">{{ e.tournament_name }}</a>
-                    } @else {
-                      <span class="dim">—</span>
-                    }
-                  </td>
-                  <td class="dim">
-                    @if (e.target_type) { {{ e.target_type }} · {{ e.target_id }} } @else { — }
-                  </td>
-                  <td class="details">{{ formatDetails(e.details) }}</td>
+                  @for (col of sortColumns; track col.key) {
+                    <th scope="col" [attr.aria-sort]="ariaSort(col.key)">
+                      <button type="button" class="sort-btn" (click)="setSort(col.key)">
+                        {{ col.label }}
+                        <ng-container *ngTemplateOutlet="sortIcon; context: { $implicit: col.key }"></ng-container>
+                      </button>
+                    </th>
+                  }
+                  <th scope="col">Target</th>
+                  <th scope="col">Details</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (e of entries(); track e.id) {
+                  <tr>
+                    <td class="time">{{ formatTimestamp(e.created_at) }}</td>
+                    <td class="action">{{ actionLabel(e.action) }}</td>
+                    <td><ng-container *ngTemplateOutlet="actor; context: { $implicit: e }"></ng-container></td>
+                    <td><ng-container *ngTemplateOutlet="tournament; context: { $implicit: e }"></ng-container></td>
+                    <td class="dim nowrap">
+                      @if (e.target_type) { {{ humanize(e.target_type) }} {{ e.target_id }} } @else { — }
+                    </td>
+                    <td class="details">{{ formatDetails(e.details) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Phones: one ruled row per entry instead of a table twice the screen's width. -->
+          <ul class="entry-rows">
+            @for (e of entries(); track e.id) {
+              <li class="entry-row">
+                <div class="entry-top">
+                  <span class="action">{{ actionLabel(e.action) }}</span>
+                  <span class="dim time">{{ formatTimestamp(e.created_at) }}</span>
+                </div>
+                <div><ng-container *ngTemplateOutlet="actor; context: { $implicit: e }"></ng-container></div>
+                @if (e.tournament_id) {
+                  <div><ng-container *ngTemplateOutlet="tournament; context: { $implicit: e }"></ng-container></div>
+                }
+                @if (e.details && formatDetails(e.details) !== '—') {
+                  <div class="details">{{ formatDetails(e.details) }}</div>
+                }
+              </li>
+            }
+          </ul>
         </div>
 
-        <div class="pagination">
-          <span class="dim">{{ total() }} total — page {{ page() }} of {{ totalPages() }}</span>
+        <nav class="pagination" aria-label="Audit log pages">
+          <span class="dim">{{ total() }} entries · page {{ page() }} of {{ totalPages() }}</span>
           <div class="pagination-buttons">
-            <button class="btn btn-sm" [disabled]="page() <= 1" (click)="goToPage(page() - 1)">Previous</button>
-            <button class="btn btn-sm" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next</button>
+            <button type="button" class="btn btn-sm" [disabled]="page() <= 1 || loading()" (click)="goToPage(page() - 1)">Previous</button>
+            <button type="button" class="btn btn-sm" [disabled]="page() >= totalPages() || loading()" (click)="goToPage(page() + 1)">Next</button>
           </div>
-        </div>
+        </nav>
       }
+
+      <ng-template #sortIcon let-key>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"
+             [class.is-idle]="sortKey() !== key"
+             [style.transform]="sortKey() === key && sortDir() === 'asc' ? 'rotate(180deg)' : null">
+          <path d="M1.5 3.5 5 7l3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
+        </svg>
+      </ng-template>
+
+      <ng-template #actor let-e>
+        @if (e.actor_username || e.actor_email) {
+          <div class="actor">
+            <span>{{ e.actor_username ?? e.actor_email }}</span>
+            @if (e.actor_username && e.actor_email) { <span class="dim">{{ e.actor_email }}</span> }
+          </div>
+        } @else {
+          <span class="dim">—</span>
+        }
+      </ng-template>
+
+      <ng-template #tournament let-e>
+        @if (e.tournament_id && e.tournament_name) {
+          @if (e.tournament_deleted_at) {
+            <span>{{ e.tournament_name }}</span>
+            <a class="deleted-link" routerLink="/admin/deleted-tournaments">deleted</a>
+          } @else {
+            <a [routerLink]="['/admin/tournament', e.tournament_id]">{{ e.tournament_name }}</a>
+          }
+        } @else {
+          <span class="dim">—</span>
+        }
+      </ng-template>
     </div>
   `,
   styles: [`
-    .page-header { margin-bottom: 24px; }
-    .page-header h1 { margin: 0; font-size: 2rem; }
+    .filters {
+      display: grid;
+      grid-template-columns: minmax(200px, 2fr) minmax(180px, 1fr) auto;
+      gap: 12px;
+      margin-bottom: 24px;
+      max-width: 960px;
+    }
+    .filter { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    @media (max-width: 640px) {
+      .filters { grid-template-columns: 1fr auto; }
+      .filter-search { grid-column: 1 / -1; }
+    }
 
-    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    /* Clears the sticky 52px header when a new page scrolls the rows back into view. */
+    .results { transition: opacity .15s; scroll-margin-top: 68px; }
+    .results.is-refreshing { opacity: .55; }
 
     .table-container { overflow-x: auto; }
-    .audit-table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      font-size: 0.85rem;
-    }
-    .audit-table th {
-      background: var(--bg);
-      border-bottom: 2px solid var(--border);
-      padding: 10px 12px;
-      text-align: left;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0;
-      color: var(--text-dim);
-      white-space: nowrap;
-    }
-    .audit-table th.sortable { cursor: pointer; user-select: none; &:hover { color: var(--text); } }
-    .audit-table td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-    .audit-table tbody tr:hover { background-color: var(--surface-2); }
-
-    .time { white-space: nowrap; font-family: var(--mono); font-size: 0.78rem; }
-    .action-code {
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      background: var(--surface-2);
-      border: 1px solid var(--border);
-      border-radius: 0;
-      padding: 2px 6px;
-      white-space: nowrap;
-    }
+    .audit-table td { vertical-align: top; }
+    .time { white-space: nowrap; font-size: 0.8rem; }
+    .action { font-weight: 600; }
     .actor { display: flex; flex-direction: column; gap: 1px; }
-    .dim { color: var(--text-dim); font-size: 0.8rem; }
+    .actor .dim { font-size: 0.8rem; overflow-wrap: anywhere; }
+    .dim { color: var(--text-dim); }
+    .nowrap { white-space: nowrap; }
     .details {
-      font-family: var(--mono);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       color: var(--text-dim);
       max-width: 320px;
       white-space: pre-wrap;
-      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .deleted-link { margin-left: 6px; font-size: 0.8rem; color: var(--text-dim); }
+
+    .sort-btn svg { transition: transform .2s cubic-bezier(.16, 1, .3, 1); }
+    .sort-btn svg.is-idle { opacity: .35; }
+    @media (prefers-reduced-motion: reduce) { .sort-btn svg { transition: none; } }
+
+    .entry-rows { display: none; list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--text); }
+    .entry-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 4px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+    }
+    .entry-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .entry-row .details { max-width: none; }
+    /* The tournament link sits on its own line here, so on a touch screen it gets a 44px
+       tap area; the negative margin keeps the row's spacing as it was. */
+    @media (pointer: coarse) {
+      .entry-row a { display: inline-block; padding: 13px 0; margin: -13px 0; }
+    }
+
+    @media (max-width: 640px) {
+      .table-container { display: none; }
+      .entry-rows { display: block; }
     }
 
     .pagination {
@@ -186,10 +253,10 @@ const PAGE_SIZES = [25, 50, 100, 200];
       flex-wrap: wrap;
       gap: 12px;
       margin-top: 16px;
+      font-size: 0.875rem;
     }
     .pagination-buttons { display: flex; gap: 8px; }
 
-    .empty { text-align: center; padding: 48px 24px; color: var(--text-dim); }
   `]
 })
 export class AuditLogComponent implements OnInit {
@@ -202,12 +269,24 @@ export class AuditLogComponent implements OnInit {
   search = signal('');
   actionFilter = signal('');
   loading = signal(true);
+  /** True once any page has arrived; later loads dim the rows instead of replacing them. */
+  loaded = signal(false);
   error = signal('');
 
   readonly actions = KNOWN_ACTIONS;
   readonly pageSizes = PAGE_SIZES;
+  readonly sortColumns: { key: SortKey; label: string }[] = [
+    { key: 'created_at', label: 'Time' },
+    { key: 'action', label: 'Action' },
+    { key: 'actor', label: 'Actor' },
+    { key: 'tournament', label: 'Tournament' },
+  ];
+  readonly humanize = humanize;
 
   private searchDebounce: ReturnType<typeof setTimeout> | null = null;
+  /** Set by Previous/Next, whose buttons sit under the table: the new page should open at its top. */
+  private scrollToTopOnLoad = false;
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   constructor(private svc: TournamentService) {}
 
@@ -250,13 +329,14 @@ export class AuditLogComponent implements OnInit {
     this.load();
   }
 
-  sortIndicator(key: SortKey): string {
-    if (this.sortKey() !== key) return '';
-    return this.sortDir() === 'asc' ? ' ▲' : ' ▼';
+  ariaSort(key: SortKey): 'ascending' | 'descending' | null {
+    if (this.sortKey() !== key) return null;
+    return this.sortDir() === 'asc' ? 'ascending' : 'descending';
   }
 
   goToPage(page: number) {
     this.page.set(page);
+    this.scrollToTopOnLoad = true;
     this.load();
   }
 
@@ -275,24 +355,47 @@ export class AuditLogComponent implements OnInit {
         this.entries.set(res.rows);
         this.total.set(res.total);
         this.loading.set(false);
+        this.loaded.set(true);
+        if (this.scrollToTopOnLoad) {
+          this.scrollToTopOnLoad = false;
+          this.scrollResultsIntoView();
+        }
       },
       error: () => {
+        this.scrollToTopOnLoad = false;
         this.error.set('Failed to load audit log.');
         this.loading.set(false);
       },
     });
   }
 
-  formatTimestamp(dateStr: string): string {
-    return new Date(dateStr).toLocaleString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  /** Only scrolls up: if the top of the rows is already on screen, nothing moves. */
+  private scrollResultsIntoView() {
+    setTimeout(() => {
+      const results = this.host.nativeElement.querySelector<HTMLElement>('.results');
+      if (results && results.getBoundingClientRect().top < 68) {
+        results.scrollIntoView({ block: 'start' });
+      }
     });
   }
 
+  actionLabel(action: string): string {
+    return humanize(action);
+  }
+
+  formatTimestamp(dateStr: string): string {
+    return new Date(dateStr).toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit',
+    });
+  }
+
+  /** One "Key: value" line per detail; strings print bare, everything else as JSON. */
   formatDetails(details: Record<string, unknown> | null): string {
     if (!details) return '—';
     const entries = Object.entries(details);
     if (entries.length === 0) return '—';
-    return entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n');
+    return entries
+      .map(([k, v]) => `${humanize(k)}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
+      .join('\n');
   }
 }

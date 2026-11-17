@@ -62,7 +62,7 @@ class AuditLogController {
 
         $stmt = $this->db->prepare("
             SELECT al.id, al.created_at, al.action, al.target_type, al.target_id, al.details_json,
-                   al.tournament_id, t.name AS tournament_name,
+                   al.tournament_id, t.name AS tournament_name, t.deleted_at AS tournament_deleted_at,
                    al.actor_user_id, u.username AS actor_username, u.email AS actor_email
             $joinSql
             $whereSql

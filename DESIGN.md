@@ -333,6 +333,6 @@ A **fold** tucks a working screen's secondary sections (Settings, Staff & access
 
 Not yet decided or not yet brought into this system. These are gaps, not rules.
 
-- The signed-in screens were reviewed in a browser on 2026-11-16 at desktop and phone width. Admin tables (users, audit log, traffic) use `.page-table`, which holds them to the header's `--page-gutter` instead of the window edge.
+- The signed-in screens were reviewed in a browser on 2026-11-16 at desktop and phone width. The super-admin screens (users, audit log, traffic, deleted tournaments) use `.page-table`, which holds them to the header's `--page-gutter` instead of the window edge, and gives their small controls 44px on a touch screen. Their tables share `.data-table` (column names over a 2px toner rule, 1px ruled lines between rows, no box) and `.sort-btn` for sortable headings; below 640px Users and Audit log switch to ruled rows. A failed load or save shows `.error-banner` (the input error style, with room for "Try again") rather than an empty state (2026-11-17).
 - The public bracket page stays a green header over white stock. A green band carrying the tournament name was considered and deferred on 2026-11-17 (`.scratch/flyer-across-pages/issues/03-bracket-page-band.md`).
 - Other sheet colours (yellow or pink stock for other Persuade pages) are undecided. Only the green sheet is established.

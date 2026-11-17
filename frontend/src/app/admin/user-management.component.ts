@@ -1,10 +1,18 @@
 // src/app/admin/user-management.component.ts
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TournamentService } from '../shared/services/tournament.service';
 import { confirmService } from '../shared/services/confirm.service';
 import { UserAccount } from '../shared/models/tournament.models';
+
+/** A reset token just generated, held on screen until the admin dismisses it. */
+interface ResetToken {
+  userId: number;
+  username: string;
+  token: string;
+  copied: boolean;
+}
 
 @Component({
   selector: 'app-user-management',
@@ -16,312 +24,274 @@ import { UserAccount } from '../shared/models/tournament.models';
         <h1>User management</h1>
       </div>
 
-      <div class="card" style="margin-bottom:24px">
-        <div class="section-label">Create user</div>
-        <div class="row create-user-row">
-          <input class="input" [(ngModel)]="newUserUsername" placeholder="Username" />
-          <input class="input" type="email" [(ngModel)]="newUserEmail" placeholder="Email" />
-          <input class="input" type="password" [(ngModel)]="newUserPassword" placeholder="Password (12+ chars)" />
-          <select class="input" [(ngModel)]="newUserRole">
-            <option value="organizer">Organizer</option>
-            <option value="super_admin">Super admin</option>
-          </select>
-          <button class="btn btn-primary" [disabled]="creatingUser()" (click)="createUser()">
-            @if (creatingUser()) { <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span> }
+      <form class="card create-user" (ngSubmit)="createUser()" novalidate>
+        <h2>Create user</h2>
+        <div class="create-user-fields">
+          <label class="field">
+            <span class="field-label">Username</span>
+            <input class="input" name="username" autocomplete="off" [(ngModel)]="newUserUsername" />
+          </label>
+          <label class="field">
+            <span class="field-label">Email</span>
+            <input class="input" name="email" type="email" autocomplete="off" [(ngModel)]="newUserEmail" />
+          </label>
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input class="input" name="password" type="password" autocomplete="new-password" [(ngModel)]="newUserPassword" aria-describedby="password-hint" />
+            <span class="field-hint" id="password-hint">At least 12 characters</span>
+          </label>
+          <label class="field">
+            <span class="field-label">Role</span>
+            <select class="input" name="role" [(ngModel)]="newUserRole">
+              <option value="organizer">Organizer</option>
+              <option value="super_admin">Super admin</option>
+            </select>
+          </label>
+          <button type="submit" class="btn btn-primary create-btn" [disabled]="creatingUser()">
+            @if (creatingUser()) { <span class="spinner spinner-sm" aria-hidden="true"></span> }
             Create user
           </button>
         </div>
-        @if (createUserError()) { <div class="form-error">{{ createUserError() }}</div> }
-      </div>
+        @if (createUserError()) { <div class="error-banner create-error" role="alert">{{ createUserError() }}</div> }
+      </form>
 
       @if (loading()) {
-        <div class="empty"><span class="spinner"></span></div>
+        <div class="empty"><span class="spinner" role="status" aria-label="Loading users"></span></div>
+      } @else if (error()) {
+        <div class="error-banner" role="alert">
+          {{ error() }}
+          <button type="button" class="btn btn-sm" (click)="load()">Try again</button>
+        </div>
       } @else if (users().length === 0) {
-        <div class="empty">No users found.</div>
+        <div class="empty">No users yet.</div>
       } @else {
         <div class="table-container">
-          <table class="users-table">
+          <table class="data-table users-table">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Plan</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <th scope="col">Username</th>
+                <th scope="col">Email</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
+                <th scope="col">Plan</th>
+                <th scope="col">Created</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               @for (user of users(); track user.id) {
-                <tr [class.disabled]="user.status === 'disabled'">
-                  <td class="username">{{ user.username }}</td>
-                  <td class="email">{{ user.email }}</td>
-                  <td class="role">
-                    <select
-                      [value]="user.role"
-                      (change)="changeRole(user, $event)"
-                      [disabled]="isUpdating(user.id)"
-                      class="role-select">
-                      <option value="organizer">Organizer</option>
-                      <option value="super_admin">Super admin</option>
-                    </select>
+                <tr [class.is-disabled]="user.status === 'disabled'">
+                  <th scope="row" class="username">{{ user.username }}</th>
+                  <td class="dim">{{ user.email }}</td>
+                  <td>
+                    <ng-container *ngTemplateOutlet="roleSelect; context: { $implicit: user }"></ng-container>
                   </td>
-                  <td class="status">
-                    <span class="badge" [class.status-active]="user.status === 'active'" [class.status-disabled]="user.status === 'disabled'">
-                      {{ user.status === 'active' ? 'Active' : 'Disabled' }}
-                    </span>
+                  <td>
+                    <ng-container *ngTemplateOutlet="statusBadge; context: { $implicit: user }"></ng-container>
                   </td>
-                  <td class="plan">
-                    <select
-                      [value]="user.plan"
-                      (change)="changePlan(user, $event)"
-                      [disabled]="isUpdating(user.id)"
-                      class="role-select"
-                      title="Manual plan override — a plan set here is not revoked by Stripe">
-                      <option value="free">Free</option>
-                      <option value="paid">Paid</option>
-                    </select>
+                  <td>
+                    <ng-container *ngTemplateOutlet="planSelect; context: { $implicit: user }"></ng-container>
                   </td>
-                  <td class="created">{{ formatDate(user.created_at) }}</td>
+                  <td class="dim nowrap">{{ formatDate(user.created_at) }}</td>
                   <td class="actions">
-                    <button 
-                      class="btn btn-sm" 
-                      title="Reset password"
-                      [disabled]="isUpdating(user.id)"
-                      (click)="resetPassword(user)">
-                      @if (isUpdating(user.id)) {
-                        <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
-                      } @else {
-                        Reset
-                      }
-                    </button>
-                    <button 
-                      class="btn btn-sm" 
-                      [class.btn-danger]="user.status === 'active'"
-                      [disabled]="isUpdating(user.id)"
-                      (click)="toggleStatus(user)">
-                      @if (isUpdating(user.id)) {
-                        <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
-                      } @else {
-                        {{ user.status === 'active' ? 'Disable' : 'Enable' }}
-                      }
-                    </button>
+                    <ng-container *ngTemplateOutlet="actionButtons; context: { $implicit: user }"></ng-container>
                   </td>
                 </tr>
+                @if (resetToken()?.userId === user.id) {
+                  <tr class="token-tr">
+                    <td colspan="7">
+                      <ng-container *ngTemplateOutlet="tokenPanel"></ng-container>
+                    </td>
+                  </tr>
+                }
               }
             </tbody>
           </table>
         </div>
 
-        <div class="user-cards">
+        <ul class="user-rows">
           @for (user of users(); track user.id) {
-            <div class="user-card" [class.disabled]="user.status === 'disabled'">
-              <div class="user-card-top">
+            <li class="user-row" [class.is-disabled]="user.status === 'disabled'">
+              <div class="user-row-top">
                 <span class="username">{{ user.username }}</span>
-                <span class="badge" [class.status-active]="user.status === 'active'" [class.status-disabled]="user.status === 'disabled'">
-                  {{ user.status === 'active' ? 'Active' : 'Disabled' }}
-                </span>
+                <ng-container *ngTemplateOutlet="statusBadge; context: { $implicit: user }"></ng-container>
               </div>
-              <div class="email">{{ user.email }}</div>
-              <div class="user-card-row">
-                <span class="field-label">Role</span>
-                <select
-                  [value]="user.role"
-                  (change)="changeRole(user, $event)"
-                  [disabled]="isUpdating(user.id)"
-                  class="role-select">
-                  <option value="organizer">Organizer</option>
-                  <option value="super_admin">Super admin</option>
-                </select>
+              <div class="dim email">{{ user.email }}</div>
+              <div class="user-row-fields">
+                <label class="inline-field">
+                  <span class="field-label">Role</span>
+                  <ng-container *ngTemplateOutlet="roleSelect; context: { $implicit: user }"></ng-container>
+                </label>
+                <label class="inline-field">
+                  <span class="field-label">Plan</span>
+                  <ng-container *ngTemplateOutlet="planSelect; context: { $implicit: user }"></ng-container>
+                </label>
               </div>
-              <div class="user-card-row">
-                <span class="field-label">Plan</span>
-                <select
-                  [value]="user.plan"
-                  (change)="changePlan(user, $event)"
-                  [disabled]="isUpdating(user.id)"
-                  class="role-select"
-                  title="Manual plan override — a plan set here is not revoked by Stripe">
-                  <option value="free">Free</option>
-                  <option value="paid">Paid</option>
-                </select>
+              <div class="dim">Joined {{ formatDate(user.created_at) }}</div>
+              <div class="user-row-actions">
+                <ng-container *ngTemplateOutlet="actionButtons; context: { $implicit: user }"></ng-container>
               </div>
-              <div class="created">Joined {{ formatDate(user.created_at) }}</div>
-              <div class="user-card-actions">
-                <button
-                  class="btn btn-sm"
-                  title="Reset password"
-                  [disabled]="isUpdating(user.id)"
-                  (click)="resetPassword(user)">
-                  @if (isUpdating(user.id)) {
-                    <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
-                  } @else {
-                    Reset
-                  }
-                </button>
-                <button
-                  class="btn btn-sm"
-                  [class.btn-danger]="user.status === 'active'"
-                  [disabled]="isUpdating(user.id)"
-                  (click)="toggleStatus(user)">
-                  @if (isUpdating(user.id)) {
-                    <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
-                  } @else {
-                    {{ user.status === 'active' ? 'Disable' : 'Enable' }}
-                  }
-                </button>
-              </div>
-            </div>
+              @if (resetToken()?.userId === user.id) {
+                <ng-container *ngTemplateOutlet="tokenPanel"></ng-container>
+              }
+            </li>
           }
-        </div>
+        </ul>
       }
 
+      <ng-template #roleSelect let-user>
+        <select
+          class="input cell-select role-select"
+          [value]="user.role"
+          (change)="changeRole(user, $event)"
+          [disabled]="isUpdating(user.id)"
+          [attr.aria-label]="'Role for ' + user.username">
+          <option value="organizer">Organizer</option>
+          <option value="super_admin">Super admin</option>
+        </select>
+      </ng-template>
+
+      <ng-template #planSelect let-user>
+        <select
+          class="input cell-select plan-select"
+          [value]="user.plan"
+          (change)="changePlan(user, $event)"
+          [disabled]="isUpdating(user.id)"
+          [attr.aria-label]="'Plan for ' + user.username + '. A plan set here is not revoked by Stripe.'"
+          title="Manual plan override. A plan set here is not revoked by Stripe.">
+          <option value="free">Free</option>
+          <option value="paid">Paid</option>
+        </select>
+      </ng-template>
+
+      <!-- Not badge-active: the global stylesheet owns that name for the pink "Live" badge,
+           and pink means live-right-now only. Account status is quiet stock with a ruled edge. -->
+      <ng-template #statusBadge let-user>
+        <span class="badge" [class.status-active]="user.status === 'active'" [class.status-disabled]="user.status === 'disabled'">
+          {{ user.status === 'active' ? 'Active' : 'Disabled' }}
+        </span>
+      </ng-template>
+
+      <ng-template #actionButtons let-user>
+        <button
+          type="button"
+          class="btn btn-sm"
+          [disabled]="isUpdating(user.id)"
+          [attr.aria-label]="'Reset password for ' + user.username"
+          [attr.data-reset-for]="user.id"
+          (click)="resetPassword(user)">
+          Reset password
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-danger]="user.status === 'active'"
+          [disabled]="isUpdating(user.id)"
+          [attr.aria-label]="(user.status === 'active' ? 'Disable ' : 'Enable ') + user.username"
+          (click)="toggleStatus(user)">
+          {{ user.status === 'active' ? 'Disable' : 'Enable' }}
+        </button>
+        @if (isUpdating(user.id)) { <span class="spinner spinner-sm" role="status" aria-label="Saving"></span> }
+      </ng-template>
+
+      <!-- The token stays here until dismissed: if the clipboard write failed, this is the
+           only copy there is, so it can't live in a toast that times out. -->
+      <ng-template #tokenPanel>
+        @if (resetToken(); as r) {
+          <div class="token-panel" role="region" [attr.aria-label]="'Reset token for ' + r.username">
+            <p class="token-note">
+              <strong>Reset token for {{ r.username }}.</strong>
+              {{ r.copied ? 'Copied to your clipboard.' : 'Copy it and send it to them.' }}
+              It works once and expires in 24 hours.
+            </p>
+            <div class="token-row">
+              <input class="input token-input" readonly [value]="r.token" aria-label="Reset token" (focus)="selectAll($event)" />
+              <button type="button" class="btn btn-sm" (click)="copyToken()">Copy</button>
+              <button type="button" class="btn btn-sm" (click)="dismissToken()">Done</button>
+            </div>
+          </div>
+        }
+      </ng-template>
+
+      <!-- Always on the page, so a screen reader hears the text change; a live region
+           created together with its text is often missed. -->
+      <div class="sr-only" role="status">{{ toast() }}</div>
       @if (toast()) {
-        <div class="toast" [class.toast-success]="toastType() === 'success'" [class.toast-error]="toastType() === 'error'">
+        <div class="toast" aria-hidden="true" [class.toast-success]="toastType() === 'success'" [class.toast-error]="toastType() === 'error'">
           {{ toast() }}
         </div>
-      }
-
-      @if (error()) {
-        <div class="form-error">{{ error() }}</div>
       }
     </div>
   `,
   styles: [`
-    .page-header { margin-bottom: 24px; }
-    .page-header h1 { margin: 0; font-size: 2rem; }
-
-    .section-label {
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      letter-spacing: 0;
-      color: var(--text-dim);
-      margin-bottom: 10px;
+    .create-user { margin-bottom: 32px; }
+    .create-user h2 { font-size: 1.2rem; margin: 0 0 14px; }
+    .create-user-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      align-items: start;
     }
-    .row { display: flex; gap: 8px; }
-    .create-user-row { flex-wrap: wrap; }
-    .create-user-row .input { flex: 1 1 160px; min-width: 140px; }
+    .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    /* Lines the button up with the inputs rather than their labels. */
+    .create-btn { margin-top: calc(0.78rem * 1.5 + 4px); min-height: 44px; }
+    /* One column on a phone: nothing beside it to line up with. */
+    @media (max-width: 440px) { .create-btn { margin-top: 8px; } }
 
     .table-container { overflow-x: auto; }
-    .users-table {
-      width: 100%;
-      border-collapse: collapse;
+    .users-table th[scope="row"] { font-size: 0.875rem; font-weight: 700; padding: 12px; border-bottom: 1px solid var(--border); white-space: normal; vertical-align: middle; }
+    .dim { color: var(--text-dim); }
+    .nowrap { white-space: nowrap; }
+
+    /* A disabled account keeps full-strength text (dimming it failed contrast); the badge
+       and a recessed row say it's off. */
+    tr.is-disabled, .user-row.is-disabled { background: var(--surface-2); }
+
+    .cell-select { width: auto; padding: 6px 8px; font-size: 0.875rem; }
+    .role-select { min-width: 8.5rem; }
+    .plan-select { min-width: 5.5rem; }
+
+    .badge.status-active { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+    .badge.status-disabled { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
+
+    .actions { text-align: right; white-space: nowrap; }
+    .actions .btn + .btn { margin-left: 6px; }
+    .actions .spinner-sm { margin-left: 6px; }
+
+    .token-tr td { background: var(--surface); padding: 0 12px 16px; }
+    .token-tr:hover { background: transparent; }
+    .token-panel {
+      border: 1.5px solid var(--text);
+      padding: 14px 16px;
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
     }
-    
-    .users-table th {
-      background: var(--bg);
-      border-bottom: 2px solid var(--border);
-      padding: 12px 16px;
-      text-align: left;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0;
-      color: var(--text-dim);
-    }
-    
-    .users-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    
-    .users-table tbody tr {
-      transition: background-color 0.2s;
-      &:hover { background-color: var(--surface-2); }
-      &.disabled { opacity: 0.6; }
-    }
-    
-    .username { font-weight: 500; }
-    .email { font-size: 0.9rem; color: var(--text-dim); }
-    
-    .role-select {
-      padding: 6px 8px;
-      border: 1px solid var(--border);
-      border-radius: 0;
-      background: var(--surface);
-      color: var(--text);
-      font-size: 0.9rem;
-      cursor: pointer;
-      
-      &:hover { border-color: var(--accent); }
-      &:disabled { opacity: 0.5; cursor: not-allowed; }
-    }
-    
-    /* Not badge-active: the global stylesheet owns that name for the pink "Live" badge, and
-       pink means live-right-now only. Account status is quiet stock with a ruled edge. */
-    .badge {
-      &.status-active { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
-      &.status-disabled { background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
-    }
+    .token-note { margin: 0 0 10px; font-size: 0.875rem; }
+    .token-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .token-input { flex: 1 1 260px; width: auto; font-size: 0.875rem; }
 
-    .created { font-size: 0.9rem; color: var(--text-dim); }
-
-    .actions { text-align: right; }
-    .btn { padding: 6px 12px; font-size: 0.85rem; }
-    .btn-danger { color: var(--danger); border-color: var(--danger); }
-
-    /* Mobile card list (replaces the table below the breakpoint) */
-    .user-cards { display: none; flex-direction: column; gap: 10px; }
-    .user-card {
+    /* Phones: ruled rows instead of the table (DESIGN.md, List Rows). */
+    .user-rows { display: none; list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--text); }
+    .user-row {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      padding: 12px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      &.disabled { opacity: 0.6; }
+      padding: 14px 4px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
     }
-    .user-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .user-card-row { display: flex; align-items: center; gap: 8px; }
-    .field-label {
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      letter-spacing: 0;
-      color: var(--text-dim);
-    }
-    .user-card-actions { display: flex; gap: 8px; margin-top: 2px; }
+    .user-row .username { font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+    .user-row .email { overflow-wrap: anywhere; }
+    .user-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .user-row-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+    .inline-field { display: flex; align-items: center; gap: 8px; }
+    .user-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 
     @media (max-width: 640px) {
       .table-container { display: none; }
-      .user-cards { display: flex; }
+      .user-rows { display: block; }
     }
 
-    .form-error {
-      color: var(--danger);
-      font-size: 0.85rem;
-      margin-top: 16px;
-      padding: 12px;
-      background: rgba(var(--danger-rgb), 0.1);
-      border-radius: var(--radius);
-    }
-    
-    .empty {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text-dim);
-    }
-    
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 24px;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      animation: slideIn 0.3s ease-out;
-      
-      &.toast-success { background: var(--marker); color: var(--marker-ink); }
-      &.toast-error { background: var(--danger); color: var(--danger-ink); }
-    }
-    
-    @keyframes slideIn {
-      from { transform: translateX(-100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
+    .create-error { margin-top: 14px; }
   `]
 })
 export class UserManagementComponent implements OnInit {
@@ -331,6 +301,7 @@ export class UserManagementComponent implements OnInit {
   toast = signal('');
   toastType = signal<'success' | 'error'>('success');
   updatingUserIds = signal<number[]>([]);
+  resetToken = signal<ResetToken | null>(null);
 
   newUserUsername = '';
   newUserEmail = '';
@@ -338,6 +309,9 @@ export class UserManagementComponent implements OnInit {
   newUserRole: 'organizer' | 'super_admin' = 'organizer';
   creatingUser = signal(false);
   createUserError = signal('');
+
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   constructor(private svc: TournamentService) {}
 
@@ -375,7 +349,7 @@ export class UserManagementComponent implements OnInit {
         this.users.set(data);
         this.loading.set(false);
       },
-      error: err => {
+      error: () => {
         this.error.set('Failed to load users.');
         this.loading.set(false);
       },
@@ -402,7 +376,7 @@ export class UserManagementComponent implements OnInit {
       }
     }
 
-    this.updateUser(user.id, { role: newRole });
+    this.updateUser(user.id, { role: newRole }, () => { target.value = user.role; });
   }
 
   // FEATURE_TRACKER item 12: the manual lever for an account plan, which Stripe billing
@@ -412,7 +386,7 @@ export class UserManagementComponent implements OnInit {
     const target = event.target as HTMLSelectElement;
     const newPlan = target.value as 'free' | 'paid';
     if (newPlan === user.plan) return;
-    this.updateUser(user.id, { plan: newPlan });
+    this.updateUser(user.id, { plan: newPlan }, () => { target.value = user.plan; });
   }
 
   async toggleStatus(user: UserAccount) {
@@ -440,11 +414,13 @@ export class UserManagementComponent implements OnInit {
     this.svc.resetUserPassword(user.id).subscribe({
       next: result => {
         this.updatingUserIds.update(ids => ids.filter(id => id !== user.id));
-        // Copy token to clipboard for easy sharing
-        navigator.clipboard.writeText(result.token).then(() => {
+        // Shown in the row until dismissed, whether or not the clipboard write works.
+        this.resetToken.set({ userId: user.id, username: user.username, token: result.token, copied: false });
+        this.focusVisible('.token-input');
+        this.writeClipboard(result.token).then(ok => {
+          if (!ok) return;
+          this.markCopied(result.token);
           this.showToast('Reset token copied to clipboard (expires in 24 hours).', 'success');
-        }).catch(() => {
-          this.showToast(`Reset token: ${result.token}`, 'success');
         });
       },
       error: err => {
@@ -455,7 +431,49 @@ export class UserManagementComponent implements OnInit {
     });
   }
 
-  private updateUser(userId: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled'; plan?: 'free' | 'paid' }) {
+  async copyToken() {
+    const r = this.resetToken();
+    if (!r) return;
+    if (await this.writeClipboard(r.token)) {
+      this.markCopied(r.token);
+      this.showToast('Reset token copied.', 'success');
+    } else {
+      this.showToast('Could not copy. Select the token and copy it by hand.', 'error');
+    }
+  }
+
+  /** Closes the token panel and hands focus back to the button that opened it. */
+  dismissToken() {
+    const r = this.resetToken();
+    this.resetToken.set(null);
+    if (r) this.focusVisible(`[data-reset-for="${r.userId}"]`);
+  }
+
+  selectAll(event: Event) {
+    (event.target as HTMLInputElement).select();
+  }
+
+  /** Focuses the first match that is actually shown: the table and the phone rows both
+      render each control, and one of them is display:none. Runs after the next render. */
+  private focusVisible(selector: string) {
+    setTimeout(() => {
+      const els = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>(selector));
+      els.find(el => el.offsetParent !== null)?.focus();
+    });
+  }
+
+  private markCopied(token: string) {
+    this.resetToken.update(r => (r && r.token === token ? { ...r, copied: true } : r));
+  }
+
+  private writeClipboard(text: string): Promise<boolean> {
+    if (!navigator.clipboard?.writeText) return Promise.resolve(false);
+    return navigator.clipboard.writeText(text).then(() => true, () => false);
+  }
+
+  /** `revert` puts a select back when the server refuses the change: the model never
+      changed, so Angular has nothing to re-render and the select would keep the refused value. */
+  private updateUser(userId: number, data: { role?: 'organizer' | 'super_admin'; status?: 'active' | 'disabled'; plan?: 'free' | 'paid' }, revert?: () => void) {
     this.updatingUserIds.update(ids => [...ids, userId]);
     this.svc.updateUser(userId, data).subscribe({
       next: updated => {
@@ -466,6 +484,7 @@ export class UserManagementComponent implements OnInit {
       error: err => {
         this.updatingUserIds.update(ids => ids.filter(id => id !== userId));
         const msg = err?.error?.error ?? 'Failed to update user.';
+        revert?.();
         this.showToast(msg, 'error');
       },
     });
@@ -480,6 +499,7 @@ export class UserManagementComponent implements OnInit {
   private showToast(msg: string, type: 'success' | 'error') {
     this.toast.set(msg);
     this.toastType.set(type);
-    setTimeout(() => this.toast.set(''), 2500);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toast.set(''), 3500);
   }
 }
