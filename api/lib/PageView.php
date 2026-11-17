@@ -27,7 +27,7 @@ final class PageView
     /** Public pages, counted as themselves. Keep in step with frontend app.routes.ts. */
     const PAGES = [
         '/', '/tournaments', '/how-it-works', '/pricing', '/sports', '/blind-draw-generator',
-        '/cornhole-fundraiser', '/scoreholio-alternative', '/terms', '/refunds', '/privacy',
+        '/cornhole-score-keeper', '/cornhole-fundraiser', '/scoreholio-alternative', '/terms', '/refunds', '/privacy',
         '/admin/login', '/admin/register', '/reset-password', '/verify-email',
         '/notifications/confirm', '/notifications/unsubscribe', '/notifications/preferences',
     ];

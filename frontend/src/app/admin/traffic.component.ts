@@ -14,6 +14,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/pricing': 'Pricing',
   '/sports': 'Sports',
   '/blind-draw-generator': 'Blind draw generator',
+  '/cornhole-score-keeper': 'Score keeper',
   '/cornhole-fundraiser': 'Fundraiser guide',
   '/scoreholio-alternative': 'Scoreholio comparison',
   '/terms': 'Terms',

@@ -36,6 +36,11 @@ import { TournamentService } from '../shared/services/tournament.service';
             <p style="margin-top:8px">
               No need to register again — the organizer can see your name.
             </p>
+            <!-- The one moment before play starts that a player is looking at us. Neutral
+                 wording: the app doesn't name a sport (PRODUCT.md), the page it opens does. -->
+            <p style="margin-top:8px">
+              Keeping score? Try our free <a routerLink="/cornhole-score-keeper">score keeper</a>.
+            </p>
           </div>
         } @else {
           <!-- Someone reaching this page has usually just scanned a QR code at the venue and

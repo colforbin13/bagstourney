@@ -15,6 +15,7 @@ final class PageViewTest extends TestCase
         $this->assertSame('/', PageView::path(''));
         $this->assertSame('/pricing', PageView::path('/pricing'));
         $this->assertSame('/pricing', PageView::path('/Pricing/'));
+        $this->assertSame('/cornhole-score-keeper', PageView::path('/cornhole-score-keeper'));
         $this->assertSame('/admin/register', PageView::path('/admin/register'));
         $this->assertSame('/notifications/confirm', PageView::path('/notifications/confirm'));
     }

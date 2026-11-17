@@ -4,6 +4,62 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Free cornhole score keeper
+
+`FEATURE_TRACKER.md` item 24: a free public page for keeping score of one game of bags, which
+doubles as a search landing page ("cornhole score keeper") ending in an invite to run a
+tournament, the same job the blind draw generator does. Added and built 2026-11-17 per Matt;
+spec and tickets in `.scratch/bags-scorekeeper/`.
+
+**What changed.** `/cornhole-score-keeper` (`bracket/bags-scorekeeper.component.ts`). Two team
+cards side by side, each with an editable name, the running score and 44px steppers for bags
+in the hole and on the board (+ stops at four bags a side). A line under the board previews
+the round before it is scored. Undo drops the last round and puts its bags back on the
+steppers, so a miscounted round is fixed rather than retyped. Settings (scoring mode, play-to,
+going over) show until the first round, then collapse to a summary. "New game" mid-game takes
+a second tap; after a win it keeps the names. Prerendered with the rules as copy (points,
+cancellation, straight, busting, how to use it), and wired in like the generator: server
+route, `.htaccess` page list, sitemap, `PageView::PAGES`, the Traffic page name, and
+`FOOT_LINKS`, which also makes it end on the sheet foot.
+
+**Rules.** The logic is pure in `shared/bags-score.ts`: `scoreGame(settings, rounds)` replays
+a whole game. In = 3, on = 1. Cancellation (default) awards only the difference to the side
+ahead; straight keeps both. Target editable, default 21. Without a bust rule, reaching or
+passing the target wins. With one, a side must land on the target exactly, and going over
+sets it back to 13, 15 or its score before the round (a 13/15 set-back must be below the
+target; lowering the target under it switches to "previous score"). Under straight scoring
+both sides can finish together: the higher total wins, and a tie goes to extra rounds played
+without the bust rule until a round separates them. Without that exemption, two sides tied
+at the target under "previous score" could never separate.
+
+**Design decisions.** Settings are fixed once the first round is scored, so the round history
+always matches the score. The stored game is `{ v: 1, settings, names, rounds }` under
+`bb_bags_game`, read only in the browser and replayed through `scoreGame`, so a corrupt or
+hand-edited value fails validation and starts a fresh game rather than showing a wrong score.
+Nothing reaches the server. No home page tab yet; revisit if Traffic shows it earning one.
+
+**Entry points for players mid-tournament.** Players at an event never see the marketing
+pages, so the page is also linked from the quiet footer's link row (under every public
+bracket, the sign-up page and the working screens) and from the sign-up confirmation
+("Keeping score? Try our free score keeper."). Both use neutral wording: PRODUCT.md keeps
+the app sport-neutral, and the page they open is the one that names cornhole. A "Keep score"
+link on each now-playing board, with team names prefilled, was considered and declined by
+Matt for the same reason: the bracket page serves any doubles game, and gating it on the
+venue label "board" would still send darts players to a cornhole page. Revisit if the app
+ever records a tournament's sport.
+
+**Verified.** `bags-score.spec.ts` (27 specs), mutation-checked: removing cancellation, the
+"previous score" set-back, the tie rule, the extra-rounds bust exemption or the four-bag cap
+each fails at least one (requiring an exact hit vs. `>=` is an equivalent mutant, since a bust
+already pulls the score under the target). `bags-scorekeeper.component.spec.ts` (13 specs:
+scoring, the cap, undo, winner and new game, locked settings, a straight game with a bust,
+the two-tap clear, reload restore, corrupt storage, no storage while prerendering). 587
+frontend tests and 218 PHP tests pass. Production build prerenders 11 routes and flattens
+`cornhole-score-keeper.html`, which carries its title, description, canonical, share card
+and rules text, and ends on the sheet foot without listing itself. In Chrome at 402x680 the
+whole tool through "Score round" fits the first screen with no sideways scroll; played to a
+win, reloaded mid-game and got it back, no console errors.
+
 ### Decluttered tournament management screen
 
 2026-11-17. Commit `41a0515`, plus the follow-up that fixed button heights, trimmed the

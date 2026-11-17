@@ -211,33 +211,6 @@ Priority note: sequenced right after item 12 since it reuses item 12's gating me
 rather than introducing new feature gates of its own, and shares the same
 organizer-pays-you billing model that's now the priority entry point for monetization.
 
-### 24. Free bags scorekeeper page
-
-A public helper page for keeping score of one game of bags, round by round. Two teams are
-named by the players (team names or bag colours), each round they enter how many bags went
-in the hole and how many landed on the board for each side, and the page works out the
-round's points and the running score. Everything stays in the browser: no account, nothing
-saved, nothing sent to the server.
-
-- Doubles as a marketing page, like the blind draw generator: a free tool that people find
-  by search ("cornhole score keeper", "bags score calculator") and that ends by inviting
-  them to run a whole tournament on Bracketway.
-- Bags scoring to settle before building: in = 3, on = 1, and with the usual cancellation
-  scoring only the difference between the two sides counts each round. The game goes to 21.
-  Open questions: offer straight (non-cancellation) scoring as an option; whether to support
-  a "bust" rule (going over 21 drops you back, a common backyard variation); whether the
-  target score is editable.
-- Phone first, one-handed, readable outdoors: big tap targets for each count, the running
-  score large, a round history below, and an undo for a mistyped round. Should survive a
-  page refresh mid-game (browser storage only).
-- Prerendered and in the sitemap like the other marketing pages, so the instructions and
-  rules text are in the HTML for search engines. Needs an entry in `PageView::PAGES`, the
-  footer's sheet-foot index (`FOOT_LINKS`) and the home page's tabs if it earns a place there.
-- Sport naming: PRODUCT.md keeps the core app sport-neutral but lets search and guide pages
-  lead with cornhole, so this page can be about bags by name.
-
-Status: Planned — added 2026-11-17 per Matt. Small, frontend only.
-
 ### 19. Odd player handling (ghost partner)
 
 Today a blind draw refuses an odd number of players (`TeamController::draw()`), so the
@@ -591,6 +564,17 @@ display).
 Built and verified. Everything below is live in production as of the 2026-11-17 `deploy.ps1`
 run, which shipped the whole current build. New entries go at the top, marked **not yet
 deployed** until the next deploy carries them.
+
+- **24. Free cornhole score keeper** (2026-11-17, **not yet deployed**) —
+  `/cornhole-score-keeper`, a public no-login page for scoring one game of bags round by round:
+  steppers for bags in the hole and on the board, cancellation or straight scoring, an editable
+  target, and an optional bust rule (back to 13, 15 or the score before the round). Undo, and
+  the game survives a reload (browser storage only). Prerendered with the rules as copy, in
+  the sitemap and the footer's sheet-foot index, ends in an invite to run a tournament.
+  Players in a tournament find it from the quiet footer under every bracket page and a line
+  on the sign-up confirmation (no board-panel link: the app stays sport-neutral).
+  Frontend only, apart from the `PageView::PAGES` entry.
+  [Full notes](FEATURE_ARCHIVE.md#free-cornhole-score-keeper)
 
 - **Decluttered tournament management screen** (2026-11-17) — once teams exist the Teams list
   is the only roster, and a player is edited by opening their team. Settings and Staff &

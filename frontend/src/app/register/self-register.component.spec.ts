@@ -169,6 +169,18 @@ describe('SelfRegisterComponent', () => {
     expect(component.registeredEmail()).toBe(true);
   });
 
+  it('should point a registered player to the score keeper', async () => {
+    await setup();
+    httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`).flush(activeTournament);
+    component.name = 'Alice';
+    component.submit();
+    httpMock.expectOne(`${environment.apiUrl}/participants/self-register`).flush({ success: true, name: 'Alice' });
+    fixture.detectChanges();
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('.notif-success a');
+    expect(link?.getAttribute('href')).toBe('/cornhole-score-keeper');
+    expect(link?.textContent?.trim()).toBe('score keeper');
+  });
+
   it('should show a server error message on failure', async () => {
     await setup();
     httpMock.expectOne(`${environment.apiUrl}/tournaments/by-uuid/abc-123`).flush(activeTournament);

@@ -76,6 +76,15 @@ export const routes: Routes = [
       description: 'Paste in your players and get random two-player teams and a seeded bracket in one click. Free blind draw generator for cornhole, bags, darts and doubles. No account needed.',
     },
   },
+  // Free bags scorekeeper (.scratch/bags-scorekeeper): one game, kept in the browser.
+  {
+    path: 'cornhole-score-keeper',
+    loadComponent: () => import('./bracket/bags-scorekeeper.component').then(m => m.BagsScorekeeperComponent),
+    title: 'Free cornhole score keeper',
+    data: {
+      description: 'Keep score of a game of cornhole from your phone: tap in bags in the hole and on the board each round, with cancellation scoring and optional bust rules. Free, no account needed.',
+    },
+  },
   // Guide pages (marketing handoff): prerendered how-tos for the searches organizers make.
   {
     path: 'cornhole-fundraiser',

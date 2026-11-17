@@ -26,9 +26,9 @@ describe('FooterComponent', () => {
     Array.from<HTMLAnchorElement>(el.querySelectorAll(selector)).map(a => a.getAttribute('href'));
 
   describe('the quiet footer', () => {
-    it('should link to the generator, the fundraiser guide, pricing and every legal page', async () => {
+    it('should link to the generator, the score keeper, the fundraiser guide, pricing and every legal page', async () => {
       expect(hrefs(await render(false), '.app-footer-links a'))
-        .toEqual(['/blind-draw-generator', '/cornhole-fundraiser', '/pricing', '/terms', '/refunds', '/privacy']);
+        .toEqual(['/blind-draw-generator', '/cornhole-score-keeper', '/cornhole-fundraiser', '/pricing', '/terms', '/refunds', '/privacy']);
     });
 
     it('should invite signed-out visitors to sign up', async () => {
@@ -89,7 +89,7 @@ describe('FooterComponent', () => {
 
     it('should index the other marketing pages, leaving out the one being read', async () => {
       expect(hrefs(await render(false, '/pricing'), '.foot-row'))
-        .toEqual(['/how-it-works', '/blind-draw-generator', '/cornhole-fundraiser', '/sports']);
+        .toEqual(['/how-it-works', '/blind-draw-generator', '/cornhole-score-keeper', '/cornhole-fundraiser', '/sports']);
     });
 
     it('should index every marketing page from the comparison page, which is not in the index', async () => {
@@ -99,7 +99,7 @@ describe('FooterComponent', () => {
     it('should say what each indexed page is for', async () => {
       const notes = Array.from((await render(false, '/sports')).querySelectorAll('.foot-row-note'))
         .map(n => n.textContent?.trim());
-      expect(notes.length).toBe(4);
+      expect(notes.length).toBe(FOOT_LINKS.length - 1);
       notes.forEach(note => expect(note).toBeTruthy());
     });
 

@@ -19,6 +19,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'pricing', renderMode: RenderMode.Prerender },
   { path: 'sports', renderMode: RenderMode.Prerender },
   { path: 'blind-draw-generator', renderMode: RenderMode.Prerender },
+  { path: 'cornhole-score-keeper', renderMode: RenderMode.Prerender },
   { path: 'cornhole-fundraiser', renderMode: RenderMode.Prerender },
   { path: 'scoreholio-alternative', renderMode: RenderMode.Prerender },
   { path: 'terms', renderMode: RenderMode.Prerender },

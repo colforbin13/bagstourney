@@ -27,6 +27,7 @@ export const FOOT_LINKS: FootLink[] = [
   { label: 'How it works', note: 'The whole run, step by step', link: '/how-it-works' },
   { label: 'Pricing', note: 'Free for tournaments up to 32 players', link: '/pricing' },
   { label: 'Blind draw generator', note: 'Random teams from a list of names', link: '/blind-draw-generator' },
+  { label: 'Score keeper', note: 'Keep score of a game of cornhole', link: '/cornhole-score-keeper' },
   { label: 'Fundraiser guide', note: 'Plan a cornhole fundraiser, start to finish', link: '/cornhole-fundraiser' },
   { label: 'Sports', note: 'Any game played in two-player teams', link: '/sports' },
 ];
@@ -114,6 +115,7 @@ const SIGNED_IN_PRICING: FootPitch = { line: 'Manage your plan', label: 'Go to b
         </a>
         <nav class="app-footer-links" aria-label="Site information">
           <a routerLink="/blind-draw-generator">Blind draw generator</a>
+          <a routerLink="/cornhole-score-keeper">Score keeper</a>
           <a routerLink="/cornhole-fundraiser">Fundraiser guide</a>
           <a routerLink="/pricing">Pricing</a>
           <a routerLink="/terms">Terms</a>
