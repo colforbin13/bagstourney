@@ -73,6 +73,14 @@ describe('BracketViewComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('links "All tournaments" to the tournament list, not the landing page', () => {
+    bootstrap(tournamentWith());
+    fixture.detectChanges();
+    const back = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('a'))
+      .find(a => a.textContent!.includes('All tournaments'))!;
+    expect(back.getAttribute('href')).toBe('/tournaments');
+  });
+
   it('canScore should be false for an anonymous viewer (no capabilities on the response)', () => {
     bootstrap(tournamentWith(undefined));
     expect(component.canScore()).toBe(false);
