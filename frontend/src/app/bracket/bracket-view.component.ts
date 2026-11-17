@@ -1,5 +1,5 @@
 // src/app/bracket/bracket-view.component.ts
-import { Component, OnInit, AfterViewInit, OnDestroy, DOCUMENT, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, DOCUMENT, signal, computed, inject, effect } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -17,6 +17,14 @@ import {
   championName,
   BracketSideName,
 } from '../shared/bracket-labels';
+import {
+  bracketSections,
+  liveSection,
+  rotationSections,
+  requestedSection,
+  SectionKey,
+} from '../shared/bracket-sections';
+import { preferMirrored } from '../shared/bracket-fit';
 
 interface ScoreEntry { team1: string; team2: string; }
 
@@ -165,6 +173,87 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     return [...p.rounds].reverse();
   });
+
+  // ── Sections (FEATURE_TRACKER item 25) ──────────────────────────────────────
+  // Pool play and the separate trees of double elimination stacked into one very long page,
+  // and onto a TV scaled down until nothing was readable. Each is now shown on its own,
+  // picked with a row of buttons on the page and cycled through on a timer on a TV.
+  // Single elimination without pool play has one section and renders exactly as before.
+
+  sections = computed(() => bracketSections(this.bracketData()));
+  hasSections = computed(() => this.sections().length > 1);
+
+  /** ?view=, which pins the page (and a TV) to one section. */
+  private view = signal<string | null>(null);
+  pinnedSection = computed(() => requestedSection(this.sections(), this.view()));
+
+  /** How long a TV holds each section before moving on. */
+  readonly rotateIntervalMs = 30000;
+  private rotateTick = signal(0);
+  private rotateTimer: number | null = null;
+
+  private rotation = computed(() => rotationSections(this.sections()));
+  /** A TV that is cycling, as opposed to pinned or with only one section left to show. */
+  rotating = computed(() => this.kiosk() && this.hasSections() && !this.pinnedSection() && this.rotation().length > 1);
+
+  activeSection = computed<SectionKey | null>(() => {
+    const sections = this.sections();
+    if (!this.hasSections()) return sections[0]?.key ?? null;
+    const pinned = this.pinnedSection();
+    if (pinned) return pinned;
+    if (this.kiosk()) {
+      const rotation = this.rotation();
+      return rotation[this.rotateTick() % rotation.length].key;
+    }
+    return liveSection(sections);
+  });
+
+  activeHeading = computed(() => this.sections().find(s => s.key === this.activeSection())?.heading ?? '');
+  /** Position in the cycle, for the dots on the TV's title bar. */
+  rotationDots = computed(() => this.rotation().map(s => s.key === this.activeSection()));
+
+  /** The double-elimination trees to draw: the active one, or all of them with no sections. */
+  visibleSideLayouts = computed(() => {
+    const layouts = this.sideLayouts();
+    if (!this.hasSections()) return layouts;
+    const active = this.activeSection();
+    const side = active === 'finals' ? 'grand_final' : active;
+    return layouts.filter(l => l.side === side);
+  });
+
+  showPoolSection = computed(() =>
+    !!this.pool()?.started && (this.activeSection() === 'pool' || !this.rounds().length));
+
+  // A different section has a different natural size, so re-fit the TV and re-centre
+  // the page's horizontal scroll once it has rendered.
+  private refitOnSectionChange = effect(() => {
+    this.activeSection();
+    setTimeout(() => { this.centerBracket(); this.recomputeFit(); }, 0);
+  });
+
+  selectSection(key: SectionKey) {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { view: key },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  private startRotation() {
+    if (this.rotateTimer != null) return;
+    this.rotateTick.set(0);
+    this.rotateTimer = window.setInterval(() => {
+      if (this.rotating()) this.rotateTick.update(t => t + 1);
+    }, this.rotateIntervalMs) as unknown as number;
+  }
+
+  private stopRotation() {
+    if (this.rotateTimer != null) {
+      clearInterval(this.rotateTimer);
+      this.rotateTimer = null;
+    }
+  }
 
   /**
    * The match that actually crowns the champion, so the trophy marker can be placed without
@@ -327,10 +416,29 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   // narrow screen, which keeps the existing stacked layout untouched. That switch has to
   // happen in the markup rather than in CSS: collapsing the mirrored DOM into one column
   // would read round 1, round 2, final, round 2, round 1 down the page, instead of
-  // grouping each round together the way the phone layout always has. Kiosk mode ignores
-  // the width entirely — a stick browser reporting a narrow viewport still wants the real
-  // bracket, and it gets scaled to fit regardless.
-  useMirrorLayout = computed(() => this.totalRounds() >= 2 && (this.kiosk() || !this.isNarrow()));
+  // grouping each round together the way the phone layout always has.
+  //
+  // The winners bracket of double elimination is the same halving tree, so it mirrors too
+  // when it is the section on show; the losers bracket halves every two rounds and is
+  // already short, so it never does.
+  //
+  // Kiosk mode ignores the viewport width (a stick browser reporting a narrow viewport still
+  // wants the real bracket) and instead measures: mirroring only pays when the tree is
+  // limited by height and there is width to spare, which depends on the field size, the
+  // screen, and the boards column. recomputeFit() keeps whichever scales larger.
+  mirrorEligible = computed(() =>
+    this.totalRounds() >= 2 && (!this.isDoubleElimination() || this.activeSection() === 'winners'));
+  private kioskMirror = signal(true);
+  private justSwitchedLayout = false;
+  useMirrorLayout = computed(() =>
+    this.mirrorEligible() && (this.kiosk() ? this.kioskMirror() : !this.isNarrow()));
+
+  private mirrorLabel(pos: number, total: number): string {
+    return labelForRound(pos, total, 'winners', this.bracketData()?.format ?? 'single');
+  }
+
+  /** The round in the middle: the final, or in double elimination the winners final. */
+  mirrorFinalLabel = computed(() => this.mirrorLabel(this.totalRounds(), this.totalRounds()));
 
   mirrorLayout = computed<MirrorLayout | null>(() => {
     const rs = this.rounds();
@@ -358,7 +466,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
           matches.push({ match, gridRow: `${(k - 1) * span + 1} / span ${span}` });
         }
 
-        out.push({ pos, label: this.roundLabel(pos, n), matches, connectors: this.mirrorConnectors(perSide, span) });
+        out.push({ pos, label: this.mirrorLabel(pos, n), matches, connectors: this.mirrorConnectors(perSide, span) });
       }
       return out;
     };
@@ -447,6 +555,8 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.route.queryParamMap.subscribe(params => {
       const on = params.get('kiosk') === '1';
       this.kiosk.set(on);
+      this.view.set(params.get('view'));
+      on ? this.startRotation() : this.stopRotation();
       document.body.classList.toggle('kiosk-mode', on);
       setTimeout(() => this.recomputeFit(), 0);
     });
@@ -473,14 +583,17 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     this.narrowMedia.removeEventListener('change', this.onNarrowChange);
     document.body.classList.remove('kiosk-mode');
     this.stopAutoReload();
+    this.stopRotation();
   }
 
   // ── TV / kiosk mode ────────────────────────────────────────────────────────
 
+  // Entering TV mode drops any section picked on the page, so the TV cycles through them
+  // all; a screen meant to stay on one section is set up with ?view= in its bookmark.
   setKiosk(on: boolean) {
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { kiosk: on ? 1 : null },
+      queryParams: on ? { kiosk: 1, view: null } : { kiosk: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -510,6 +623,23 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
       const availW = stage.clientWidth - this.kioskMarginPx * 2;
       const availH = stage.clientHeight - this.kioskMarginPx * 2;
       if (availW <= 0 || availH <= 0) return;
+
+      // Try the other layout when it would come out clearly bigger, then fit whichever is
+      // on screen. One switch per fit, so an estimate that is slightly off can't loop.
+      if (this.mirrorEligible() && !this.justSwitchedLayout) {
+        const mirrored = this.useMirrorLayout();
+        const want = preferMirrored(
+          { width: naturalW, height: naturalH }, mirrored,
+          { rounds: this.totalRounds(), rowUnit: this.rowUnitPx, gutter: this.gutterWidth },
+          { width: availW, height: availH }, this.maxKioskScale);
+        if (want !== mirrored) {
+          this.justSwitchedLayout = true;
+          this.kioskMirror.set(want);
+          setTimeout(() => this.recomputeFit(), 0);
+          return;
+        }
+      }
+      this.justSwitchedLayout = false;
 
       const scale = Math.min(availW / naturalW, availH / naturalH);
       this.fitScale.set(Math.min(this.maxKioskScale, Math.max(0.1, scale)));

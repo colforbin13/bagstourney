@@ -231,29 +231,6 @@ Status: Planned — added 2026-10-23 from the Scoreholio comparison. Small.
 Priority note: first of the Scoreholio-derived items because it fixes a real failure at
 the venue for every blind draw, free tier included.
 
-### 25. Split the bracket page into views for double elimination and pool play (Pro)
-
-In double elimination, and more so with pool play in front of it, the public bracket page
-is very long: pool standings and rounds, then the winners bracket, losers bracket and grand
-final stacked one under another. A spectator has to scroll a long way to find their game,
-and in TV mode everything is scaled down to fit one screen, so each part is hard to read.
-
-- On the bracket page: a row of buttons (pool play, winners, losers, finals; or by round)
-  that shows one part at a time at full width, defaulting to whichever part is being played
-  right now. Single elimination without pool play keeps today's single view.
-- In TV mode: cycle through the same parts on a timer, each at full screen width, so every
-  part is readable from across the room. Open questions: how long each part stays up; whether
-  to skip finished parts; whether the boards / up-next panel stays fixed on every view.
-- Builds on what's there: `bracket()` already returns the bracket grouped by side
-  (`sides`), and `bracket-view` already lays each side out separately (`sideLayouts()`), so
-  this is mostly a presentation change. Pool play renders through `PoolStandingsComponent`.
-- Related, found 2026-11-16: the double-elimination example in TV mode at 1080p renders the
-  bracket very small under the boards panel, with much of the screen unused.
-- Free tournaments (single elimination, no pool play) are unaffected, so this only ever
-  appears for tournaments using Pro formats.
-
-Status: Planned — added 2026-11-17 per Matt. Medium, frontend only.
-
 ### 20. Sponsor logos on the bracket and TV view (Pro)
 
 Board sponsors are how fundraisers raise money, and the fundraiser guide
@@ -565,7 +542,16 @@ Built and verified. Everything below is live in production as of the 2026-11-17 
 run, which shipped the whole current build. New entries go at the top, marked **not yet
 deployed** until the next deploy carries them.
 
-- **24. Free cornhole score keeper** (2026-11-17, **not yet deployed**) —
+- **25. Bracket and TV mode split into sections** (2026-11-17) — double elimination and
+  pool play show one section at a time: buttons on the bracket page (Pool play / Winners /
+  Losers / Finals, or Pool play / Bracket), opening on the one in play, kept in `?view=`. TV
+  mode rotates every 30 seconds through sections still being played, skipping finished and
+  all-TBD ones, with the boards in a column on the right; `?kiosk=1&view=…` pins a screen.
+  The winners bracket mirrors like single elimination, and a TV picks mirrored or stacked by
+  whichever scales larger. Single elimination without pool play is unchanged. Frontend only.
+  [Full notes](FEATURE_ARCHIVE.md#bracket-and-tv-mode-sections)
+
+- **24. Free cornhole score keeper** (2026-11-17) —
   `/cornhole-score-keeper`, a public no-login page for scoring one game of bags round by round:
   steppers for bags in the hole and on the board, cancellation or straight scoring, an editable
   target, and an optional bust rule (back to 13, 15 or the score before the round). Undo, and

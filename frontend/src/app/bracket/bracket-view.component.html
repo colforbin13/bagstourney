@@ -132,6 +132,14 @@
         @if (tournament()) {
         <span class="badge badge-{{ tournament()!.status }}" [class.badge-quiet]="isExample()">{{ statusLabel() }}</span>
         }
+        @if (hasSections() && !loading()) {
+        <span class="kiosk-section">{{ activeHeading() }}</span>
+        @if (rotating()) {
+        <span class="kiosk-dots" aria-hidden="true">
+            @for (on of rotationDots(); track $index) { <span class="kiosk-dot" [class.on]="on"></span> }
+        </span>
+        }
+        }
         <button type="button" class="btn btn-sm kiosk-exit" (click)="setKiosk(false)">Exit TV mode</button>
     </div>
     } @else {
@@ -162,15 +170,31 @@
     </div>
     }
 
-    @if (!loading() && showBoards()) {
-    <div class="boards-wrap" [class.boards-wrap-kiosk]="kiosk()">
-        <app-boards-panel [data]="bracketData()" [large]="kiosk()" />
+    @if (!loading() && showBoards() && !kiosk()) {
+    <div class="boards-wrap">
+        <app-boards-panel [data]="bracketData()" />
     </div>
     }
 
+    @if (!loading() && hasSections() && !kiosk()) {
+    <!-- One section at a time (FEATURE_TRACKER item 25). Defaults to whichever is being
+         played; a pick is kept in ?view= so a link to the losers bracket stays one. -->
+    <nav class="section-tabs" aria-label="Bracket sections">
+        @for (s of sections(); track s.key) {
+        <button type="button" class="section-tab" [class.active]="s.key === activeSection()"
+            [attr.aria-current]="s.key === activeSection() ? 'true' : null"
+            (click)="selectSection(s.key)">{{ s.label }}</button>
+        }
+    </nav>
+    }
+
+    <!-- On a TV the boards sit in a column beside whichever section is up, using the width a
+         16:9 screen has to spare instead of the height the bracket needs. -->
+    <div class="view-row" [class.view-row-kiosk]="kiosk()">
+    <div class="view-main">
     @if (loading()) {
     <div class="empty"><span class="spinner"></span></div>
-    } @else if (!rounds().length && pool()?.started) {
+    } @else if (showPoolSection()) {
     <ng-container *ngTemplateOutlet="poolView" />
     } @else if (!rounds().length) {
     <div class="empty">Bracket not generated yet.</div>
@@ -180,15 +204,53 @@
     <div class="fit-stage">
     <div class="fit-inner" [style.transform]="kiosk() ? 'scale(' + fitScale() + ')' : null">
 
-    @if (isDoubleElimination()) {
+    @if (useMirrorLayout() && mirrorLayout(); as layout) {
+    <!-- Mirrored: both halves of round 1 start at the outside edges and play inward to
+         the final in the middle. Half the height of a single-sided bracket, so the cards
+         and text can be much bigger on the same screen. -->
+    <div class="bracket bracket-mirrored">
+        @for (round of layout.left; track round.pos) {
+            <ng-container *ngTemplateOutlet="mirrorRound; context: { round: round, rows: layout.rows, flip: false }"></ng-container>
+            <ng-container *ngTemplateOutlet="mirrorGutter; context: { round: round, rows: layout.rows, flip: false }"></ng-container>
+        }
+
+        <div class="bracket-round bracket-final">
+            <div class="round-label label-center">{{ mirrorFinalLabel() }}</div>
+            <div class="bracket-matches" [style.--total-rows]="layout.rows" [style.--row-unit.px]="rowUnitPx">
+            @if (layout.final; as final) {
+                <div class="match-wrapper" [style.grid-row]="'1 / span ' + layout.rows">
+                <ng-container *ngTemplateOutlet="matchCard; context: { match: final }"></ng-container>
+                </div>
+            }
+            </div>
+            <!-- In double elimination the middle is the winners final, not the end. -->
+            @if (tournament()?.status === 'complete' && !isDoubleElimination()) {
+            <div class="champion">
+                <div class="champion-name">
+                <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
+                {{ champion() }}
+                </div>
+            </div>
+            }
+        </div>
+
+        <!-- Right half runs inward-out: gutter first, then its round column. -->
+        @for (round of layout.right; track round.pos) {
+            <ng-container *ngTemplateOutlet="mirrorGutter; context: { round: round, rows: layout.rows, flip: true }"></ng-container>
+            <ng-container *ngTemplateOutlet="mirrorRound; context: { round: round, rows: layout.rows, flip: true }"></ng-container>
+        }
+    </div>
+    } @else if (isDoubleElimination()) {
     <!-- Stacked sections: winners bracket, then losers, then the grand final. Deliberately
          not mirrored — the mirrored geometry assumes a perfect halving tree, which the
          losers bracket is not. Stacking also keeps the two trees legible as separate
          things, which is the point of the format. -->
     <div class="bracket-sides">
-        @for (side of sideLayouts(); track side.side) {
+        @for (side of visibleSideLayouts(); track side.side) {
         <section class="bracket-side">
+            @if (!hasSections()) {
             <h2 class="bracket-side-heading">{{ side.heading }}</h2>
+            }
             <div class="bracket">
                 @for (round of side.rounds; track round.pos) {
                 <div class="bracket-round">
@@ -222,48 +284,13 @@
         </section>
         }
 
-        @if (tournament()?.status === 'complete' && champion()) {
+        @if (tournament()?.status === 'complete' && champion() && (!hasSections() || activeSection() === 'finals')) {
         <div class="champion">
             <div class="champion-name">
             <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
             {{ champion() }}
             </div>
         </div>
-        }
-    </div>
-    } @else if (useMirrorLayout() && mirrorLayout(); as layout) {
-    <!-- Mirrored: both halves of round 1 start at the outside edges and play inward to
-         the final in the middle. Half the height of a single-sided bracket, so the cards
-         and text can be much bigger on the same screen. -->
-    <div class="bracket bracket-mirrored">
-        @for (round of layout.left; track round.pos) {
-            <ng-container *ngTemplateOutlet="mirrorRound; context: { round: round, rows: layout.rows, flip: false }"></ng-container>
-            <ng-container *ngTemplateOutlet="mirrorGutter; context: { round: round, rows: layout.rows, flip: false }"></ng-container>
-        }
-
-        <div class="bracket-round bracket-final">
-            <div class="round-label label-center">{{ roundLabel(totalRounds(), totalRounds()) }}</div>
-            <div class="bracket-matches" [style.--total-rows]="layout.rows" [style.--row-unit.px]="rowUnitPx">
-            @if (layout.final; as final) {
-                <div class="match-wrapper" [style.grid-row]="'1 / span ' + layout.rows">
-                <ng-container *ngTemplateOutlet="matchCard; context: { match: final }"></ng-container>
-                </div>
-            }
-            </div>
-            @if (tournament()?.status === 'complete') {
-            <div class="champion">
-                <div class="champion-name">
-                <svg class="champion-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 2h8v5a4 4 0 0 1-8 0V2zM5 4H2v1a3 3 0 0 0 3 3M13 4h3v1a3 3 0 0 1-3 3M9 11v4M5.5 16h7" stroke="currentColor" stroke-width="2"/></svg>
-                {{ champion() }}
-                </div>
-            </div>
-            }
-        </div>
-
-        <!-- Right half runs inward-out: gutter first, then its round column. -->
-        @for (round of layout.right; track round.pos) {
-            <ng-container *ngTemplateOutlet="mirrorGutter; context: { round: round, rows: layout.rows, flip: true }"></ng-container>
-            <ng-container *ngTemplateOutlet="mirrorRound; context: { round: round, rows: layout.rows, flip: true }"></ng-container>
         }
     </div>
     } @else {
@@ -317,20 +344,21 @@
 
     </div>
     </div>
-
-    <!-- Once the bracket exists, the pool that seeded it stays on the page as a record. -->
-    @if (!loading() && rounds().length && pool()?.started && !kiosk()) {
-    <div class="pool-after">
-        <app-pool-standings [pool]="pool()" />
-    </div>
     }
+    </div>
+
+    @if (kiosk() && !loading() && showBoards()) {
+    <aside class="boards-side">
+        <app-boards-panel [data]="bracketData()" [large]="true" [column]="true" />
+    </aside>
+    }
+    </div>
 
     @if (error()) {
         <div class="toast toast-error">{{ error() }}</div>
     }
     @if (successMsg()) {
         <div class="toast toast-success">{{ successMsg() }}</div>
-    }
     }
 </div>
 
@@ -358,7 +386,8 @@
                 }
             </div>
             }
-            @if (pool()?.complete) {
+            <!-- Once the bracket exists the pool stays a tab of its own, as a record. -->
+            @if (pool()?.complete && !pool()?.locked) {
             <div class="pool-wait">Pool play is finished. The bracket is coming up next.</div>
             }
         </div>

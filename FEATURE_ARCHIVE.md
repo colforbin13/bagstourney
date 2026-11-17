@@ -4,6 +4,53 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Bracket and TV mode sections
+
+`FEATURE_TRACKER.md` item 25, built and deployed 2026-11-17. A double-elimination bracket,
+more so with pool play in front of it, was one very long page (pool, winners, losers, grand
+final stacked), and TV mode scaled all of it onto one screen until nothing was readable; at
+1080p the double-elimination example sat small under the boards band with much of the screen
+unused.
+
+**Sections.** `shared/bracket-sections.ts` (pure, `bracket-sections.spec.ts`) lists a
+bracket's sections in play order: `pool` when the pool has started, then `bracket` for single
+elimination or `winners` / `losers` / `finals` for double. Each carries `done` (every match
+complete or bye; for finals and single elimination, the champion rule from `championName()`,
+because the deciding match is never played when the winners side takes the grand final) and
+`waiting` (no team placed anywhere in it yet). `liveSection()` is the first not done, else the
+last. Single elimination without pool play has one section, so no buttons and the old page.
+
+**Page.** A row of buttons under the header; the default is the live section, and a pick is
+written to `?view=` so a link keeps it. Once the bracket exists the pool is a section of its
+own (it used to sit under the bracket) and no longer says the bracket is coming.
+
+**TV.** Decided with Matt: 30 seconds per section; `rotationSections()` skips finished
+sections and ones still all TBD (a losers bracket or final with nobody in it has nothing to
+read), falling back to the open ones, then to the last section, so a decided tournament
+settles on the champion. The title bar names the section with a dot per rotation step. The
+boards panel moved from a band across the top to a fixed column on the right
+(`BoardsPanelComponent` `column` input), since a 16:9 screen has width to spare and the
+bracket needs the height. `?kiosk=1&view=losers` pins a screen to one section; the TV mode
+button clears any page pick so the TV rotates.
+
+**Mirroring.** The winners tree of double elimination is a true halving tree, so it reuses
+the single-elimination mirrored layout (labels via `roundLabel(..., 'winners', format)`, no
+champion line in the middle, which is the winners final). The losers bracket never mirrors.
+On the page the rule is the old one: mirrored unless narrow. On a TV, mirroring only pays when
+the tree is limited by height with width to spare, which the boards column changes, so
+`shared/bracket-fit.ts` (`bracket-fit.spec.ts`) estimates the other layout from the measured
+one (column width and non-grid height recovered from the measurement) and `recomputeFit()`
+switches when the other scales at least 5% larger, one switch per fit, so it cannot oscillate.
+The estimate ignores extras such as the trophy line, which can make it under-guess a stacked
+width by up to about 20%; it still picked correctly in every case checked.
+
+**Verified.** Frontend suite 627 passing. Mutation checks: dropping the done filter, the
+TBD filter, the champion rule for finals, and the 5% margin each fail at least one test. In
+Chrome at 1080p: Legion Hall example sections and pinning; its 16-team winners bracket
+mirrored at 0.84x beside the boards (stacked estimated 0.75x); the 8-team Labor Day example
+mirrored at 1.43x on the full width and switched to stacked at 1.42x when the stage was
+narrowed to 1400px (mirrored about 1.03x). Phone width was not checked in the browser.
+
 ### Free cornhole score keeper
 
 `FEATURE_TRACKER.md` item 24: a free public page for keeping score of one game of bags, which

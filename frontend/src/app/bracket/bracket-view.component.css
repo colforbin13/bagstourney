@@ -412,7 +412,6 @@ Double elimination: the two trees stacked
 .pool-score { font-family: var(--mono); font-size: .8rem; color: var(--muted); text-align: center; min-width: 44px; }
 .pool-game.done .pool-score { color: var(--text); }
 .pool-wait { margin-top: 14px; font-size: .85rem; color: var(--text-dim); }
-.pool-after { max-width: 680px; margin: 36px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
 .pool-view-kiosk { max-width: none; flex-direction: row; align-items: flex-start; padding: 0 28px; }
 .pool-view-kiosk .pool-panel { flex: 1; }
 .pool-view-kiosk .pool-panel { padding: 24px 28px; }
@@ -422,7 +421,59 @@ Double elimination: the two trees stacked
 
 /* Board assignments (item 8) */
 .boards-wrap { max-width: 680px; margin: 0 auto 24px; }
-.boards-wrap-kiosk { max-width: none; margin: 0; flex-shrink: 0; }
+
+/* ── Sections (FEATURE_TRACKER item 25): one part of a long bracket at a time ── */
+.section-tabs {
+    max-width: 680px;
+    margin: 0 auto 24px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.section-tab {
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: .9rem;
+    font-weight: 500;
+    padding: 8px 16px;
+    min-height: 40px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+.section-tab:hover { border-color: var(--text); }
+.section-tab.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+/* Kiosk: the section on show fills the space left of the boards column. */
+.view-row-kiosk {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+.view-row-kiosk .view-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.view-row-kiosk .pool-view { padding-top: 24px; }
+.boards-side {
+    flex: 0 0 clamp(280px, 24vw, 460px);
+    min-height: 0;
+}
+
+.kiosk-section {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+.kiosk-dots { display: inline-flex; gap: 6px; }
+.kiosk-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--text-dim); }
+.kiosk-dot.on { background: var(--text); border-color: var(--text); }
 .pool-board { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--accent); font-weight: 600; }
 .pool-view-kiosk .pool-board { font-size: 1rem; }
 

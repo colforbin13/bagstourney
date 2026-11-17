@@ -15,7 +15,7 @@ interface BoardGame { key: string; team1: string; team2: string; }
   standalone: true,
   template: `
     @if (boards(); as b) {
-      <section class="boards" [class.large]="large()" [attr.aria-label]="word().many">
+      <section class="boards" [class.large]="large()" [class.column]="column()" [attr.aria-label]="word().many">
         <div class="boards-col">
           <div class="boards-title">Now playing</div>
           @if (playing().length) {
@@ -70,12 +70,19 @@ interface BoardGame { key: string; team1: string; team2: string; }
     .large .tile-vs { font-size: .8rem; margin: 0; }
     .large .next-list { font-size: 1.1rem; gap: 6px; }
     .large .vs { font-size: .85rem; }
+    /* TV side column: the boards stack down the right of the bracket rather than across
+       the top, because the bracket needs the height and a 16:9 screen has width to spare. */
+    .boards.column { flex-direction: column; flex-wrap: nowrap; height: 100%; border-width: 0 0 0 1px; padding: 14px 18px; gap: 18px; overflow: hidden; }
+    .column .boards-col, .column .boards-col.next { flex: 0 0 auto; }
+    .column .tiles { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
   `],
 })
 export class BoardsPanelComponent {
   data = input<BracketData | null | undefined>(null);
   /** Bigger type for the TV/kiosk view. */
   large = input(false);
+  /** Stack vertically, for the column beside the bracket on a TV. */
+  column = input(false);
   /** How many waiting games to list. */
   nextCount = input(4);
 

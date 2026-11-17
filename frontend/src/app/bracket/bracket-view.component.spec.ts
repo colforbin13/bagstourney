@@ -511,7 +511,7 @@ describe('BracketViewComponent', () => {
       const navigate = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
 
       component.setKiosk(true);
-      expect(navigate.calls.mostRecent().args[1]!.queryParams).toEqual({ kiosk: 1 });
+      expect(navigate.calls.mostRecent().args[1]!.queryParams).toEqual({ kiosk: 1, view: null });
 
       component.setKiosk(false);
       expect(navigate.calls.mostRecent().args[1]!.queryParams).toEqual({ kiosk: null });
@@ -598,25 +598,135 @@ describe('BracketViewComponent', () => {
       });
     }
 
-    function bootstrapDouble() {
+    function bootstrapDouble(data: BracketData = doubleBracket()) {
       fixture.detectChanges();
       httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
-      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(doubleBracket());
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(data);
       fixture.detectChanges();
     }
 
-    it('renders the two trees as separate stacked sections', () => {
+    it('lays the two trees and the final out as separate sides', () => {
       bootstrapDouble();
 
       expect(component.isDoubleElimination()).toBe(true);
       expect(component.sideLayouts().map(s => s.side)).toEqual(['winners', 'losers', 'grand_final']);
-
-      const headings = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.bracket-side-heading'))
-        .map(el => el.textContent!.trim());
-      expect(headings).toEqual(['Winners bracket', 'Losers bracket', 'Grand final']);
     });
 
-    it('does not use the mirrored layout, whose geometry assumes a halving tree', () => {
+    it('shows one side at a time behind a row of buttons, starting with the one in play', () => {
+      component.isNarrow.set(true);   // stacked, so each side is a .bracket-side
+      bootstrapDouble();
+      const el: HTMLElement = fixture.nativeElement;
+
+      const tabs = Array.from<HTMLElement>(el.querySelectorAll('.section-tab')).map(t => t.textContent!.trim());
+      expect(tabs).toEqual(['Winners', 'Losers', 'Finals']);
+      expect(el.querySelector('.section-tab.active')!.textContent!.trim()).toBe('Winners');
+      expect(el.querySelectorAll('.bracket-side').length).toBe(1);
+      expect(component.visibleSideLayouts().map(s => s.side)).toEqual(['winners']);
+    });
+
+    it('shows the side named in ?view=', () => {
+      bootstrapDouble();
+      queryParams$.next(convertToParamMap({ view: 'finals' }));
+      fixture.detectChanges();
+
+      expect(component.activeSection()).toBe('finals');
+      expect(component.visibleSideLayouts().map(s => s.side)).toEqual(['grand_final']);
+    });
+
+    it('puts a picked section in the URL so the link keeps it', () => {
+      bootstrapDouble();
+      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.returnValue(Promise.resolve(true));
+
+      (fixture.nativeElement.querySelectorAll('.section-tab')[1] as HTMLElement).click();
+      expect(navigate.calls.mostRecent().args[1]!.queryParams).toEqual({ view: 'losers' });
+    });
+
+    describe('on a TV', () => {
+      beforeEach(() => jasmine.clock().install());
+      afterEach(() => jasmine.clock().uninstall());
+
+      // The minute-long auto-refresh would fire inside these ticks; it has tests of its own.
+      // Mid-tournament: teams in the first round of both trees, nobody in the finals yet.
+      function underway(): BracketData {
+        const data = doubleBracket();
+        for (const side of data.sides.filter(s => s.side !== 'grand_final')) {
+          for (const m of side.rounds[0].matches) {
+            Object.assign(m, { team1_id: m.id * 10, team2_id: m.id * 10 + 1, team1_name: 'T' + m.id, team2_name: 'U' + m.id, status: 'ready' });
+          }
+        }
+        return data;
+      }
+
+      function bootstrapQuietDouble() {
+        bootstrapDouble(underway());
+        component.onAutoReloadToggle(false);
+      }
+
+      it('cycles through the sections being played, one every 30 seconds, skipping an all-TBD final', () => {
+        bootstrapQuietDouble();
+        queryParams$.next(convertToParamMap({ kiosk: '1' }));
+        fixture.detectChanges();
+
+        expect(component.rotating()).toBe(true);
+        expect(component.activeSection()).toBe('winners');
+        jasmine.clock().tick(30000);
+        expect(component.activeSection()).toBe('losers');
+        jasmine.clock().tick(30000);
+        expect(component.activeSection()).toBe('winners');
+      });
+
+      it('stays on the section pinned with ?view=', () => {
+        bootstrapQuietDouble();
+        queryParams$.next(convertToParamMap({ kiosk: '1', view: 'losers' }));
+        fixture.detectChanges();
+
+        expect(component.rotating()).toBe(false);
+        jasmine.clock().tick(90000);
+        expect(component.activeSection()).toBe('losers');
+      });
+
+      it('stops cycling when TV mode is left', () => {
+        bootstrapQuietDouble();
+        queryParams$.next(convertToParamMap({ kiosk: '1' }));
+        queryParams$.next(convertToParamMap({}));
+        fixture.detectChanges();
+
+        jasmine.clock().tick(90000);
+        expect(component.activeSection()).toBe('winners');
+      });
+    });
+
+    it('drops a section picked on the page when entering TV mode, so the TV cycles', () => {
+      bootstrapDouble();
+      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.returnValue(Promise.resolve(true));
+      component.setKiosk(true);
+      expect(navigate.calls.mostRecent().args[1]!.queryParams).toEqual({ kiosk: 1, view: null });
+    });
+
+    it('mirrors the winners bracket on a wide screen, labelled as the winners side', () => {
+      component.isNarrow.set(false);
+      bootstrapDouble();
+      const el: HTMLElement = fixture.nativeElement;
+
+      expect(component.activeSection()).toBe('winners');
+      expect(el.querySelector('.bracket-mirrored')).toBeTruthy();
+      expect(el.querySelector('.bracket-final .round-label')!.textContent!.trim()).toBe('Winners final');
+      expect(component.mirrorLayout()!.left.map(r => r.label)).toEqual(['Winners round 1', 'Winners semifinal']);
+    });
+
+    it('never mirrors the losers bracket, which is not a halving tree', () => {
+      component.isNarrow.set(false);
+      bootstrapDouble();
+      queryParams$.next(convertToParamMap({ view: 'losers' }));
+      fixture.detectChanges();
+
+      expect(component.useMirrorLayout()).toBe(false);
+      expect(fixture.nativeElement.querySelector('.bracket-mirrored')).toBeNull();
+      expect(fixture.nativeElement.querySelectorAll('.bracket-side').length).toBe(1);
+    });
+
+    it('keeps the winners bracket stacked on a phone', () => {
+      component.isNarrow.set(true);
       bootstrapDouble();
       expect(fixture.nativeElement.querySelector('.bracket-mirrored')).toBeNull();
     });
@@ -713,7 +823,7 @@ describe('BracketViewComponent', () => {
       expect(component.poolRoundsToShow().map(r => r.round)).toEqual([2]);
     });
 
-    it('keeps the final standings under the bracket once it exists', () => {
+    it('keeps the final standings as a section of their own once the bracket exists', () => {
       bootWithPool({ ...singleEliminationBracket({ 1: [
         { id: 9, tournament_id: 1, round: 1, match_number: 1, team1_id: 1, team2_id: 2, team1_score: null, team2_score: null,
           winner_id: null, next_match_id: null, next_match_slot: null, status: 'ready',
@@ -721,8 +831,15 @@ describe('BracketViewComponent', () => {
           team1_participant1_name: null, team1_participant2_name: null, team2_participant1_name: null, team2_participant2_name: null } as any,
       ] }), pool: { ...poolData, complete: true, locked: true } });
 
-      expect(fixture.nativeElement.querySelector('.pool-after app-pool-standings')).not.toBeNull();
-      expect(fixture.nativeElement.querySelector('.pool-view')).toBeNull();
+      const el: HTMLElement = fixture.nativeElement;
+      // The bracket is what's being played, so it comes up first.
+      expect(component.activeSection()).toBe('bracket');
+      expect(el.querySelector('.pool-view')).toBeNull();
+
+      queryParams$.next(convertToParamMap({ view: 'pool' }));
+      fixture.detectChanges();
+      expect(el.querySelector('.pool-view app-pool-standings')).not.toBeNull();
+      expect(el.textContent).not.toContain('The bracket is coming up next');
     });
   });
 
@@ -751,6 +868,21 @@ describe('BracketViewComponent', () => {
       expect(chips).toEqual(['Board 1']);
       expect(el.querySelector('app-boards-panel .tile')!.textContent).toContain('T1');
       expect(el.querySelector('app-boards-panel .next-list')!.textContent).toContain('T2');
+    });
+
+    it('moves the boards into a column beside the bracket on a TV', () => {
+      boot();
+      queryParams$.next(convertToParamMap({ kiosk: '1' }));
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.boards-wrap')).toBeNull();
+      expect(el.querySelector('.view-row-kiosk .boards-side app-boards-panel .boards.column')).not.toBeNull();
+    });
+
+    it('leaves a single-elimination bracket without pool play as one view, with no buttons', () => {
+      boot();
+      expect(component.hasSections()).toBe(false);
+      expect(fixture.nativeElement.querySelector('.section-tabs')).toBeNull();
     });
 
     it('hides the boards panel once the tournament is over', () => {
