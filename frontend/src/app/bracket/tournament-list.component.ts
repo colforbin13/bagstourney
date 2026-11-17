@@ -33,8 +33,8 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
             <h1 class="hero-title">Set it up in minutes. Settle it at the venue.</h1>
             <p class="hero-what">Tournament manager for two-player teams</p>
             <p class="hero-lede">
-              Sign-ups, team draws, seeding, and live scoring in one place — so you can run the
-              tournament instead of redrawing a whiteboard bracket every round.
+              Sign-ups, team draws, seeding and live scoring. Run the tournament and stop
+              redrawing a whiteboard bracket every round.
             </p>
             <!-- The page itself is identical for everyone; only these two destinations move,
                  since sending a signed-in organizer to the register/sign-in screens would be
@@ -81,10 +81,10 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
                  because the app genuinely doesn't care which game it is — but a visitor who
                  can't see their own game in the copy assumes it isn't supported. -->
             <p class="hero-sports">
-              Bags, KanJam, pickleball, horseshoes, darts, euchre — any bracket of two-person
-              teams. <a routerLink="/sports">See what people run</a>
+              Bags, KanJam, pickleball, horseshoes, darts, euchre: any bracket of two-player
+              teams. <a routerLink="/sports">See the full list</a>
             </p>
-            <p class="hero-note"><a routerLink="/pricing">Free to start</a> · Nothing to install · Works on the phone in your pocket</p>
+            <p class="hero-note"><a routerLink="/pricing">Free to start</a> · Nothing to install · Works on your phone</p>
           </div>
         </div>
 
@@ -114,8 +114,8 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
             <span class="step-num" aria-hidden="true">2</span>
             <h2 class="step-title">Draw the teams</h2>
             <p class="step-body">
-              Blind draw random pairs or enter teams directly, then let the seeding fall where it
-              may, drag the ladder into the order you want, or let pool play games earn the seeds.
+              Blind draw random pairs or enter set teams. Seed them automatically, put them in
+              your own order, or let pool play decide.
             </p>
           </li>
           <li class="step">

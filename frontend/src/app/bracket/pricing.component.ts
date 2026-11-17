@@ -40,8 +40,8 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       <h1>Free to run. Pro when it gets big.</h1>
       <p class="lede">
         Most tournaments never need to pay for anything. Upgrade when your field outgrows the
-        free tier or you want double elimination, pool play or board assignments, either for every tournament you run or
-        just for one.
+        free tier, or when you want double elimination, pool play or board assignments. You can
+        upgrade everything you run, or just one tournament.
       </p>
     </header>
 

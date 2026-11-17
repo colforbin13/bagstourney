@@ -11,10 +11,9 @@ import { RouterLink } from '@angular/router';
       <h1>From a pile of players to a champion.</h1>
       <p class="lede">
         The whole run of a tournament, start to finish, so you know what you're getting into
-        before you set one up. It takes about five minutes of actual work. Nothing below
-        depends on which game you're playing — see
-        <a routerLink="/sports">the sports people run</a> if you're wondering whether yours
-        fits.
+        before you set one up. It takes about five minutes. Nothing below
+        depends on which game you're playing. See <a routerLink="/sports">the list of sports</a>
+        if you're wondering whether yours fits.
       </p>
     </header>
 
@@ -27,14 +26,13 @@ import { RouterLink } from '@angular/router';
         <video src="assets/bracketway-tour.mp4" poster="assets/bracketway-tour.jpg"
           controls playsinline preload="none" width="1280" height="720"></video>
         <figcaption>
-          Sign-ups, the draw, live scoring and the bracket on the wall — the whole run in 23 seconds.
+          Sign-ups, the draw, live scoring and the bracket on the wall: the whole run in 23 seconds.
         </figcaption>
       </figure>
 
       <ol class="walkthrough measure">
         <li class="chapter ruled">
-          <span class="chapter-num">Step 01</span>
-          <h2>Create the tournament</h2>
+          <h2><span class="chapter-num" aria-hidden="true">1</span> Create the tournament</h2>
           <p>
             A name is the only thing you have to decide. Everything else has a sensible
             default, but it's worth understanding, because two of the choices lock once you
@@ -44,15 +42,15 @@ import { RouterLink } from '@angular/router';
             <dt>Public or private</dt>
             <dd>
               Public tournaments are listed on the home page for anyone to follow. Private ones
-              are unlisted and reachable only by their link — though anyone holding that link
+              are unlisted and reachable only by their link, though anyone holding that link
               can watch. Changeable at any time.
             </dd>
             <dt>Blind draw or direct entry</dt>
             <dd>
               Blind draw means players sign up as individuals and get randomly paired into
               teams. Direct entry means you type in each team yourself, partners already
-              decided. <strong>The player sign-up link only works with blind draw</strong> —
-              there's no pool of unpaired players for a walk-up to join otherwise.
+              decided. <strong>The player sign-up link only works with blind draw</strong>,
+              because there's no pool of unpaired players for a walk-up to join otherwise.
               Got a few strong players and a few beginners? Turn on the balanced (A/B) draw
               under Advanced, mark your stronger players A, and every A is paired with a
               random B, so the weakest players never end up together.
@@ -64,7 +62,7 @@ import { RouterLink } from '@angular/router';
               the strong teams are and want them apart in the bracket.
               Pool play has every team play 2 to 5 games first, with no rematches, and seeds
               the bracket from the standings: win percentage, then point differential. Every
-              team gets more games, and the seeds are earned.
+              team gets more games before the bracket starts.
               <strong>Pool play is a <a routerLink="/pricing">Pro feature</a>.</strong>
             </dd>
             <dt>Single or double elimination</dt>
@@ -74,8 +72,8 @@ import { RouterLink } from '@angular/router';
               a second knocks you out. It's kinder to a team that draws the eventual champion
               early, at the cost of roughly twice as many games.
               <strong>Double elimination is a <a routerLink="/pricing">Pro feature</a></strong>, and unlike the other
-              choices here it's locked once the bracket is generated — the bracket's whole
-              shape depends on it.
+              choices here it's locked once the bracket is generated, because the bracket's
+              whole shape depends on it.
             </dd>
             <dt>Board assignments</dt>
             <dd>
@@ -90,26 +88,23 @@ import { RouterLink } from '@angular/router';
         </li>
 
         <li class="chapter ruled">
-          <span class="chapter-num">Step 02</span>
-          <h2>Get your players in</h2>
+          <h2><span class="chapter-num" aria-hidden="true">2</span> Get your players in</h2>
           <p>
             Paste in a whole list of names at once (straight from a notes app, a spreadsheet
-            column or a group text), type them in one at a time, or open the tournament's
-            sign-up link — there's a QR code for it — and let people add themselves from their
+            column or a group text), type them in one at a time, or share the
+            tournament's sign-up link or its QR code and let people add themselves from their
             phones while you're still setting up.
           </p>
           <p>
             Self sign-ups land as <em>pending</em> and don't join the roster until you approve
-            them, so a stray scan or a joker typing nonsense never quietly ends up in your
-            bracket. You'll want an even number of players, four at minimum.
+            them, so a stray scan or a made-up name never ends up in your bracket. You'll want an even number of players, four at minimum.
           </p>
         </li>
 
         <li class="chapter ruled">
-          <span class="chapter-num">Step 03</span>
-          <h2>Draw the teams</h2>
+          <h2><span class="chapter-num" aria-hidden="true">3</span> Draw the teams</h2>
           <p>
-            One button pairs every approved player at random into two-person teams (with the
+            One button pairs every approved player at random into two-player teams (with the
             balanced draw, each A gets a random B). If you chose automatic seeding, this also
             seeds them, builds the bracket, and starts play in a single step. If you chose
             manual, you get the ladder to reorder first. With pool play, the pool games start
@@ -122,10 +117,9 @@ import { RouterLink } from '@angular/router';
         </li>
 
         <li class="chapter ruled">
-          <span class="chapter-num">Step 04</span>
-          <h2>The bracket gets built</h2>
+          <h2><span class="chapter-num" aria-hidden="true">4</span> The bracket gets built</h2>
           <p>
-            Your teams get slotted into the nearest bracket that fits them — 8 teams into 8
+            Your teams get slotted into the nearest bracket that fits them: 8 teams into 8
             slots, 9 teams into 16. In single elimination, losing once ends your run.
           </p>
           <p>
@@ -139,16 +133,15 @@ import { RouterLink } from '@angular/router';
             When the count isn't a clean power of two, the leftover slots become
             <strong>byes</strong>: the teams facing them advance automatically without playing
             a first-round match. That's normal and it's why a 9-team tournament shows fewer
-            matches than you might expect — a bye is a free pass, not a game.
+            matches than you might expect. A bye is a free pass, not a game.
           </p>
         </li>
 
         <li class="chapter ruled">
-          <span class="chapter-num">Step 05</span>
-          <h2>Score it as you play</h2>
+          <h2><span class="chapter-num" aria-hidden="true">5</span> Score it as you play</h2>
           <p>
             Tap in each match's score as it finishes. The winner advances to the next round on
-            its own — you never move anyone by hand — and the public bracket updates for
+            its own, so you never move anyone by hand, and the public bracket updates for
             everyone watching the moment you save.
           </p>
           <p>
@@ -157,35 +150,33 @@ import { RouterLink } from '@angular/router';
             link, and can unsubscribe from any message after that.
           </p>
           <p>
-            Running the scores is its own screen, too — it lists just the matches that can be
+            Running the scores is its own screen, too. It lists just the matches that can be
             played right now, so whoever's keeping score isn't hunting through a whole bracket
             on their phone between games.
           </p>
         </li>
 
         <li class="chapter ruled">
-          <span class="chapter-num">Step 06</span>
-          <h2>Put it on the wall</h2>
+          <h2><span class="chapter-num" aria-hidden="true">6</span> Put it on the wall</h2>
           <p>
             Open the bracket on any TV, streaming stick, or laptop plugged into a screen and
-            switch on <strong>TV mode</strong>: the site's own furniture disappears and the
+            switch on <strong>TV mode</strong>: the header and menus disappear and the
             bracket scales up to fill the display, refreshing itself as scores land. No app,
-            no cast, nothing to install — it's a web page, so bookmark it once and the screen
+            no cast, nothing to install. It's a web page, so bookmark it once and the screen
             looks after itself for the rest of the day.
           </p>
           <p>
             For everyone not standing in front of that screen, print a sign. Bracketway makes
-            you a full-page QR sheet — one to follow the bracket from a phone, one to sign up
-            — ready to print or save as a PDF.
+            you two full-page QR sheets, one to follow the bracket from a phone and one to sign
+            up, ready to print or save as a PDF.
           </p>
         </li>
 
         <li class="chapter ruled">
-          <span class="chapter-num">Step 07</span>
-          <h2>Someone wins</h2>
+          <h2><span class="chapter-num" aria-hidden="true">7</span> Someone wins</h2>
           <p>
             Score the final and the tournament closes itself out, champion and all. It stays
-            up afterwards — the bracket link keeps working, so people can go back and argue
+            up afterwards. The bracket link keeps working, so people can go back and argue
             about the semifinal for as long as they like.
           </p>
         </li>
@@ -224,13 +215,10 @@ import { RouterLink } from '@angular/router';
     }
 
     .walkthrough { display: flex; flex-direction: column; gap: 36px; list-style: none; }
-        .chapter-num {
-      font-family: var(--mono);
-      font-size: 0.78rem;
-      letter-spacing: 0;
-      color: var(--accent);
-    }
-    .chapter h2 { font-size: clamp(1.6rem, 2.8vw, 2rem); font-weight: 900; font-stretch: 106%; margin: 8px 0 12px; }
+        /* The step numeral sits beside its title, as on the home page; the list itself carries
+       the order for a screen reader. */
+    .chapter-num { margin-right: .5em; }
+    .chapter h2 { font-size: clamp(1.6rem, 2.8vw, 2rem); font-weight: 900; font-stretch: 106%; margin: 0 0 12px; }
     .chapter p {
       font-size: 0.9rem;
       line-height: 1.65;

@@ -24,7 +24,7 @@ export interface FootLink {
 
 /** The marketing pages the sheet foot points to, in order. The current page is left out. */
 export const FOOT_LINKS: FootLink[] = [
-  { label: 'How it works', note: 'From sign-ups to a champion, step by step', link: '/how-it-works' },
+  { label: 'How it works', note: 'The whole run, step by step', link: '/how-it-works' },
   { label: 'Pricing', note: 'Free for tournaments up to 32 players', link: '/pricing' },
   { label: 'Blind draw generator', note: 'Random teams from a list of names', link: '/blind-draw-generator' },
   { label: 'Fundraiser guide', note: 'Plan a cornhole fundraiser, start to finish', link: '/cornhole-fundraiser' },

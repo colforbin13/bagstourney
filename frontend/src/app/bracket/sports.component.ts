@@ -19,9 +19,9 @@ interface SportGroup {
     <header class="sheet-head">
       <h1>If it's two-player teams, it runs here.</h1>
       <p class="lede">
-        Bracketway doesn't know or care what game you're playing. It draws teams of two,
+        Bracketway doesn't need to know what game you're playing. It draws teams of two,
         seeds them, builds the bracket, and tracks a score per side. Any
-        game that fits that shape fits here — these are the ones organizers actually run.
+        game that fits that shape fits here. Here are the common ones.
       </p>
     </header>
 
@@ -43,9 +43,9 @@ interface SportGroup {
       <section class="aside measure">
         <h2 class="aside-title">Don't see yours?</h2>
         <p>
-          The list isn't a set of modes you pick from — there's no sport field on a
+          The list isn't a set of modes you pick from. There's no sport field on a
           tournament, and nothing in the app behaves differently based on what you're
-          playing. If your game is played by two-person teams, head to head, it already
+          playing. If your game is played by two-player teams, head to head, it already
           works. Name the tournament after it and go.
         </p>
         <p>
@@ -106,7 +106,7 @@ export class SportsComponent {
   readonly groups: SportGroup[] = [
     {
       name: 'Yard & tailgate',
-      blurb: 'Where most Bracketway tournaments happen — a driveway, a parking lot, a field behind the pavilion.',
+      blurb: 'A driveway, a parking lot, a field behind the pavilion.',
       sports: [
         'Bags (Cornhole)',
         'KanJam',
@@ -119,7 +119,7 @@ export class SportsComponent {
       ],
     },
     {
-      name: 'Racket & net — doubles',
+      name: 'Racket and net doubles',
       blurb: 'Doubles play is already two-player teams, so a club ladder or a weekend open drops straight in.',
       sports: [
         'Pickleball',
@@ -140,7 +140,7 @@ export class SportsComponent {
       ],
     },
     {
-      name: 'Cards — partners',
+      name: 'Partner card games',
       blurb: "Not a sport, but the shape is identical: partners across the table, a score per side, loser goes home.",
       sports: [
         'Euchre',

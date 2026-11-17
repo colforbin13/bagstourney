@@ -24,10 +24,9 @@ interface Row {
     <header class="sheet-head">
       <h1>Bracketway vs Scoreholio</h1>
       <p class="lede">
-        Scoreholio is the best-known tournament app in cornhole, and for good reason. Bracketway
+        Scoreholio is the best-known tournament app in cornhole. Bracketway
         is a simpler tool built for a different night: a fundraiser, a bar tournament or a
-        backyard bracket, where nobody should have to download anything. Here's an honest look
-        at how they differ, so you can pick the one that fits your event.
+        backyard bracket, where nobody should have to download anything. Here's how they differ, so you can pick the one that fits your event.
       </p>
     </header>
 

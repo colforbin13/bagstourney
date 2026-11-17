@@ -54,7 +54,7 @@ What Bracketway can truthfully claim:
   Scoreholio's free plan includes double elimination and 32-team brackets.
 
 **Sport framing** (confirmed 2026-11-16): the app and the home page are sport-neutral, for
-any game played by two-person teams. Cornhole and blind draw lead the search and guide
+any game played by two-player teams. Cornhole and blind draw lead the search and guide
 pages. A sport is named once on the home page and nowhere else in the core app.
 
 ## Operating Context

@@ -41,7 +41,7 @@ describe('HowItWorksComponent', () => {
     setup();
     const numbers: string[] = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.chapter-num'))
       .map(el => el.textContent!.trim());
-    expect(numbers).toEqual(['Step 01', 'Step 02', 'Step 03', 'Step 04', 'Step 05', 'Step 06', 'Step 07']);
+    expect(numbers).toEqual(['1', '2', '3', '4', '5', '6', '7']);
   });
 
   it('should cover the venue setup — screen on the wall, signs by the door', () => {
