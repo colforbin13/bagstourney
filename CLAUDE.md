@@ -151,6 +151,8 @@ The tag-building is pure and lives in `api/lib/LinkPreview.php` (tested in `test
 
 Private tournaments are described like public ones — knowing the link already grants full access to the bracket, so withholding the name would protect nothing while making a deliberately shared link look broken.
 
+The same card is the preview image for every other public page: `SeoTitleStrategy` writes `og:image` and a large Twitter card on any route with a `title` and `data.description` (see Prerendering), so a link to the site and a link to a bracket look alike in a chat. The empty shell (`index.csr.html`) carries no image tags, which is what keeps a bracket from getting two sets.
+
 `og:image` is a static brand card at `frontend/src/assets/og-card.png`, rendered once by headless Chrome from `frontend/scripts/og-card.html` (the command is in that file's header). Production needs neither Chrome nor the font. Both the PNG and `.htaccess` are Angular assets, so they land in `dist/browser/` and survive `deploy.ps1`'s mirrored copy of the web root — which deletes anything not in the build output.
 
 ### Traffic
@@ -173,7 +175,7 @@ The public marketing pages (`/`, `/how-it-works`, `/pricing`, `/sports`, `/blind
 - Pages are prerendered as a signed-out visitor sees them. In the browser, `provideClientHydration()` adopts the HTML, then swaps in the signed-in nav and buttons. That swap waits for the app to be **stable**, so never leave a long-running timer inside Angular's zone on these pages (see `AuthService.scheduleExpiryCheck()`, which runs its 8-hour timer outside the zone for exactly this reason).
 - Code that runs on a prerendered page must not touch browser globals (`localStorage`, `window`, `document` outside Angular's `DOCUMENT`) at construction. `AuthService` reads storage only when `isPlatformBrowser`.
 - The build makes no API calls: `app.config.server.ts` swaps in an `HttpBackend` that completes every request empty, so pages are baked in their loading state and fetch live data in the browser. Anything that must be in the HTML for search engines therefore has to come from the template, not the API. That is why `pricing.component.ts` carries the live Stripe prices as `FALLBACK_PLANS`: update them when a price changes in Stripe.
-- Page `<title>`, meta description, canonical link and basic Open Graph tags come from each route's `title` and `data.description` via `SeoTitleStrategy` (`src/app/shared/seo.ts`).
+- Page `<title>`, meta description, canonical link, Open Graph tags (including the share card as `og:image`) and a `summary_large_image` Twitter card come from each route's `title` and `data.description` via `SeoTitleStrategy` (`src/app/shared/seo.ts`). A route without a description gets none of them.
 
 ### Frontend structure
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-17T03:03:56Z",
+  "generatedAt": "2026-11-17T12:40:33Z",
   "title": "Design System: Bracketway",
   "extensions": {
     "colorMeta": {
@@ -382,7 +382,7 @@
       },
       {
         "name": "The Highlighter Rule",
-        "body": "Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. A made-up example tournament is never live, whatever its seeded state, so an example in progress gets an outlined \"In progress\" badge instead. Text selection is toner turned inside out for the same reason.",
+        "body": "Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. A made-up example tournament is never live, whatever its seeded state, so an example in progress gets an outlined \"In progress\" badge instead. That holds on the example's own bracket page and TV view as well as in lists. Text selection is toner turned inside out for the same reason.",
         "section": "colors"
       },
       {

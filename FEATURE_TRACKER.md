@@ -22,12 +22,25 @@ Note that **items 12 and 13 are live in production** — their enforcement plumb
 than moving to Done until they have earned: the open question they answer is whether
 organizers will pay. Every other item below is genuinely unstarted.
 
+Items 24 and 25 were added 2026-11-17 per Matt, after items 19-23, which keeps their place
+in the order: a free scorekeeper page that also brings people to the site, and splitting the
+long double-elimination / pool-play bracket page into views.
+
 Items 19-23 were added 2026-10-23 from a comparison with Scoreholio, the best-known
-cornhole tournament app, in the order Matt approved. Scoreholio features judged not worth
-chasing (player stats and PPR, handicaps, Swiss and King of the Court formats, multi-week
-seasons, custom dashboards) were left out: they serve competitive leagues, Scoreholio's
-ground. "You're up next" alerts, start times (item 8) and entry-fee payments (items 10/11)
+cornhole tournament app, in the order Matt approved. Scoreholio features that serve
+competitive leagues (player stats and PPR, handicaps, Swiss and King of the Court formats,
+multi-week seasons, custom dashboards) were left out at the time. Since 2026-11-17 PRODUCT.md
+treats league features as deferred rather than ruled out: worth revisiting once organizers
+show they will pay. "You're up next" alerts, start times (item 8) and entry-fee payments (items 10/11)
 were already here.
+
+**Reordered 2026-11-17** while Bracketway is proving organizers will pay (PRODUCT.md).
+Items 12 and 13 stay on top, live and earning their place. Then, in order: cheap work that
+brings organizers in or fixes a failure at the door (24, 19); work that makes Pro worth
+paying for (25, 20, 21); items that wait until an organizer asks (23, 8, 22, 5); and the
+registration-fee marketplace (10, 11), held until subscriptions show organizers pay. League
+features such as item 22 are deferred, not ruled out, per PRODUCT.md. Double elimination
+(16) moved to Done; configurable team size (7) moved to Evaluated and declined.
 
 ### 12. Freemium tiers with usage limits
 
@@ -198,263 +211,32 @@ Priority note: sequenced right after item 12 since it reuses item 12's gating me
 rather than introducing new feature gates of its own, and shares the same
 organizer-pays-you billing model that's now the priority entry point for monetization.
 
-### 16. Double-elimination brackets (paid feature)
+### 24. Free bags scorekeeper page
 
-Let an organizer choose double elimination when creating a tournament. Single elimination
-stays the default and stays free; double elimination is gated to the paid tier. Added
-2026-08-17 per Matt's request — it's the first *feature* gate for the paid tier, where
-items 12/13 gate only a numeric cap, so it's what actually makes a subscription worth
-buying rather than just raising a ceiling.
+A public helper page for keeping score of one game of bags, round by round. Two teams are
+named by the players (team names or bag colours), each round they enter how many bags went
+in the hole and how many landed on the board for each side, and the page works out the
+round's points and the running score. Everything stays in the browser: no account, nothing
+saved, nothing sent to the server.
 
-The engine is single-elimination throughout, not by configuration but by structure, so
-this is the largest item in the tracker by implementation risk. Scoped below against the
-code as it stands.
+- Doubles as a marketing page, like the blind draw generator: a free tool that people find
+  by search ("cornhole score keeper", "bags score calculator") and that ends by inviting
+  them to run a whole tournament on Bracketway.
+- Bags scoring to settle before building: in = 3, on = 1, and with the usual cancellation
+  scoring only the difference between the two sides counts each round. The game goes to 21.
+  Open questions: offer straight (non-cancellation) scoring as an option; whether to support
+  a "bust" rule (going over 21 drops you back, a common backyard variation); whether the
+  target score is editable.
+- Phone first, one-handed, readable outdoors: big tap targets for each count, the running
+  score large, a round history below, and an undo for a mistyped round. Should survive a
+  page refresh mid-game (browser storage only).
+- Prerendered and in the sitemap like the other marketing pages, so the instructions and
+  rules text are in the HTML for search engines. Needs an entry in `PageView::PAGES`, the
+  footer's sheet-foot index (`FOOT_LINKS`) and the home page's tabs if it earns a place there.
+- Sport naming: PRODUCT.md keeps the core app sport-neutral but lets search and guide pages
+  lead with cornhole, so this page can be about bags by name.
 
-**Schema.** Three additions, all defaulting to today's behavior:
-
-- `tournaments.format ENUM('single','double') NOT NULL DEFAULT 'single'` — follows the
-  existing mode-column pattern (`seeding_mode`, `team_entry_mode`) and leaves every
-  existing row on single elimination.
-- `matches.loser_match_id` / `matches.loser_match_slot` — the crux. `matches` today has
-  exactly **one** forward pointer (`next_match_id`/`next_match_slot`, "where winner
-  advances to"). Double elimination needs a second edge for where the loser drops to.
-- `matches.bracket_side ENUM('winners','losers','grand_final') NOT NULL DEFAULT 'winners'`
-  — `round` alone can't order two trees. `MatchController::bracket()` groups results
-  purely by `round`, so a winners round 2 and a losers round 2 would collide into one
-  group and render as the same column.
-
-**Backend.** `TeamController::generateBracket()` builds one tree; the losers tree is new
-construction, not a variation:
-
-- A losers bracket has 2×(rounds−1) rounds alternating *minor* rounds (losers-bracket
-  survivors play each other) and *major* rounds (survivors play a team just dropped from
-  the winners bracket). The drop-slot mapping has to be crossed/reversed on alternating
-  rounds or teams get an immediate rematch of the game that dropped them.
-- **Byes get materially harder.** Today the bracket rounds up to a power of two and byes
-  exist only in round 1, handled inline. In double elimination a bye'd team that loses
-  later drops into a losers round that may have no opponent waiting, so byes propagate
-  into the losers tree as well.
-- `cascadePropagate()` places the winner into one slot; it needs to place the loser too.
-- **`cascadeClearDownstream()` is where the real bug risk is.** It's a single-pointer walk
-  today. With two edges, editing an already-scored match must invalidate the winner's path
-  *and* the loser's path — and those paths **re-converge** at the grand final. A naive
-  recursive clear across both edges will wipe results in the other tree that never actually
-  depended on the edited match. Build the affected set by walking both edges to a fixed
-  point and clearing only matches whose current participants are genuinely descendants of
-  the edited one. This is silent data-loss territory and needs tests, not a smoke check.
-- **Finality detection changes.** `enqueueTournamentFinalizedNotifications()` is called
-  from the `next_match_id IS NULL` branch, whose comment states that is "structurally
-  always the final". That stops being true: the grand final may need a **reset match** —
-  if the team arriving from the losers bracket wins, both sides have one loss and a second
-  grand final is played. "No next match" no longer implies "tournament over", so the
-  champion and the `status = 'complete'` transition need an explicit rule. Decide whether
-  the reset match is always created and skipped, or created on demand.
-- `TournamentController::list()`'s `LIST_STATS_SQL` aggregates (total rounds, current
-  round, champion) assume a single tree and will misreport on the landing/tournament list.
-
-**Frontend.**
-
-- `bracket-view.component.ts` mirrors one tree into two halves for TV mode with
-  hand-computed SVG connector geometry (`mirrorLayout()`, `mirrorConnectors()`). Showing
-  a winners tree plus a losers tree is a real layout change, and kiosk mode's auto-fit
-  scaling assumes one bracket's natural dimensions. Likely the single biggest chunk of
-  frontend work in the item — consider stacked winners/losers sections rather than trying
-  to extend the mirrored geometry.
-- `roundLabel()` in `shared/bracket-labels.ts` counts back from the end (Final /
-  Semifinal / Quarterfinal). It needs losers-bracket naming and grand-final/reset labels.
-  That file exists specifically so the bracket view and score-entry screen can't disagree
-  about presentation, so both consume the change automatically — but it does mean the
-  labelling has to make sense in both places at once.
-
-**Gating.** Reuse the item 12/13 mechanism rather than inventing one:
-
-- A sibling helper to `effectiveParticipantCap()` in `api/middleware/auth.php`, reading
-  the same `users.plan` and `tournaments.paid_override` flags. **This can ship before real
-  billing exists**, gated on the manual super-admin flags, exactly as the cap enforcement
-  did — so it is not blocked on Stripe.
-- Enforce server-side at tournament creation *and* again at bracket generation; the
-  frontend selector is UX only, per the standing rule that the backend is the authorization
-  boundary.
-- Format locks at bracket generation, same as `seeding_mode`/`team_entry_mode` — the
-  `/how-it-works` page already tells organizers two of the creation choices lock when teams
-  are drawn, so this needs adding to that copy and to the create-form hint text.
-- **Open question — downgrade semantics.** If a subscription lapses or a super admin clears
-  `paid_override` while a double-elimination tournament is in flight, does it keep working?
-  Recommendation: **yes** — gate the *choice* at generation time, never the *running
-  tournament*. A lapsed card breaking a live bracket mid-event at a venue is the worst
-  available failure mode, and the tournament is already built by then.
-- **Open question — which paid lever unlocks it.** Item 13's own open question is "which
-  limits/features make sense as a one-time per-tournament unlock"; double elimination is
-  the natural first answer, since the once-a-year big event is exactly when an organizer
-  wants it and exactly who doesn't want a subscription. Suggest both levers unlock it,
-  matching how the participant cap already works.
-
-**Testing gap — now closed for single elimination (2026-08-21).** The original note here
-said there was no PHP test framework and that `php -l` plus manual smoke tests would not be
-enough for losers-bracket routing or the two-edge cascade-clear. That prerequisite has been
-built as its own slice, ahead of any double-elimination logic:
-
-- `api/lib/BracketBuilder.php` — bracket *shape* extracted out of
-  `TeamController::generateBracket()` as a pure function with no PDO. The controller now
-  only persists the returned plan (insert rows, then rewrite array indexes into match ids).
-  This is the seam the losers bracket gets added to.
-- PHPUnit via `tools/phpunit.phar` and `.\run-php-tests.ps1`, no Composer (production is
-  still PHP 7.2). `tests/BracketBuilderTest.php` builds every field from 2 to 64 teams,
-  plays each one out, and asserts the invariants: exactly N−1 games for N teams, one
-  champion, each team eliminated at most once, every team entered exactly once, forward
-  pointers always advancing exactly one round, and seeds 1 and 2 meeting only in the final.
-  `tests/BracketPersistenceTest.php` covers the index → id translation with a recording PDO
-  double. 23 tests, ~18k assertions, runs in ~20ms.
-
-Double elimination adds its cases to this suite rather than starting from nothing: two
-losses to elimination, byes dropping into the losers tree, and re-scoring a winners-bracket
-match after the grand final is populated.
-
-**When it ships**, update `AGENTS.md` and `README.md` — both currently describe Bracketway
-flatly as a "single-elimination tournament manager", which stops being accurate.
-
-Status: **Feature complete — all 5 slices done (2026-08-21/22).** Double elimination can be
-chosen, generated, scored, and rendered. Migration `016` is applied to production and slices
-2–3 are deployed; slices 4 and 5 were deployed by 2026-11-16.
-
-Slice 4 added the paid-tier gate: `formatRequiresPaidPlan()` +
-`tournamentHasPaidFeatures()` / `userHasPaidPlan()` in `api/middleware/auth.php`, reusing
-items 12/13's `users.plan` and `tournaments.paid_override` levers (`effectiveParticipantCap()`
-was refactored onto the same helper so there is one source of truth). Enforced at the two
-moments the scope called for — choosing the format and generating the bracket — and never
-while a tournament is being played. Plus the create-form and manage-screen selectors, a
-`double elimination` badge, `plan` on the session payload, and `/how-it-works` copy.
-
-One correction to the scope while implementing it: format must **not** lock on team count the
-way `seeding_mode`/`team_entry_mode` do. Teams are drawn while a manual-seeding tournament is
-still in `setup`, so a double-elimination tournament whose plan lapsed in that window could
-neither generate its bracket nor drop back to single elimination — a dead end. It locks on
-`status` leaving `'setup'` instead, which is exactly "before the bracket exists".
-
-Slice 5 reshaped the bracket API to group by side then round, fixed champion detection in
-`LIST_STATS_SQL` (which found the champion via `next_match_id IS NULL` — in double
-elimination that is the *reset*, usually unplayed, so a finished tournament reported no
-champion at all), taught `roundLabel()` to qualify both trees and name the grand final and
-its deciding match, moved champion detection into the shared `bracket-labels.ts` alongside it,
-and rendered the two trees as stacked sections. Single elimination still renders through the
-mirrored/column layouts untouched.
-
-The stacked layout is deliberately not an extension of the mirrored geometry, which assumes a
-perfect halving tree; the losers bracket halves every *two* rounds. Rows are apportioned from
-each round's real match count (which reduces to the same placement for a perfect tree) and
-connectors are derived from real `next_match_id` links, since a losers major round takes only
-one entrant from the previous round.
-
-**Bug found in testing (2026-08-22, fixed):** `plan` was added to the login payload in
-`AuthController::publicUser()` so the UI could unlock paid-tier controls, but the login query
-feeding it was left selecting its original column list. The field was therefore always
-missing, the fallback reported `free` for every session, and flipping a user to paid had no
-visible effect on the create form no matter how many times they signed back in.
-`tests/SessionPayloadTest.php` now asserts every field `publicUser()` emits is actually
-selected — a structural check, because the failure mode is structural.
-
-**Known follow-up, not blocking:** TV/kiosk mode fits the whole three-section stack correctly
-but scales it down noticeably, because stacking triples the height while leaving most of the
-width unused. Placing the winners and losers brackets side by side in kiosk mode would roughly
-double the on-screen size. Worth doing if double elimination gets real TV use.
-
-Slice 2 (2026-08-21) added migration `016_double_elimination.sql` —
-`tournaments.format ENUM('single','double') DEFAULT 'single'`, `matches.loser_match_id` /
-`loser_match_slot` (+ self-FK), `matches.bracket_side ENUM('winners','losers','grand_final')
-DEFAULT 'winners'`, and `matches.is_reset`. All additive and defaulted, so every existing
-row keeps today's behaviour. `TeamController::generateBracket()` now takes a `$format`
-argument, branches to the right builder, and writes both edges in one UPDATE; an
-unrecognised value falls back to single elimination so a pre-migration row can never be read
-as double. `TournamentController` deliberately does **not** accept `format` on create or
-update — exposing it before slice 3 would let an organizer build a bracket that score entry
-cannot advance.
-
-Sequenced deliberately engine-first rather than schema-first (2026-08-21, per Matt): the
-migration's column shape falls out of what the engine actually needs, and migrations here
-are append-only files applied to prod, so a guessed shape would cost a corrective migration.
-Slice 1 touched no schema and shipped nothing.
-
-Slices 4 (gating + UI) and 5 (two-tree rendering) are described in the status note above.
-
-Slice 3 (2026-08-21) made the match-state machine two-edge aware. `cascadePropagate()` now
-places the loser as well as the winner, and stops short of the reset when the winners-bracket
-side wins the grand final. `cascadeClearDownstream()` follows both edges with a visited guard
-(they re-converge at the grand final) and recurses only where a team was actually withdrawn.
-Finality moved out of the `next_match_id IS NULL` rule into `championOf()` — reset winner if
-the reset was played, else the grand final's winner but only when the winners-bracket side
-took it. `enqueueRoundCompletedNotifications()` is now scoped by `bracket_side`, since round
-numbers restart per side and matching on `round` alone would treat winners round 2 and losers
-round 2 as one round.
-
-Tested in `tests/MatchCascadeTest.php` against an in-memory SQLite database — the cascade
-reads back state it just wrote, which a statement recorder cannot cover. **Validated by
-mutation**, which is worth repeating for any future change here: breaking the loser edge in
-the clear, removing the loser drop, removing the reset guard, or letting `championOf()` ignore
-the reset each fails at least one test.
-
-One correction to the scope's framing, found during that mutation run: a *naive* clear that
-walks every downstream edge regardless of state turns out to be **equivalent** to the
-data-driven one in any reachable state, because each slot has exactly one feeder and a match
-cannot hold a result unless both slots were filled — so nothing downstream survives an
-ancestor being withdrawn. The data-driven guards are worth keeping (they stop the walk early
-and stay correct if a partially-populated shape ever appears), but they are not fixing a live
-bug, and the scope's "silent data-loss territory" warning was aimed at a risk that the
-single-feeder-per-slot invariant already rules out. The real regressions to guard against are
-the four the mutation battery covers.
-
-What slice 1 settled, which slice 2's migration followed:
-
-- `matches.loser_match_id` / `loser_match_slot` — as scoped. The grand final uses **both**
-  edges to feed the reset match (winner into slot 1, loser into slot 2), so the reset needs
-  no special-case source plumbing.
-- `matches.bracket_side ENUM('winners','losers','grand_final')` — as scoped, plus a flag
-  distinguishing the reset from the grand final itself (`is_reset`, or a fourth enum value).
-- **The reset match is always created**, answering the open question in the scope above. It
-  simply goes unplayed when the winners-bracket side wins the grand final, which is a
-  runtime decision, so the builder stays a static structure and persistence stays a
-  straight insert of what it returns.
-- **Byes turned out to be far less invasive than feared.** Because seeds are contiguous,
-  every winners round-1 match has at least one entrant, so every later winners match is a
-  real game with a real loser — meaning only winners round 1 can produce byes, and the
-  shortfall reaches at most two losers rounds. Losers matches that can only ever receive one
-  team are removed outright and their live feeder is rerouted to that match's own target, so
-  there are **no run-time walkovers in the losers tree at all**. The two-edge cascade in
-  slice 3 does not need to handle them.
-- One scoped invariant is **false and should not be asserted**: "no team meets the same
-  opponent twice before the grand final" is impossible in double elimination — in a 4-team
-  field the losers final is necessarily a rematch of a winners round-1 game. What the
-  reversal actually guarantees, and what the suite asserts, is that a team dropping from
-  winners round r does not land on the survivor of the losers match its own two feeders fell
-  into.
-
-Verified: 38 tests / 45,665 assertions across the three bracket test files, ~80ms. Double
-elimination is played out at every field size from 2 to 48 under two scenarios (chalk, and
-a losers-bracket win in the grand final), asserting exactly 2N−2 games without a reset and
-2N−1 with one, every eliminated team on exactly two losses, one champion, every edge
-pointing strictly forward, and no two matches feeding the same slot.
-
-Earlier prerequisite work: the pure-function extraction and PHPUnit harness (see the
-testing-gap note above) shipped and was verified against production 2026-08-21.
-
-Verified live against the production database 2026-08-21 via the `run-bag-bracket` stack,
-using throwaway private tournaments driven through the real HTTP API at three field shapes
-— 5 teams (3 byes), 8 teams (no byes), 9 teams (7 byes). Every persisted row matched
-`BracketBuilder`'s plan exactly, including `next_match_id` after the array-index → id
-translation. Also confirmed live: playing out gives N−1 games for N teams; re-scoring a
-round-1 match in a finished tournament clears the final's winner **and** reopens the
-tournament to `active` (the pre-existing status bug fixed by `syncTournamentStatus()`);
-replaying re-completes it. All test data hard-deleted afterwards — row counts and max ids
-back to baseline, and a SHA-256 fingerprint of every pre-existing row in `tournaments` /
-`participants` / `teams` / `matches` was identical before and after, with no orphans left
-in `tournament_members`, `audit_log`, or `notification_queue`. Deployed by 2026-11-16.
-
-Priority note: placed after items 12/13 because it's the feature that gives their paid tier
-something worth paying for, but it is **not blocked by them** — it can ship against the
-existing manual `users.plan`/`paid_override` flags and start earning the moment billing
-lands. Placed ahead of items 10/11 since those are the much larger Stripe Connect
-marketplace build. Be aware this is a bigger engine change than anything shipped so far;
-if it needs to be split, the natural seam is single-elimination-preserving schema and
-gating first, then the losers-bracket construction, then the two-tree rendering.
+Status: Planned — added 2026-11-17 per Matt. Small, frontend only.
 
 ### 19. Odd player handling (ghost partner)
 
@@ -475,6 +257,29 @@ Status: Planned — added 2026-10-23 from the Scoreholio comparison. Small.
 
 Priority note: first of the Scoreholio-derived items because it fixes a real failure at
 the venue for every blind draw, free tier included.
+
+### 25. Split the bracket page into views for double elimination and pool play (Pro)
+
+In double elimination, and more so with pool play in front of it, the public bracket page
+is very long: pool standings and rounds, then the winners bracket, losers bracket and grand
+final stacked one under another. A spectator has to scroll a long way to find their game,
+and in TV mode everything is scaled down to fit one screen, so each part is hard to read.
+
+- On the bracket page: a row of buttons (pool play, winners, losers, finals; or by round)
+  that shows one part at a time at full width, defaulting to whichever part is being played
+  right now. Single elimination without pool play keeps today's single view.
+- In TV mode: cycle through the same parts on a timer, each at full screen width, so every
+  part is readable from across the room. Open questions: how long each part stays up; whether
+  to skip finished parts; whether the boards / up-next panel stays fixed on every view.
+- Builds on what's there: `bracket()` already returns the bracket grouped by side
+  (`sides`), and `bracket-view` already lays each side out separately (`sideLayouts()`), so
+  this is mostly a presentation change. Pool play renders through `PoolStandingsComponent`.
+- Related, found 2026-11-16: the double-elimination example in TV mode at 1080p renders the
+  bracket very small under the boards panel, with much of the screen unused.
+- Free tournaments (single elimination, no pool play) are unaffected, so this only ever
+  appears for tournaments using Pro formats.
+
+Status: Planned — added 2026-11-17 per Matt. Medium, frontend only.
 
 ### 20. Sponsor logos on the bracket and TV view (Pro)
 
@@ -503,6 +308,34 @@ semifinals and final) as best of three.
 
 Status: Planned — added 2026-10-23. Small to medium.
 
+### 23. Sign-up cap with a waitlist
+
+Organizers cap a fundraiser at a number that fits their boards and time slot. Today a full
+tournament refuses new sign-ups; a waitlist would queue them instead, and promote the next
+one when someone drops out. Scoreholio has waitlists on its top plan.
+
+- Builds on self-registration's `pending` state (item 6): a capped tournament puts extra
+  sign-ups on a waitlist, shown to the organizer in order.
+- Open questions: is the cap the organizer's own number or only the plan cap; does the
+  waitlist promote automatically or wait for the organizer; notify the promoted player by
+  email if they gave one.
+
+Status: Planned — added 2026-10-23. Medium.
+
+### 8. Match scheduling (start times)
+
+Board assignments, the first half of this item, shipped 2026-10-16 (see Done). What remains
+is clock-based scheduling: a planned start time per game, for leagues and events that run
+to a timetable rather than to board availability. Bar nights don't, which is why boards
+came first.
+
+- Open question: how a timetable interacts with the board queue (a game with a start time
+  shouldn't be put on a board early), and with bracket regeneration and byes.
+- A "You're up on Board 3" email or text through the existing notification system is a
+  natural follow-up to boards, deliberately left out of v1.
+
+Status: Planned — the board half is done; start times not yet scoped.
+
 ### 22. Rotating partners (Switcholio-style)
 
 Players get a new partner every round and are ranked individually, which is what weekly
@@ -518,19 +351,33 @@ the marketing plan ("rotating partners").
 
 Status: Planned — added 2026-10-23. Large.
 
-### 23. Sign-up cap with a waitlist
+### 5. Revisit default participant notification settings
 
-Organizers cap a fundraiser at a number that fits their boards and time slot. Today a full
-tournament refuses new sign-ups; a waitlist would queue them instead, and promote the next
-one when someone drops out. Scoreholio has waitlists on its top plan.
+Reconsider the current defaults for the score-notification email feature (item 1) now
+that it's live, rather than treating the initial ship as final.
 
-- Builds on self-registration's `pending` state (item 6): a capped tournament puts extra
-  sign-ups on a waitlist, shown to the organizer in order.
-- Open questions: is the cap the organizer's own number or only the plan cap; does the
-  waitlist promote automatically or wait for the organizer; notify the promoted player by
-  email if they gave one.
+- All three categories (match completed, round completed, tournament finalized) default
+  to **on** the moment a participant confirms their email — worth revisiting once there's
+  real usage/feedback on whether that's the right default mix, or whether it's too much
+  email for a casual local tournament.
+- Email content/tone is currently minimal (plain subject + short body) — worth a pass
+  once real recipients have seen a few of them.
+- Sending domain has since moved off the bare `irishguys.org` to `bracketway.com`
+  (observed 2026-08-12 while verifying item 9) — worth confirming DKIM/Return-Path/DMARC
+  are actually verified on the new domain in Postmark, not just assumed, since that
+  migration doesn't seem to have been tracked anywhere when it happened. **Confirmed on
+  the Brevo side 2026-08-13** (`authenticated: true, verified: true` via DNS); the
+  equivalent check against Postmark is still outstanding.
+- Bulk sending moved to Brevo 2026-08-13, so the "is this too much email?" question now
+  has a hard ceiling attached: the free tier allows 300/day, and a full 32-participant
+  tournament uses roughly half of that. Revisiting the default category mix is now a
+  cost question as well as a UX one.
 
-Status: Planned — added 2026-10-23. Medium.
+Status: Planned — no urgency, revisit after the feature has been live for a bit and
+there's actual participant feedback to act on rather than guessing upfront.
+
+Priority note: low-cost, low-urgency polish — worth slotting into a quiet moment rather
+than dedicating a planning cycle to it.
 
 ### 10. Payment provider integration for tournament registration fees
 
@@ -592,70 +439,6 @@ scoping useful until then.
 Priority note: sequenced right after item 10 since it's a small add-on once payments
 exist; both now sit behind items 12/13 in the overall order (see item 10's priority
 note).
-
-### 8. Match scheduling (start times)
-
-Board assignments, the first half of this item, shipped 2026-10-16 (see Done). What remains
-is clock-based scheduling: a planned start time per game, for leagues and events that run
-to a timetable rather than to board availability. Bar nights don't, which is why boards
-came first.
-
-- Open question: how a timetable interacts with the board queue (a game with a start time
-  shouldn't be put on a board early), and with bracket regeneration and byes.
-- A "You're up on Board 3" email or text through the existing notification system is a
-  natural follow-up to boards, deliberately left out of v1.
-
-Status: Planned — the board half is done; start times not yet scoped.
-
-### 5. Revisit default participant notification settings
-
-Reconsider the current defaults for the score-notification email feature (item 1) now
-that it's live, rather than treating the initial ship as final.
-
-- All three categories (match completed, round completed, tournament finalized) default
-  to **on** the moment a participant confirms their email — worth revisiting once there's
-  real usage/feedback on whether that's the right default mix, or whether it's too much
-  email for a casual local tournament.
-- Email content/tone is currently minimal (plain subject + short body) — worth a pass
-  once real recipients have seen a few of them.
-- Sending domain has since moved off the bare `irishguys.org` to `bracketway.com`
-  (observed 2026-08-12 while verifying item 9) — worth confirming DKIM/Return-Path/DMARC
-  are actually verified on the new domain in Postmark, not just assumed, since that
-  migration doesn't seem to have been tracked anywhere when it happened. **Confirmed on
-  the Brevo side 2026-08-13** (`authenticated: true, verified: true` via DNS); the
-  equivalent check against Postmark is still outstanding.
-- Bulk sending moved to Brevo 2026-08-13, so the "is this too much email?" question now
-  has a hard ceiling attached: the free tier allows 300/day, and a full 32-participant
-  tournament uses roughly half of that. Revisiting the default category mix is now a
-  cost question as well as a UX one.
-
-Status: Planned — no urgency, revisit after the feature has been live for a bit and
-there's actual participant feedback to act on rather than guessing upfront.
-
-Priority note: low-cost, low-urgency polish — worth slotting into a quiet moment rather
-than dedicating a planning cycle to it.
-
-### 7. Configurable team size (beyond 2 participants per team)
-
-Support tournaments where a "team" isn't always exactly 2 participants — other
-bag-toss/cornhole-adjacent formats, or other sports/game types entirely, may use
-singles, 3s, 4s, or a variable roster size per team.
-
-- Touches `teams.participant1_id`/`participant2_id` (currently `NOT NULL`, hardcoded to
-  exactly two), the notification feature (item 1, which addresses "the 4 participants of
-  that match"), and the custom-team-name-participant display (item 2) — all three
-  currently assume exactly 2 participants per team.
-
-Status: Planned — deliberately deferred out of item 3 (added 2026-08-10) rather than
-solved there. Item 3's direct team entry keeps the 2-participants-per-team invariant on
-purpose, specifically to avoid this scope. Revisit as its own item once there's a
-concrete format that needs a different team size.
-
-Priority note: ranked last — no concrete tournament format needs this yet, so it's
-speculative scope until one does. Pinball was evaluated 2026-08-18 as a candidate driver
-(it needs singles, i.e. one participant per competitor) but was declined on competitive
-grounds — see item 17 — and would have required a separate engine regardless, so it
-doesn't unblock or justify this item.
 
 ## Evaluated and declined
 
@@ -774,11 +557,52 @@ companion display that *reads from* Match Play — selling to its users rather t
 which is a much smaller build and requires none of the eight engine pieces listed above. Still a feature rather
 than a product, so it needs its own monetization answer before it becomes an item.
 
+### 7. Configurable team size (beyond 2 participants per team)
+
+Support tournaments where a "team" isn't always exactly 2 participants — other
+bag-toss/cornhole-adjacent formats, or other sports/game types entirely, may use
+singles, 3s, 4s, or a variable roster size per team.
+
+- Touches `teams.participant1_id`/`participant2_id` (currently `NOT NULL`, hardcoded to
+  exactly two), the notification feature (item 1, which addresses "the 4 participants of
+  that match"), and the custom-team-name-participant display (item 2) — all three
+  currently assume exactly 2 participants per team.
+
+Status: Planned — deliberately deferred out of item 3 (added 2026-08-10) rather than
+solved there. Item 3's direct team entry keeps the 2-participants-per-team invariant on
+purpose, specifically to avoid this scope. Revisit as its own item once there's a
+concrete format that needs a different team size.
+
+Priority note: ranked last — no concrete tournament format needs this yet, so it's
+speculative scope until one does. Pinball was evaluated 2026-08-18 as a candidate driver
+(it needs singles, i.e. one participant per competitor) but was declined on competitive
+grounds — see item 17 — and would have required a separate engine regardless, so it
+doesn't unblock or justify this item.
+
+**Declined 2026-11-17.** PRODUCT.md makes two-player teams a fixed product truth: the blind
+draw, the positioning and the copy all rest on it, and no format in the audience needs a
+different size. **What would flip this:** a paying segment that needs another team size, for
+example singles or threes at a club already on Pro, enough to justify reworking the
+two-participant team model and everything built on it (blind draw, notifications, name
+display).
+
 ## Done
 
 Built and verified. Everything below is live in production as of the 2026-11-16 `deploy.ps1`
 run, which shipped the whole current build. New entries go at the top, marked **not yet
 deployed** until the next deploy carries them.
+
+- **Door Flyer follow-ups** (2026-11-16) — the flyer now covers every public page: How it
+  works, Pricing, Sports, the generator, the fundraiser guide and the comparison print a green
+  sheet head and end on a green "sheet foot" (closing line and action, the other pages as
+  ruled rows, legal links), which replaced a tear-off strip that read as a second footer. A
+  plain-language pass took out em dashes, stock phrases and three lines implying customers
+  that don't exist yet ("two-player teams" everywhere). Every described page now previews
+  with the share card (`og:image` + Twitter card). The How it works tour video was re-rendered
+  in the new look. All of that deployed 2026-11-16. **Not yet deployed:** the example brackets
+  moved into their own band under the start page's steps, named for what each shows; How it
+  works and Pricing link to them; an example's bracket page says "In progress", never "Live".
+  [Full notes](FEATURE_ARCHIVE.md#door-flyer-follow-ups)
 
 - **New look: "The Door Flyer"** (2026-11-16) — replaced the cream, brick-red and Bebas Neue look, which read as
   generic. Green sheet header on every screen, white pages, black type in one typeface (Archivo), pink for
@@ -865,6 +689,13 @@ deployed** until the next deploy carries them.
   **Blind draw** in the UI to match what organizers search for. No migration.
   [Full notes](FEATURE_ARCHIVE.md#fast-blind-draw-setup)
 
+- **16. Double-elimination brackets** (2026-08-21/22, Pro) — an organizer can choose double
+  elimination: a losers bracket, a grand final and a reset match when the losers-side team
+  wins it. Single elimination stays the free default. The engine work is in
+  `api/lib/BracketBuilder.php` and `MatchController`'s cascade, gated by
+  `formatRequiresPaidPlan()` at the two moments a format is chosen or a bracket generated,
+  never mid-event. Migration `016`. Listed under Planned until 2026-11-17 by oversight.
+  [Full notes](FEATURE_ARCHIVE.md#16-double-elimination-brackets-paid-feature)
 - **Link previews for shared bracket URLs** (2026-08-22) — sharing a bracket link in
   iMessage, Slack or WhatsApp previewed as an unlabelled "Bracketway" for every tournament,
   because the app is a single-page app served from one static `index.html` and none of those

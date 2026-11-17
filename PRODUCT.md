@@ -38,9 +38,12 @@ priced, and no further scope gets added until organizers show they will pay.
 
 ## Positioning
 
-The easiest way to run a casual or social tournament. Not a tool for serious competitive
-circuits; that ground belongs to Scoreholio and is deliberately not contested (no player
-stats, handicaps, seasons or ranking systems).
+The easiest way to run a casual or social tournament. Serious competitive circuits are
+Scoreholio's ground and are not contested now. League features (player stats, handicaps,
+seasons, standings and rankings, rotating partners) are **deferred, not ruled out**
+(decided 2026-11-17): once organizers show they will pay, they are a sensible next step for
+the weekly venues and clubs already in the audience, likely as part of Pro. Until then the
+product claims none of them.
 
 What Bracketway can truthfully claim:
 
@@ -136,8 +139,9 @@ pages. A sport is named once on the home page and nowhere else in the core app.
    tournament continuing.
 4. **The obvious path stays obvious.** The plain blind draw and single elimination are the
    default; advanced options are folded away, not removed.
-5. **Stay casual.** Features that only serve competitive circuits are declined, even when
-   a competitor has them.
+5. **Casual first.** The one-off event and the casual weekly night come first, and nothing
+   built for leagues may make them harder. League features wait until organizers show they
+   will pay; a competitor having one is not on its own a reason to build it.
 
 ## Accessibility & Inclusion
 

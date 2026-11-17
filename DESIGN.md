@@ -329,5 +329,5 @@ A drawn chevron in the 2px square stroke replaces the browser triangle and turns
 Not yet decided or not yet brought into this system. These are gaps, not rules.
 
 - The signed-in screens were reviewed in a browser on 2026-11-16 at desktop and phone width. Admin tables (users, audit log, traffic) use `.page-table`, which holds them to the header's `--page-gutter` instead of the window edge.
-- The public bracket page is still a green header over white stock. A green band carrying the tournament name is planned (`.scratch/flyer-across-pages/issues/03-bracket-page-band.md`).
+- The public bracket page stays a green header over white stock. A green band carrying the tournament name was considered and deferred on 2026-11-17 (`.scratch/flyer-across-pages/issues/03-bracket-page-band.md`).
 - Other sheet colours (yellow or pink stock for other Persuade pages) are undecided. Only the green sheet is established.

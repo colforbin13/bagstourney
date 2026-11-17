@@ -34,8 +34,8 @@ which is why the default is the safe direction rather than the conservative-look
 
 **Live.** Testing, validation and live-mode setup are complete, and production runs billing
 with live Stripe values in the server's `database.php`. The live prices match
-`FALLBACK_PLANS` in `pricing.component.ts` ($9.99 a month, $12.99 per tournament); keep the
-two in step when a price changes in Stripe.
+`FALLBACK_PLANS` in `pricing.component.ts` ($9.99 a month, $99.99 a year, $12.99 per
+tournament); keep the two in step when a price changes in Stripe.
 
 The rest of this section is the history of getting there, kept because the test results and
 the two bugs they found are worth knowing.
@@ -44,7 +44,7 @@ the two bugs they found are worth knowing.
 
 - Stripe account created, with a sandbox ("Bracketway sandbox").
 - Sandbox catalogue: monthly subscription ($9.99) and one-time tournament upgrade ($12.99).
-  No annual price — that option is simply not offered.
+  No annual price in the sandbox; live added one ($99.99 a year).
 - Sandbox customer portal works (opened and used to cancel a subscription).
 - Local `api/config/database.php` holds the sandbox secret key, a webhook secret and the two
   price ids.

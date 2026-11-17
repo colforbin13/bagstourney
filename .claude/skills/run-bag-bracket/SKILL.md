@@ -30,6 +30,9 @@ From the repo root, in the background:
 php -d extension=pdo_mysql -d date.timezone=UTC -S localhost:8080 -t api
 ```
 
+Load `mbstring` too (`-d extension=mbstring`) whenever a test adds players: the participant
+endpoints call `mb_*` functions and return a bare 500 without it.
+
 To exercise Stripe billing locally the API needs three more things, none of which
 are on by default here: the `curl`, `openssl` and `mbstring` extensions (the webhook
 handler calls `mb_substr` and 500s without it), a CA bundle (without
