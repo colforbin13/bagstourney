@@ -588,9 +588,20 @@ display).
 
 ## Done
 
-Built and verified. Everything below is live in production as of the 2026-11-16 `deploy.ps1`
+Built and verified. Everything below is live in production as of the 2026-11-17 `deploy.ps1`
 run, which shipped the whole current build. New entries go at the top, marked **not yet
 deployed** until the next deploy carries them.
+
+- **Decluttered tournament management screen** (2026-11-17) — once teams exist the Teams list
+  is the only roster, and a player is edited by opening their team. Settings and Staff &
+  access fold to one summary line each at the bottom; a finished tournament puts its champion
+  at the top. Lists are ruled rows that open in place instead of stacked boxes with Edit
+  buttons. The plan override moved into the Actions menu, and Transfer ownership sits apart
+  from the Add buttons. 44px touch targets on phones, Escape and `aria-expanded` on the
+  Actions menu, error toasts styled as errors. The dashboard dropped its Manage button (the
+  name is the link). On a phone the live page went from 4,181px to 1,757px. Also fixed: a
+  link-button and a real button side by side were different heights. Deployed 2026-11-17.
+  [Full notes](FEATURE_ARCHIVE.md#decluttered-tournament-management-screen)
 
 - **Door Flyer follow-ups** (2026-11-16) — the flyer now covers every public page: How it
   works, Pricing, Sports, the generator, the fundraiser guide and the comparison print a green
@@ -599,9 +610,10 @@ deployed** until the next deploy carries them.
   plain-language pass took out em dashes, stock phrases and three lines implying customers
   that don't exist yet ("two-player teams" everywhere). Every described page now previews
   with the share card (`og:image` + Twitter card). The How it works tour video was re-rendered
-  in the new look. All of that deployed 2026-11-16. **Not yet deployed:** the example brackets
+  in the new look. All of that deployed 2026-11-16. The example brackets
   moved into their own band under the start page's steps, named for what each shows; How it
   works and Pricing link to them; an example's bracket page says "In progress", never "Live".
+  Those deployed 2026-11-17.
   [Full notes](FEATURE_ARCHIVE.md#door-flyer-follow-ups)
 
 - **New look: "The Door Flyer"** (2026-11-16) — replaced the cream, brick-red and Bebas Neue look, which read as

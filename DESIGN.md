@@ -251,7 +251,8 @@ The sign-up sheet sits slightly crooked (rotated 1.2 degrees, 0.8 on phones), as
 
 ### Buttons
 Plain and flat, like a filled or outlined box on a form.
-- **Shape:** square (0px), 1px toner border, 10px 20px padding, 0.875rem at weight 600. Small variant: 6px 12px, 0.78rem.
+- **Shape:** square (0px), 1px toner border, 10px 20px padding, 0.875rem at weight 600, line height 1.2. Small variant: 6px 12px, 0.78rem. The line height is set on `.btn`, never inherited: a `<button>` ignores the body's and an `<a class="btn">` takes it, so a link and a button side by side came out different heights.
+- **Touch:** on a coarse pointer, small buttons, inputs and menu items on the working screens reach 44px. Desktop keeps the denser small size.
 - **Primary:** toner fill, white text. Hover goes to pressed toner.
 - **Outline (default):** transparent, toner text and border. Hover fills with recessed stock.
 - **Danger:** red text and border; hover fills red with white text.
@@ -293,11 +294,15 @@ White stock on the green hero, slightly rotated, with the sheet-edge shadow. A t
 ### List Rows
 Ruled rows, not cards: 14px vertical padding, 1px ruled-line divider, name at weight 700, a muted metadata line, a 5px toner progress bar for live brackets, and a drawn arrow. Hover fills with recessed stock and indents 8px.
 
+On the working screens (tournament management) a list opens with a heading at weight 800 over a 2px toner rule, with its count beside it. Each row is at least 56px and the whole row is the button that opens it; an underlined cue at the right ("Edit", then "Done") says what a tap does, so there is no column of identical Edit buttons. An open row sits on recessed stock and holds its editing in place. Destructive actions ("Remove player", "Remove team") live inside the open row, never on the row itself. On touch screens the hover indent is switched off so a tapped row doesn't stay indented.
+
 ### Bracket Match Card
 White stock, 1px ruled-line border, two team rows split by a 1px line. The winner's row takes marker-green text at weight 600 over the faint green tint; the loser dims to muted. A game assigned to a board gains a toner border and a toner strip across the top naming the board. Matches not yet playable sit at 50% opacity. Connectors are 1.5px ruled lines with toner dots at the junctions.
 
 ### Disclosures
 A drawn chevron in the 2px square stroke replaces the browser triangle and turns from right to down when open. Question lists are ruled top and bottom in 1.5px toner.
+
+A **fold** tucks a working screen's secondary sections (Settings, Staff & access) to one line: the title at weight 800 and a muted summary of the current state ("Blind draw · Automatic seeding · Double elimination · 4 boards", "1 person"), ruled top and bottom in 1.5px toner. Adjacent folds share one rule. Folds go below the screen's main task, never above it.
 
 ## Do's and Don'ts
 

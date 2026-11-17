@@ -4,6 +4,76 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Decluttered tournament management screen
+
+2026-11-17. Commit `41a0515`, plus the follow-up that fixed button heights, trimmed the
+stylesheet and recorded these notes. Came out of an Impeccable audit (11/20) prompted by
+"multiple action buttons, long lists of participants and teams, all starts to feel too
+cluttered", then distill, layout, adapt, harden and polish run in that order.
+
+**One roster.** The screen used to show the participant list and the team list together once
+teams were drawn: 48 players and 24 teams on a finished tournament, each a boxed card with its
+own Edit button. Once teams exist the Teams list is now the only list. Opening a team
+(`toggleTeam()`, one open at a time) shows a rename field and each player with "Edit player";
+players are looked up through the `participantById` map. Team names became editable during
+setup as a side effect: the row is the same in every phase, and `TeamController::update` had
+always allowed it. In setup, before the draw, the player list is still the roster: pending
+sign-ups sort first (`rosterInOrder`), replacing the separate pending banner, and a row opens
+the editor with "Remove player" inside it, replacing the red ✕ beside Edit.
+
+**Order.** Toolbar, then the champion (finished only), then the task for the phase (setup
+checklist and add-players, or pool standings, or Teams), then the folds. Settings (entry,
+seeding, format, boards) folds to one line whose summary is `settingsSummary`; it is hidden on
+a finished tournament. Staff & access folds below it, open while a user is being picked.
+Transfer ownership moved to its own line with "You'll become a manager", away from the Add
+buttons, since it hands the tournament over in one tap.
+
+**Toolbar.** Badges are status, visibility and cap only; format and seeding badges were cut
+because the settings line says the same. The super-admin plan override moved from a badge-row
+button into the Actions menu. Upgrade is a link beside the cap rather than a black button.
+
+**Harden.** The Actions trigger has `aria-expanded`/`aria-controls`, Escape closes it and
+returns focus (`onEscape()`, which otherwise closes the QR dialog), and its caret is a drawn
+SVG. `showToast()` takes a kind; every failure call site passes `'error'`, since errors had been
+showing in success green. The QR modal is `role="dialog"`. Long names wrap
+(`overflow-wrap: anywhere`) instead of overflowing or truncating.
+
+**Two traps worth knowing.** A `cdkDragHandle` inside a shared `ng-template` resolves its
+injector where the template is declared, so it can't find its `cdkDrag` parent; the manual
+seeding handle sits in the drag wrapper, outside the shared `#teamRow` template. CDK's drag
+preview attaches to `<body>`, so component-encapsulated styles never reach it; the global
+stylesheet already styles it, and copies in the component were dead.
+
+**Button heights.** `.btn` set no line height, so an `<a class="btn">` (body line height 1.5)
+was about 4px taller than a `<button class="btn">` (browser default, about 1.2). Most visible
+as the Actions button beside Enter scores and View bracket. `.btn` now sets 1.2, which matches
+the 57 real buttons and shortens the 11 link-buttons. Measured: small link 32.7px and button
+28px before, both 29px after.
+
+**CSS budget.** The component stylesheet passed the 10kB `anyComponentStyle` error limit.
+Dead code went first (`border-radius` rules, which are all 0 because `--radius` is `0px`, a
+duplicate `.team-players`, `.section-label` properties already global): 9.90kB to 9.61kB. The
+error limit in `angular.json` is now 16kB; the 5kB warning stays, and was already exceeded by
+this screen, the public tournament list and the bracket view.
+
+**Verified.** 547 frontend tests (10 new: one roster, Actions menu, error toast, plan
+override). Phone-width (402px) full-page captures of two real tournaments, before (committed
+code) and after, against the production database:
+
+| Screen | Before | After |
+|---|---|---|
+| Live, 32 players: page height | 4,181px | 1,757px |
+| Live: Teams list starts | 826px | 273px |
+| Finished, 48 players: page height | 5,602px | 2,251px |
+| Finished: champion | 5,250px down | 313px down |
+
+Coarse-pointer targets measured at 44px or more. Deployed and checked on production by Matt
+2026-11-17. **Not checked in a browser:** the setup phase, since writing a test tournament to
+the production database was blocked; it is covered by unit tests only.
+
+**Open.** Delete is still on every dashboard row, including the public examples for an
+organizer who doesn't own them (the Door Flyer follow-ups note; Manage is gone now).
+
 ### Door Flyer follow-ups
 
 2026-11-16, the evening after the redesign shipped. Commits `84fb6bf` through `c08e0f4`.

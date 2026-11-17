@@ -117,6 +117,9 @@ h1, h2, h3 {
   font-family: var(--sans);
   font-size: 0.875rem;
   font-weight: 600;
+  /* Set, not inherited: a <button> ignores the body's line-height while an <a class="btn">
+     takes it, so a link and a button side by side came out different heights. */
+  line-height: 1.2;
   cursor: pointer;
   text-decoration: none;
   transition: border-color .15s, background .15s, color .15s;
