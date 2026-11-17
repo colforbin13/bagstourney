@@ -330,6 +330,26 @@ class TournamentController {
             $fields[] = 'draw_mode = ?';
             $params[] = $body['draw_mode'];
         }
+        if (isset($body['ghost_rule'])) {
+            // How a solo team plays (item 19). It only changes what players are told, so it
+            // stays changeable through the event. Pro for anything but walking, checked when
+            // chosen like every other paid feature; going back to walking is always allowed.
+            $ghost = SoloTeam::normalizeRule($body['ghost_rule'], $body['ghost_rule_text'] ?? null);
+            if (is_string($ghost)) {
+                http_response_code(400);
+                echo json_encode(['error' => $ghost]);
+                return;
+            }
+            if (SoloTeam::requiresPaidPlan($ghost['rule']) && !tournamentHasPaidFeatures($this->db, $id)) {
+                http_response_code(403);
+                echo json_encode(['error' => SoloTeam::PAID_MESSAGE]);
+                return;
+            }
+            $fields[] = 'ghost_rule = ?';
+            $params[] = $ghost['rule'];
+            $fields[] = 'ghost_rule_text = ?';
+            $params[] = $ghost['text'];
+        }
         if (isset($body['format'])) {
             if (!in_array($body['format'], ['single', 'double'], true)) {
                 http_response_code(400);

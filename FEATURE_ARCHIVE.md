@@ -4,6 +4,54 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Odd player handling (ghost partner)
+
+`FEATURE_TRACKER.md` item 19, built and deployed 2026-11-17, from the Scoreholio comparison.
+A blind draw refused an odd number of players, so the organizer had to turn someone away or
+find a filler at the door.
+
+**Model.** The odd player out gets a team of one: `teams.participant2_id` NULL (migration
+`023` makes it nullable), named "Sam (solo)" by `SoloTeam::defaultName()`
+(`api/lib/SoloTeam.php`, `tests/SoloTeamTest.php`). Chosen over a fake ghost participant,
+which would have leaked into rosters, counts, the plan cap and notification emails. Every
+query that joins a team's second player is a `LEFT JOIN` (`TeamController::TEAM_SELECT` and
+`ParticipantController`'s rename were the two inner joins). A rename of the solo player keeps
+"(solo)" on a still-default team name; `teamParticipants()` on the frontend mirrors the rule
+and shows "Sam (solo)" under a renamed solo team.
+
+**Draw.** `BlindDraw::pair()` pairs an odd one out with null. In a random draw the team order
+is shuffled again only when the field is odd, so the solo team is not always the bottom seed
+(which could never get a bye) while an even draw is unchanged. In a balanced draw the ghost
+joins the smaller group, which is the same as one leftover player from the larger group going
+solo, so every other team stays A-with-B. `TeamController::draw()` does this only when the
+request carries `allow_solo`, which the manage screen sends after the organizer confirms; an
+older client still gets the "even number" refusal. The floor is now three players.
+
+**Rule.** `tournaments.ghost_rule` (`walk`, `four_bags`, `sub`, `custom`) plus
+`ghost_rule_text` (custom only, 120 characters, whitespace tidied; any other rule clears it).
+Decided with Matt: walking is the free default, the rest are Pro, checked when chosen in
+`TournamentController::update()` like every paid feature, never during play; going back to
+walking is always allowed. The app records only final scores, so a rule changes what players
+are told, not scoring: one sentence from `shared/solo-team.ts` on the bracket page, under the
+TV title bar, and on that team's score cards (`soloTeams()` finds solo teams from the bracket
+matches and pool standings, since pool games carry no player names). The picker sits in the
+draw box, above the button, and in the solo team's panel, rather than in Settings.
+
+**Latecomer.** `PUT /teams/{id}/partner` creates the player (approved) and fills the slot;
+"Sam (solo)" becomes "Sam & Lee" unless renamed. Refused once the team has a completed match
+or pool game, after the tournament ends, for a full team, or over the plan's player cap.
+
+**Free generator.** `shared/blind-draw.ts` mirrors the draw: a null partner, the same
+reshuffle, "Sam (solo)", a three-player floor, and copy that explains the ghost.
+
+**Verified.** PHP 230 and frontend 650 passing; removing the odd-field reshuffle fails a test.
+Migration applied to production 2026-11-17. 23 end-to-end API checks against the local stack
+as the plain organizer test account (draw with and without `allow_solo`, no ghost participant,
+rule validation and the free-plan 403, Pro after a plan override, rename, partner swap and its
+refusals including after a scored game, three- and two-player fields), then the manage screen,
+bracket, TV, score entry and free generator in Chrome. Test tournaments 75 to 80 were deleted
+(soft delete, so their rows remain).
+
 ### Bracket and TV mode sections
 
 `FEATURE_TRACKER.md` item 25, built and deployed 2026-11-17. A double-elimination bracket,

@@ -201,7 +201,7 @@ class ParticipantController {
                    p1.name AS participant1_name, p2.name AS participant2_name
             FROM teams t
             JOIN participants p1 ON t.participant1_id = p1.id
-            JOIN participants p2 ON t.participant2_id = p2.id
+            LEFT JOIN participants p2 ON t.participant2_id = p2.id
             WHERE t.participant1_id = ? OR t.participant2_id = ?
         ');
         $stmt->execute([$id, $id]);
@@ -212,12 +212,14 @@ class ParticipantController {
             $this->db->prepare('UPDATE participants SET name = ? WHERE id = ?')->execute([$name, $id]);
 
             foreach ($teams as $team) {
-                $oldDefaultName = $team['participant1_name'] . ' & ' . $team['participant2_name'];
+                // A solo team's default is "Sam (solo)" (item 19); SoloTeam names both kinds.
+                $oldDefaultName = SoloTeam::defaultName($team['participant1_name'], $team['participant2_name']);
                 if ($team['name'] !== $oldDefaultName) continue; // organizer customized this team's name
 
                 $p1 = (int)$team['participant1_id'] === $id ? $name : $team['participant1_name'];
-                $p2 = (int)$team['participant2_id'] === $id ? $name : $team['participant2_name'];
-                $this->db->prepare('UPDATE teams SET name = ? WHERE id = ?')->execute([$p1 . ' & ' . $p2, $team['id']]);
+                $p2 = $team['participant2_id'] === null ? null
+                    : ((int)$team['participant2_id'] === $id ? $name : $team['participant2_name']);
+                $this->db->prepare('UPDATE teams SET name = ? WHERE id = ?')->execute([SoloTeam::defaultName($p1, $p2), $team['id']]);
             }
 
             $this->db->commit();

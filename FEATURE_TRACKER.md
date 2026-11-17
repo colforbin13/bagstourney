@@ -211,26 +211,6 @@ Priority note: sequenced right after item 12 since it reuses item 12's gating me
 rather than introducing new feature gates of its own, and shares the same
 organizer-pays-you billing model that's now the priority entry point for monetization.
 
-### 19. Odd player handling (ghost partner)
-
-Today a blind draw refuses an odd number of players (`TeamController::draw()`), so the
-organizer has to turn someone away or find a 'filler' at the door, the worst moment of the
-night. Scoreholio solves it with a "ghost": the odd player gets a placeholder partner.
-
-- Likely shape: an option at the draw when the count is odd, adding a ghost participant
-  who is paired like anyone else. Their team plays a person short (the real player throws
-  both turns, the common house rule), or the organizer swaps in a real player later.
-- Alternative: the organizer joins as the extra player. Cheaper, but doesn't help an
-  organizer who can't play.
-- Open questions: does a ghost team count toward the plan's player cap; how it's labelled on
-  the bracket; whether `BlindDraw::pair()` should avoid putting the ghost with an A player
-  in a balanced draw.
-
-Status: Planned — added 2026-10-23 from the Scoreholio comparison. Small.
-
-Priority note: first of the Scoreholio-derived items because it fixes a real failure at
-the venue for every blind draw, free tier included.
-
 ### 20. Sponsor logos on the bracket and TV view (Pro)
 
 Board sponsors are how fundraisers raise money, and the fundraiser guide
@@ -541,6 +521,15 @@ display).
 Built and verified. Everything below is live in production as of the 2026-11-17 `deploy.ps1`
 run, which shipped the whole current build. New entries go at the top, marked **not yet
 deployed** until the next deploy carries them.
+
+- **19. Odd player handling (ghost partner)** (2026-11-17) — an odd blind draw no longer
+  fails: once the organizer confirms, the odd player out gets a ghost partner, a team with no
+  second player shown as "Sam (solo)" (no ghost row, so it never counts toward the cap or
+  gets emails), at a random seed. In a balanced draw the ghost joins the smaller group.
+  Walking is the free rule; Pro picks four bags only, an organizer-chosen sub, or a custom
+  house rule, shown on the bracket, TV and score cards. A latecomer can take the empty spot
+  until the solo team's first game is scored. The free generator does the same. Migration `023`.
+  [Full notes](FEATURE_ARCHIVE.md#odd-player-handling-ghost-partner)
 
 - **25. Bracket and TV mode split into sections** (2026-11-17) — double elimination and
   pool play show one section at a time: buttons on the bracket page (Pool play / Winners /

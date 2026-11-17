@@ -4,12 +4,13 @@
 class TeamController {
     public function __construct(private readonly PDO $db) {}
 
-    // Every team response carries its two players' names; this is the one query for it.
+    // Every team response carries its two players' names; this is the one query for it. A
+    // solo team (item 19) has no second player, so its participant2_name comes back null.
     private const TEAM_SELECT = '
         SELECT t.*, p1.name as participant1_name, p2.name as participant2_name
         FROM teams t
         JOIN participants p1 ON t.participant1_id = p1.id
-        JOIN participants p2 ON t.participant2_id = p2.id
+        LEFT JOIN participants p2 ON t.participant2_id = p2.id
     ';
 
     /** A tournament's teams in seed order. */
@@ -34,6 +35,10 @@ class TeamController {
      * POST /teams — draw teams from all participants, then seed them, then generate the
      * bracket structure. BlindDraw::pair() does the pairing: a plain random draw, or the
      * balanced A/B draw when tournaments.draw_mode says so.
+     *
+     * An odd field gives the odd player out a ghost partner, a team of one (item 19), but
+     * only when the request says `allow_solo`: the organizer confirms it at the draw, and an
+     * older client that never asks still gets the old "even number" refusal.
      */
     public function draw(array $body): void {
         $tournamentId = (int)($body['tournament_id'] ?? 0);
@@ -69,17 +74,15 @@ class TeamController {
                 throw new Exception('Approve or reject all pending self-registrations before drawing teams');
             }
 
-            if (count($participants) < 2) {
-                throw new Exception('Need at least 2 participants');
-            }
-            if (count($participants) % 2 !== 0) {
+            $count = count($participants);
+            if ($count % 2 !== 0 && empty($body['allow_solo'])) {
                 throw new Exception('Need an even number of participants to form teams');
             }
-            if (count($participants) < 4) {
-                // Exactly 2 participants form a single team with no opponent: generateBracket()
-                // creates zero matches for that case, so the tournament could never be played
-                // or reach 'complete'.
-                throw new Exception('Need at least 4 participants to form at least two teams');
+            if ($count < 3) {
+                // Fewer than three can't form two teams, even with a solo one: generateBracket()
+                // creates zero matches for a single team, so the tournament could never be
+                // played or reach 'complete'.
+                throw new Exception('Need at least 3 participants to form at least two teams');
             }
 
             // Clear any existing teams/matches for this tournament
@@ -91,12 +94,12 @@ class TeamController {
             $teams = [];
             $pairs = BlindDraw::pair($participants, $tournament['draw_mode'] ?? 'random');
             foreach ($pairs as $i => $pair) {
-                $teamName = $pair[0]['name'] . ' & ' . $pair[1]['name'];
+                $teamName = SoloTeam::defaultName($pair[0]['name'], $pair[1]['name'] ?? null);
                 $seed = $i + 1;
                 $stmt = $this->db->prepare(
                     'INSERT INTO teams (tournament_id, name, participant1_id, participant2_id, seed) VALUES (?, ?, ?, ?, ?)'
                 );
-                $stmt->execute([$tournamentId, $teamName, $pair[0]['id'], $pair[1]['id'], $seed]);
+                $stmt->execute([$tournamentId, $teamName, $pair[0]['id'], $pair[1]['id'] ?? null, $seed]);
                 $teams[] = [
                     'id'   => (int)$this->db->lastInsertId(),
                     'name' => $teamName,
@@ -339,6 +342,85 @@ class TeamController {
         }
         $this->db->prepare('UPDATE teams SET name = ? WHERE id = ?')->execute([$name, $id]);
         echo json_encode($this->teamWithNames($id));
+    }
+
+    /**
+     * PUT /teams/{id}/partner — swap a latecomer in for a solo team's ghost (item 19).
+     *
+     * Creates the new player (approved: the organizer is typing them in) and fills the empty
+     * slot, so the team becomes an ordinary pair; a team still carrying its default
+     * "Sam (solo)" name becomes "Sam & Lee". Allowed until the team's first game is scored, in
+     * the pool or the bracket, since after that the team's record was earned one player short.
+     * Counts toward the plan's player cap like any other player.
+     */
+    public function addPartner(int $id, array $body): void {
+        $name = trim(preg_replace('/\s+/', ' ', (string)($body['name'] ?? '')));
+        if ($name === '' || mb_strlen($name) > 255) {
+            http_response_code(400);
+            echo json_encode(['error' => "Enter the new player's name"]);
+            return;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $team = $this->teamWithNames($id);
+            if (!$team) {
+                throw new Exception('Team not found');
+            }
+            if ($team['participant2_id'] !== null) {
+                throw new Exception('This team already has two players');
+            }
+            $tournamentId = (int)$team['tournament_id'];
+
+            $stmt = $this->db->prepare('SELECT status FROM tournaments WHERE id = ?');
+            $stmt->execute([$tournamentId]);
+            if ($stmt->fetchColumn() === 'complete') {
+                throw new Exception('The tournament is over');
+            }
+
+            $played = $this->db->prepare('
+                SELECT (SELECT COUNT(*) FROM matches
+                         WHERE (team1_id = ? OR team2_id = ?) AND status = "complete")
+                     + (SELECT COUNT(*) FROM pool_matches
+                         WHERE (team1_id = ? OR team2_id = ?) AND status = "complete")
+            ');
+            $played->execute([$id, $id, $id, $id]);
+            if ((int)$played->fetchColumn() > 0) {
+                throw new Exception('This team has already played, so it finishes solo');
+            }
+
+            $cap = effectiveParticipantCap($this->db, $tournamentId);
+            $countStmt = $this->db->prepare('SELECT COUNT(*) FROM participants WHERE tournament_id = ?');
+            $countStmt->execute([$tournamentId]);
+            if ((int)$countStmt->fetchColumn() + 1 > $cap) {
+                throw new Exception("This tournament has reached its {$cap}-participant plan limit. Upgrade to add more.");
+            }
+
+            $this->db->prepare('INSERT INTO participants (tournament_id, name) VALUES (?, ?)')
+                ->execute([$tournamentId, $name]);
+            $partnerId = (int)$this->db->lastInsertId();
+
+            $rename = $team['name'] === SoloTeam::defaultName($team['participant1_name'], null);
+            $this->db->prepare('UPDATE teams SET participant2_id = ?, name = ? WHERE id = ?')->execute([
+                $partnerId,
+                $rename ? SoloTeam::defaultName($team['participant1_name'], $name) : $team['name'],
+                $id,
+            ]);
+
+            $this->db->commit();
+            echo json_encode($this->teamWithNames($id));
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            // An Error is not a validation failure: unwind, then let the router 500. AGENTS.md.
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
     }
 
     /**

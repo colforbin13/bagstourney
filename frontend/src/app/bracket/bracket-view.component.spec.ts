@@ -885,6 +885,27 @@ describe('BracketViewComponent', () => {
       expect(fixture.nativeElement.querySelector('.section-tabs')).toBeNull();
     });
 
+    it('tells everyone how a solo team plays, on the page and on the TV', () => {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({ ...tournamentWith(), ghost_rule: 'sub' });
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush(
+        singleEliminationBracket({ 1: [{ ...live(1, null), team1_participant1_name: 'Sam', team1_name: 'Sam (solo)' }] }));
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.solo-note')!.textContent).toContain('Sam plays solo. Each game the organizer picks a player');
+
+      queryParams$.next(convertToParamMap({ kiosk: '1' }));
+      fixture.detectChanges();
+      expect(el.querySelector('.solo-note')).toBeNull();
+      expect(el.querySelector('.kiosk-solo')!.textContent).toContain('Sam plays solo');
+    });
+
+    it('says nothing about solo play when every team is a pair', () => {
+      boot();
+      expect(component.soloNotice()).toBe('');
+      expect(fixture.nativeElement.querySelector('.solo-note')).toBeNull();
+    });
+
     it('hides the boards panel once the tournament is over', () => {
       boot('complete');
       expect(fixture.nativeElement.querySelector('app-boards-panel')).toBeNull();

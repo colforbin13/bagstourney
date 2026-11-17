@@ -28,19 +28,19 @@ describe('BlindDrawGeneratorComponent', () => {
   const button = () => el.querySelector<HTMLButtonElement>('.actions .btn-primary')!;
   const status = () => el.querySelector('.status')!.textContent!.trim();
 
-  it('should not draw until there are at least four players', () => {
+  it('should not draw until there are at least three players', () => {
     setup();
     expect(button().disabled).toBe(true);
     type('Ann\nBob');
-    expect(status()).toContain('Add at least 4');
+    expect(status()).toContain('Add at least 3');
     expect(button().disabled).toBe(true);
   });
 
-  it('should refuse an odd number of players', () => {
+  it('should draw an odd number of players, one of them solo', () => {
     setup();
     type('Ann\nBob\nCara\nDev\nEd');
-    expect(status()).toContain('odd number');
-    expect(button().disabled).toBe(true);
+    expect(status()).toBe('5 players make 3 teams. One player plays solo.');
+    expect(button().disabled).toBe(false);
   });
 
   it('should count teams and skip repeated names', () => {

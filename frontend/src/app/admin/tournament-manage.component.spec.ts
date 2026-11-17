@@ -457,12 +457,12 @@ describe('TournamentManageComponent', () => {
       expect(summary).toContain('2 teams');
     });
 
-    it('warns when the roster would end up odd', () => {
+    it('says an odd roster gets a solo player rather than refusing it', () => {
       bootstrapWithParticipants([]);
       component.pasteText.set('Ann, Bob, Cara');
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('.paste-summary').textContent).toContain('3 total, odd number');
+      expect(fixture.nativeElement.querySelector('.paste-summary').textContent).toContain('2 teams, one player solo');
     });
 
     it('posts the raw text, then reloads so the cap badge recounts', () => {
@@ -1441,6 +1441,123 @@ describe('TournamentManageComponent', () => {
       // A stuck spinner would leave the organizer unable to retry.
       expect(component.unlockBusy()).toBeFalse();
       expect(component.toast()).toContain('already upgraded');
+    });
+  });
+
+  describe('odd player out (ghost partner)', () => {
+    const player = (id: number, name: string) =>
+      ({ id, tournament_id: tournamentId, name, registration_status: 'approved' }) as Participant;
+    const five = () => ['Ann', 'Bob', 'Cara', 'Dev', 'Eve'].map((n, i) => player(i + 1, n));
+
+    function boot(players: Participant[], over: Record<string, unknown> = {}, teams: Team[] = []) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Bags Night', status: 'setup',
+        visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'auto_draft',
+        created_at: '2026-01-01', paid_override: false, capabilities: ownerCapabilities, ...over,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush(players);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(teams);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      fixture.detectChanges();
+    }
+
+    // load() again after a change: tournament, roster, teams, and staff for an owner.
+    function flushReload(players: Participant[], teams: Team[]) {
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(component.tournament());
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush(players);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush(teams);
+      httpMock.match(`${environment.apiUrl}/tournament-members/${tournamentId}`).forEach(r => r.flush(mockMembers));
+    }
+
+    it('offers the draw for an odd field and says one player plays solo', () => {
+      boot(five());
+      const box: HTMLElement = fixture.nativeElement.querySelector('.draw-ready');
+      expect(box.textContent).toContain('5 participants → 3 teams');
+      expect(box.textContent).toContain('One player plays solo, throwing both turns');
+      expect(fixture.nativeElement.querySelector('.draw-odd #ghost-rule')).not.toBeNull();
+    });
+
+    it('needs three players at least', () => {
+      boot([player(1, 'Ann'), player(2, 'Bob')]);
+      expect(fixture.nativeElement.querySelector('.draw-ready')).toBeNull();
+    });
+
+    it('confirms the solo player in the draw request', async () => {
+      boot(five());
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+      await component.drawTeams();
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams`);
+      expect(req.request.body).toEqual({ tournament_id: tournamentId, allow_solo: true });
+      req.flush([]);
+      flushReload(five(), []);
+    });
+
+    it('leaves an even draw request as it always was', async () => {
+      boot(five().slice(0, 4));
+      spyOn(confirmService, 'confirm').and.returnValue(Promise.resolve(true));
+      await component.drawTeams();
+      const req = httpMock.expectOne(`${environment.apiUrl}/teams`);
+      expect(req.request.body).toEqual({ tournament_id: tournamentId });
+      req.flush({ error: 'stop here' }, { status: 400, statusText: 'Bad Request' });
+    });
+
+    it('offers only walking on the free plan, marking the rest Pro', () => {
+      boot(five());
+      const options = Array.from<HTMLOptionElement>(fixture.nativeElement.querySelectorAll('#ghost-rule option'));
+      expect(options.map(o => o.disabled)).toEqual([false, true, true, true]);
+      expect(options[1].textContent).toContain('(Pro)');
+    });
+
+    it('saves a custom house rule only once its text is written', () => {
+      boot(five(), { paid_override: true });
+      component.onGhostRuleChange('custom');
+      httpMock.expectNone(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.ghost-rule input[type=text]')).not.toBeNull();
+
+      component.saveGhostRule('custom', 'Throws six bags');
+      const req = httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`);
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ ghost_rule: 'custom', ghost_rule_text: 'Throws six bags' });
+      req.flush({ ...component.tournament()!, ghost_rule: 'custom', ghost_rule_text: 'Throws six bags' });
+      expect(component.ghostRule()).toBe('custom');
+    });
+
+    describe('a drawn solo team', () => {
+      const solo: Team = { id: 31, tournament_id: tournamentId, name: 'Eve (solo)', participant1_id: 5, participant2_id: null,
+        participant1_name: 'Eve', participant2_name: null, seed: 3 };
+      const pair: Team = { id: 30, tournament_id: tournamentId, name: 'Ann & Bob', participant1_id: 1, participant2_id: 2,
+        participant1_name: 'Ann', participant2_name: 'Bob', seed: 1 };
+
+      it('reads "solo" in place of a partner, and only the solo team offers a latecomer swap', () => {
+        boot(five(), { status: 'active' }, [pair, solo]);
+        const el: HTMLElement = fixture.nativeElement;
+        const players = Array.from(el.querySelectorAll('.team-players')).map(p => p.textContent!.trim());
+        expect(players).toEqual(['Ann · Bob', 'Eve · solo']);
+
+        component.toggleTeam(pair);
+        fixture.detectChanges();
+        expect(el.querySelector('.solo-panel')).toBeNull();
+
+        component.toggleTeam(solo);
+        fixture.detectChanges();
+        expect(el.querySelector('.solo-panel')!.textContent).toContain('Eve plays solo');
+      });
+
+      it('swaps a latecomer in, then reloads the roster', () => {
+        boot(five(), { status: 'active' }, [pair, solo]);
+        component.toggleTeam(solo);
+        component.partnerName = '  Finn ';
+        component.addPartner(solo);
+
+        const req = httpMock.expectOne(`${environment.apiUrl}/teams/31/partner`);
+        expect(req.request.method).toBe('PUT');
+        expect(req.request.body).toEqual({ name: 'Finn' });
+        req.flush({ ...solo, name: 'Eve & Finn', participant2_id: 6, participant2_name: 'Finn' });
+        flushReload(five(), [pair]);
+        expect(component.partnerName).toBe('');
+      });
     });
   });
 

@@ -101,4 +101,12 @@ describe('teamParticipants', () => {
   it('shows the members once the team has been renamed', () => {
     expect(teamParticipants('The Ringers', 'Alice', 'Bob')).toBe('Alice · Bob');
   });
+
+  it('stays null for a team of one still named "Sam (solo)"', () => {
+    expect(teamParticipants('Sam (solo)', 'Sam', null)).toBeNull();
+  });
+
+  it('says a renamed team of one is solo', () => {
+    expect(teamParticipants('Lone Wolf', 'Sam', null)).toBe('Sam (solo)');
+  });
 });

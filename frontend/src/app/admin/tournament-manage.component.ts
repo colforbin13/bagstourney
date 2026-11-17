@@ -13,6 +13,7 @@ import { parseNameList } from '../shared/name-list';
 import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus, PoolData } from '../shared/models/tournament.models';
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { BOARD_WORDS, BoardLabel, boardWord } from '../shared/board-labels';
+import { GHOST_RULES, GHOST_RULE_MAX_TEXT, GhostRule, soloRuleFor } from '../shared/solo-team';
 import { environment } from '../../environments/environment';
 import * as QRCode from 'qrcode';
 
@@ -131,7 +132,7 @@ export class TournamentManageComponent implements OnInit {
         label: 'Add your players',
         detail: pending > 0
           ? `${pending} self sign-up${pending === 1 ? '' : 's'} waiting on your approval below.`
-          : 'Paste a list of names, or share the sign-up link. You need an even number, four or more.',
+          : 'Paste a list of names, or share the sign-up link. Three or more; with an odd number, one plays solo.',
         done: teamsDrawn,
       });
       steps.push({
@@ -535,6 +536,81 @@ export class TournamentManageComponent implements OnInit {
         this.boardsError.set(err?.error?.error || 'Failed to update.');
         const t = this.tournament();
         if (t) this.tournament.set({ ...t });
+      },
+    });
+  }
+
+  // ── Odd player out (FEATURE_TRACKER item 19) ──────────────────────────────────────
+  // An odd field draws anyway: the odd player out gets a ghost partner, a team of one. The
+  // rule for how that team plays is set where the organizer meets it, in the draw box and
+  // on the solo team, rather than among the settings. Walking is free; the rest are Pro.
+  readonly ghostRules = GHOST_RULES;
+  readonly ghostRuleMaxText = GHOST_RULE_MAX_TEXT;
+  oddField = computed(() => this.approvedParticipants().length % 2 === 1);
+  /** Three is the floor: two teams, one of them solo. */
+  canDrawField = computed(() => this.approvedParticipants().length >= 3);
+  drawTeamCount = computed(() => Math.ceil(this.approvedParticipants().length / 2));
+  ghostRule = computed<GhostRule>(() => this.tournament()?.ghost_rule ?? 'walk');
+  /** The select's value: a picked `custom` waits here until its text is saved. */
+  ghostRuleDraft = signal<GhostRule | null>(null);
+  ghostRuleText = '';
+  ghostRuleBusy = signal(false);
+  oddDrawSentence = computed(() => soloRuleFor(this.tournament(), ['One player']));
+  partnerName = '';
+  addingPartner = signal(false);
+
+  isSolo(t: Team): boolean {
+    return t.participant2_id == null;
+  }
+
+  soloSentence(t: Team): string {
+    return soloRuleFor(this.tournament(), [t.participant1_name]);
+  }
+
+  onGhostRuleChange(rule: GhostRule) {
+    if (rule === 'custom') {
+      this.ghostRuleDraft.set('custom');
+      this.ghostRuleText = this.tournament()?.ghost_rule_text ?? '';
+      return;
+    }
+    this.ghostRuleDraft.set(null);
+    this.saveGhostRule(rule);
+  }
+
+  saveGhostRule(rule: GhostRule, text?: string) {
+    this.ghostRuleBusy.set(true);
+    this.svc.updateTournament(this.tournamentId, { ghost_rule: rule, ghost_rule_text: text ?? null }).subscribe({
+      next: updated => {
+        this.tournament.set(updated);
+        this.ghostRuleDraft.set(null);
+        this.ghostRuleBusy.set(false);
+        this.showToast('Solo rule saved.');
+      },
+      error: err => {
+        this.ghostRuleBusy.set(false);
+        this.showToast(err?.error?.error || 'Failed to save the solo rule.', 'error');
+        this.ghostRuleDraft.set(null);
+        const t = this.tournament();
+        if (t) this.tournament.set({ ...t }); // re-sync the select
+      },
+    });
+  }
+
+  /** Swap a latecomer in for the ghost, until the solo team's first game is scored. */
+  addPartner(t: Team) {
+    const name = this.partnerName.trim();
+    if (!name) return;
+    this.addingPartner.set(true);
+    this.svc.addTeamPartner(t.id, name).subscribe({
+      next: () => {
+        this.addingPartner.set(false);
+        this.partnerName = '';
+        this.showToast(`${name} joined ${t.participant1_name}.`);
+        this.load();
+      },
+      error: err => {
+        this.addingPartner.set(false);
+        this.showToast(err?.error?.error || 'Failed to add the player.', 'error');
       },
     });
   }
@@ -985,11 +1061,12 @@ export class TournamentManageComponent implements OnInit {
         : this.isPoolPlay()
           ? `Draw teams and start pool play? Every team plays ${this.tournament()?.pool_games ?? 3} pool games. This cannot be undone.`
           : 'Draw teams and start the tournament? This cannot be undone.';
-    const ok = await confirmService.confirm(prompt);
+    const odd = this.oddField();
+    const ok = await confirmService.confirm(odd ? `${prompt} With an odd number, one player is drawn to play solo.` : prompt);
     if (!ok) return;
     this.drawing.set(true);
     this.drawError.set('');
-    this.svc.drawTeams(this.tournamentId).subscribe({
+    this.svc.drawTeams(this.tournamentId, odd).subscribe({
       next: () => {
         this.drawing.set(false);
         this.showToast(this.isManualSeeding() ? 'Teams drawn — set your seed order below.'
@@ -1046,6 +1123,7 @@ export class TournamentManageComponent implements OnInit {
       this.openTeamId = t.id;
       this.cancelEditParticipant();
       this.startEditTeam(t);
+      this.partnerName = '';
     }
   }
 

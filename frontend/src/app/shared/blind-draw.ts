@@ -9,14 +9,15 @@
 // seed order, and the bracket is seeded and padded with byes the way
 // api/lib/BracketBuilder.php::singleElimination() does it.
 
-/** The app's own rule: teams are pairs, and a bracket needs at least two of them. */
-export const MIN_PLAYERS = 4;
+/** The app's own rule: a bracket needs two teams, and with three players one plays solo. */
+export const MIN_PLAYERS = 3;
 /** 32 teams: enough for a bar night or a fundraiser, and a preview that still reads on a phone. */
 export const MAX_PLAYERS = 64;
 
 export interface DrawnTeam {
   seed: number;
-  players: [string, string];
+  /** A null partner is a ghost: the odd player out plays solo (FEATURE_TRACKER item 19). */
+  players: [string, string | null];
 }
 
 /** A bracket slot: a team, a bye, or a winner not yet known. */
@@ -47,34 +48,45 @@ export function shuffle<T>(items: readonly T[], random: () => number = cryptoRan
   return out;
 }
 
-/** Pairs players in order into teams seeded 1, 2, 3, ... An odd player out is not paired. */
-export function pairTeams(players: readonly string[]): DrawnTeam[] {
-  const teams: DrawnTeam[] = [];
-  for (let i = 0; i + 1 < players.length; i += 2) {
-    teams.push({ seed: teams.length + 1, players: [players[i], players[i + 1]] });
-  }
-  return teams;
+/**
+ * Pairs players in order into teams seeded 1, 2, 3, ... An odd player out gets a ghost
+ * partner, and then the team order is shuffled so the solo team isn't always the bottom
+ * seed, as api/lib/BlindDraw.php does. An even field pairs exactly as it always has.
+ */
+export function pairTeams(players: readonly string[], random: () => number = cryptoRandom): DrawnTeam[] {
+  const pairs = chunk(players);
+  const ordered = players.length % 2 === 1 ? shuffle(pairs, random) : pairs;
+  return ordered.map((players, i) => ({ seed: i + 1, players }));
+}
+
+/** Pairs in order; an odd one out at the end gets a ghost (null). */
+function chunk(players: readonly string[]): [string, string | null][] {
+  const pairs: [string, string | null][] = [];
+  for (let i = 0; i < players.length; i += 2) pairs.push([players[i], players[i + 1] ?? null]);
+  return pairs;
 }
 
 /**
  * The balanced, or A/B, draw: every A player is paired with a random B, so the weakest
  * players can't end up together. Mirrors api/lib/BlindDraw.php: with uneven groups, the
  * extra players are paired within their own group rather than refused, and the team order
- * (the seed order) is shuffled last so a leftover team isn't always the bottom seed.
+ * (the seed order) is shuffled last so a leftover team isn't always the bottom seed. With an
+ * odd field the ghost joins the smaller group, so one leftover player plays solo.
  */
 export function pairBalanced(a: readonly string[], b: readonly string[], random: () => number = cryptoRandom): DrawnTeam[] {
   const as = shuffle(a, random);
   const bs = shuffle(b, random);
   const mixed = Math.min(as.length, bs.length);
-  const pairs: [string, string][] = [];
+  const pairs: [string, string | null][] = [];
   for (let i = 0; i < mixed; i++) pairs.push([as[i], bs[i]]);
   const leftover = as.length > mixed ? as.slice(mixed) : bs.slice(mixed);
-  for (let i = 0; i + 1 < leftover.length; i += 2) pairs.push([leftover[i], leftover[i + 1]]);
+  pairs.push(...chunk(leftover));
   return shuffle(pairs, random).map((players, i) => ({ seed: i + 1, players }));
 }
 
+/** Same names as api/lib/SoloTeam.php::defaultName(): "Ann & Bob", or "Sam (solo)". */
 export function teamName(team: DrawnTeam): string {
-  return `${team.players[0]} & ${team.players[1]}`;
+  return team.players[1] === null ? `${team.players[0]} (solo)` : `${team.players[0]} & ${team.players[1]}`;
 }
 
 /**

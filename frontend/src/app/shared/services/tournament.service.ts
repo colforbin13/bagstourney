@@ -201,8 +201,14 @@ export class TournamentService {
     return this.http.get<Team[]>(`${this.api}/teams/${tournamentId}`);
   }
 
-  drawTeams(tournamentId: number) {
-    return this.http.post<Team[]>(`${this.api}/teams`, { tournament_id: tournamentId });
+  // `allowSolo` confirms an odd field: the odd player out gets a ghost partner (item 19).
+  drawTeams(tournamentId: number, allowSolo = false) {
+    return this.http.post<Team[]>(`${this.api}/teams`, { tournament_id: tournamentId, ...(allowSolo ? { allow_solo: true } : {}) });
+  }
+
+  /** Swap a latecomer in for a solo team's ghost; the team becomes an ordinary pair. */
+  addTeamPartner(teamId: number, name: string) {
+    return this.http.put<Team>(`${this.api}/teams/${teamId}/partner`, { name });
   }
 
   updateTeam(id: number, data: Partial<Team>) {

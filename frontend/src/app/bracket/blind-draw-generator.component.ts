@@ -118,7 +118,8 @@ import {
         </p>
         <h2>Running a blind draw cornhole tournament</h2>
         <ol>
-          <li>Collect names as players arrive. You need an even number, since teams are pairs.</li>
+          <li>Collect names as players arrive. With an odd number, the odd player out gets a
+            "ghost" partner and plays solo, usually throwing both turns.</li>
           <li>Draw the teams in front of everyone, so the pairing is visibly random.</li>
           <li>Seed the bracket from the draw order. With an uneven field, the top seeds get byes.</li>
           <li>Play it out as single elimination, or double elimination so every team gets two games.</li>
@@ -190,9 +191,8 @@ export class BlindDrawGeneratorComponent {
   /** Why the draw can't run yet, or null when it can. */
   readonly problem = computed(() => {
     const n = this.parsed().names.length;
-    if (n < MIN_PLAYERS) return n === 0 ? 'Add at least 4 players to draw teams.' : `${n} so far. Add at least ${MIN_PLAYERS} players.`;
+    if (n < MIN_PLAYERS) return n === 0 ? `Add at least ${MIN_PLAYERS} players to draw teams.` : `${n} so far. Add at least ${MIN_PLAYERS} players.`;
     if (n > MAX_PLAYERS) return `${n} players is over the ${MAX_PLAYERS} this preview handles. A live tournament takes more.`;
-    if (n % 2 !== 0) return `${n} players is an odd number. Teams are pairs, so add or remove one.`;
     return null;
   });
 
@@ -204,11 +204,18 @@ export class BlindDrawGeneratorComponent {
       const a = this.parsedA().names.length;
       const b = this.parsedB().names.length;
       groups = ` ${a} A, ${b} B.`;
-      if (!this.problem() && a !== b) {
-        groups += ` The ${Math.abs(a - b)} extra ${a > b ? 'A' : 'B'} players will be paired with each other.`;
+      const extra = Math.abs(a - b);
+      const group = a > b ? 'A' : 'B';
+      if (!this.problem() && extra === 1) {
+        groups += ` The extra ${group} player plays solo.`;
+      } else if (!this.problem() && extra > 1) {
+        groups += ` The ${extra} extra ${group} players will be paired with each other${extra % 2 ? ', and one plays solo' : ''}.`;
       }
     }
-    return (this.problem() ?? `${names.length} players make ${names.length / 2} teams.`) + groups + skipped;
+    const n = names.length;
+    // An odd field still draws (item 19): the odd player out gets a ghost partner.
+    const made = `${n} players make ${Math.ceil(n / 2)} teams.` + (n % 2 && !this.balanced() ? ' One player plays solo.' : '');
+    return (this.problem() ?? made) + groups + skipped;
   });
 
   onInput(event: Event): void {

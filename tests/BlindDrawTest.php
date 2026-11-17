@@ -23,7 +23,7 @@ final class BlindDrawTest extends TestCase
     private static function ids(array $pairs): array
     {
         $ids = [];
-        foreach ($pairs as [$p, $q]) { $ids[] = $p['id']; $ids[] = $q['id']; }
+        foreach ($pairs as [$p, $q]) { $ids[] = $p['id']; if ($q !== null) $ids[] = $q['id']; }
         sort($ids);
         return $ids;
     }
@@ -136,10 +136,67 @@ final class BlindDrawTest extends TestCase
         $this->assertCount(7, $leftoverBs);
     }
 
-    public function testAnOddPlayerOutIsLeftUnpaired(): void
+    /** "A1+B3" style labels per pair, a ghost as "-", tallied. */
+    private static function kinds(array $pairs): array
     {
-        $this->assertCount(2, BlindDraw::pair(self::players(0, 5)));
-        $this->assertCount(2, BlindDraw::pair(self::players(1, 4), 'balanced'));
+        return self::tally(array_map(
+            fn($p) => $p[0]['draw_group'] . ($p[1] === null ? '-' : $p[1]['draw_group']),
+            $pairs,
+        ));
+    }
+
+    private static function soloCount(array $pairs): int
+    {
+        return count(array_filter($pairs, fn($p) => $p[1] === null));
+    }
+
+    public function testAnOddPlayerOutGetsAGhostPartner(): void
+    {
+        $players = self::players(0, 5);
+        for ($run = 0; $run < 50; $run++) {
+            $pairs = BlindDraw::pair($players);
+            $this->assertCount(3, $pairs);
+            $this->assertSame(1, self::soloCount($pairs));
+            $this->assertSame(array_column($players, 'id'), self::ids($pairs));
+        }
+    }
+
+    public function testAnEvenDrawHasNoGhost(): void
+    {
+        $this->assertSame(0, self::soloCount(BlindDraw::pair(self::players(3, 3))));
+        $this->assertSame(0, self::soloCount(BlindDraw::pair(self::players(3, 3), 'balanced')));
+    }
+
+    public function testTheSoloTeamLandsAtARandomSeed(): void
+    {
+        // Pairing in shuffled order puts the odd one out last, so without a second shuffle the
+        // solo team would always be the bottom seed and could never get a bye.
+        $seeds = [];
+        $soloPlayers = [];
+        for ($run = 0; $run < 300; $run++) {
+            foreach (BlindDraw::pair(self::players(0, 7)) as $seed => [$p, $q]) {
+                if ($q === null) { $seeds[$seed] = true; $soloPlayers[$p['name']] = true; }
+            }
+        }
+        $this->assertCount(4, $seeds);
+        $this->assertCount(7, $soloPlayers);
+    }
+
+    public function testBalancedGhostJoinsTheSmallerGroup(): void
+    {
+        // Seven As, six Bs: the ghost stands in as the seventh B, so one A plays solo and
+        // every other team is still A-with-B.
+        for ($run = 0; $run < 100; $run++) {
+            $this->assertSame(['A-' => 1, 'AB' => 6], self::kinds(BlindDraw::pair(self::players(7, 6), 'balanced')));
+            $this->assertSame(['AB' => 6, 'B-' => 1], self::kinds(BlindDraw::pair(self::players(6, 7), 'balanced')));
+        }
+    }
+
+    public function testBalancedGhostWithAWiderGapPairsTheRestWithinTheirGroup(): void
+    {
+        $pairs = BlindDraw::pair(self::players(9, 6), 'balanced');
+        $this->assertSame(['A-' => 1, 'AA' => 1, 'AB' => 6], self::kinds($pairs));
+        $this->assertSame(array_column(self::players(9, 6), 'id'), self::ids($pairs));
     }
 
     private static function tally(array $kinds): array

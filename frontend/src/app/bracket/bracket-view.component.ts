@@ -25,6 +25,7 @@ import {
   SectionKey,
 } from '../shared/bracket-sections';
 import { preferMirrored } from '../shared/bracket-fit';
+import { soloRuleFor, soloTeams } from '../shared/solo-team';
 
 interface ScoreEntry { team1: string; team2: string; }
 
@@ -157,6 +158,13 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // Pool play (FEATURE_TRACKER item 18). Null unless the tournament uses it.
   pool = computed(() => this.bracketData()?.pool ?? null);
+
+  // Odd player out (item 19): while play is on, one line telling everyone how the solo team
+  // plays, since the bracket alone just shows "Sam (solo)".
+  soloNotice = computed(() => {
+    if (this.tournament()?.status !== 'active') return '';
+    return soloRuleFor(this.tournament(), [...soloTeams(this.bracketData()).values()]);
+  });
 
   // Board assignments (FEATURE_TRACKER item 8): shown only while games are being played.
   boardWord = computed(() => boardWord(this.bracketData()?.boards?.label));

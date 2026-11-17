@@ -16,6 +16,7 @@ require_once __DIR__ . '/middleware/auth.php';
 require_once __DIR__ . '/lib/BracketBuilder.php';
 require_once __DIR__ . '/lib/NameList.php';
 require_once __DIR__ . '/lib/BlindDraw.php';
+require_once __DIR__ . '/lib/SoloTeam.php';
 require_once __DIR__ . '/lib/PoolPlay.php';
 require_once __DIR__ . '/lib/BoardQueue.php';
 require_once __DIR__ . '/lib/PageView.php';
@@ -182,6 +183,9 @@ try {
             } elseif ($method === 'PUT' && !$id && $action === 'reorder') {
                 requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
                 $ctrl->reorder($body); // manual seeding: persist drag-and-drop seed order
+            } elseif ($method === 'PUT' && $id && $action === 'partner') {
+                requireTournamentRole($db, tournamentIdFor($db, 'teams', $id), ['owner', 'manager']);
+                $ctrl->addPartner($id, $body); // swap a latecomer in for a solo team's ghost
             } elseif ($method === 'PUT' && $id) {
                 requireTournamentRole($db, tournamentIdFor($db, 'teams', $id), ['owner', 'manager']);
                 $ctrl->update($id, $body);

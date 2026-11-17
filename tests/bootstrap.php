@@ -11,6 +11,7 @@ require_once __DIR__ . '/../api/lib/StripeSignature.php';
 require_once __DIR__ . '/../api/lib/BillingIntent.php';
 require_once __DIR__ . '/../api/lib/NameList.php';
 require_once __DIR__ . '/../api/lib/BlindDraw.php';
+require_once __DIR__ . '/../api/lib/SoloTeam.php';
 require_once __DIR__ . '/../api/lib/PoolPlay.php';
 require_once __DIR__ . '/../api/lib/BoardQueue.php';
 require_once __DIR__ . '/../api/lib/PageView.php';

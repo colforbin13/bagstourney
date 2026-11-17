@@ -76,6 +76,8 @@ Tests: `tests/BracketBuilderTest.php` (single elimination, fields 2–64), `test
 
 Team pairing for a blind draw lives in `api/lib/BlindDraw.php` (`tests/BlindDrawTest.php`): a plain random draw by default, or the balanced A/B draw when `tournaments.draw_mode` is `balanced` (every `participants.draw_group` A paired with a random B; migration `021`). The free generator's `shared/blind-draw.ts` mirrors it. The option is deliberately tucked behind an "Advanced" disclosure so the plain draw stays the obvious path.
 
+An odd field still draws (item 19, migration `023`): the odd player out gets a "ghost" partner, stored as a team with `participant2_id` NULL and named "Sam (solo)" (`api/lib/SoloTeam.php`, `tests/SoloTeamTest.php`). There is deliberately no ghost row in `participants`, so anything that counts, lists or emails players never sees one; every query joining a team's second player must be a `LEFT JOIN`. The draw only does this when the request carries `allow_solo` (the organizer confirmed it). `tournaments.ghost_rule` says how a solo team plays and is shown on the bracket, TV and score cards (`shared/solo-team.ts`); the app only records final scores, so it changes what players are told, not scoring. Walking is free, `four_bags` / `sub` / `custom` are Pro, gated when chosen. `PUT /teams/{id}/partner` swaps a latecomer in until the solo team's first game is scored.
+
 Match/tournament state transitions live in `MatchController`:
 
 - `cascadePropagate()` advances the winner and, in double elimination, drops the loser. It stops short of the reset match when the winners-bracket side wins the grand final, since the reset is then moot.

@@ -370,6 +370,21 @@
 
 .draw-ready { margin-top: 24px; }
 
+/* Odd player out (FEATURE_TRACKER item 19): the solo rule under the draw box, and the solo
+   team's own panel with the rule and the latecomer swap. */
+.draw-odd { margin-top: 12px; }
+.odd-note { color: var(--muted); font-weight: 600; }
+.ghost-rule { display: flex; flex-direction: column; gap: 6px; }
+.ghost-rule .section-label { margin-bottom: 0; }
+.solo-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.solo-panel > .section-label { margin: 6px 0 0; }
+
 /* ── Touch ──
    The organizer runs this one-handed at a venue, so on a touch screen every control
    reaches 44px (DESIGN.md). Desktop keeps the denser small buttons. */

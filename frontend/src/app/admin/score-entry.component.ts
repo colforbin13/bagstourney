@@ -6,6 +6,7 @@ import { TournamentService } from '../shared/services/tournament.service';
 import { Tournament, Match, BracketData, PoolMatch } from '../shared/models/tournament.models';
 import { roundLabel, teamParticipants } from '../shared/bracket-labels';
 import { boardWord } from '../shared/board-labels';
+import { soloRuleFor, soloTeams } from '../shared/solo-team';
 
 // `key` rather than the match id identifies a row: pool games (FEATURE_TRACKER item 18) live
 // in their own table, so a pool game and a bracket match can share an id.
@@ -77,6 +78,9 @@ interface ScoreEntry { team1: string; team2: string; }
                     }
                     {{ row.label }} · Match {{ row.match.match_number }}
                   </div>
+                  @if (soloRule(row); as rule) {
+                    <div class="solo-rule">{{ rule }}</div>
+                  }
                   <div class="score-row">
                     <div class="score-team">
                       <div class="score-team-name">{{ row.match.team1_name }}</div>
@@ -237,6 +241,8 @@ interface ScoreEntry { team1: string; team2: string; }
       color: var(--muted);
     }
     .score-row { display: flex; align-items: center; gap: 12px; }
+    /* A solo team in this game (item 19): the house rule, so the scorer can repeat it. */
+    .solo-rule { font-size: .8rem; color: var(--text-dim); }
     .score-row.done { justify-content: space-between; font-size: .9rem; }
     .score-team { flex: 1; min-width: 0; }
     .score-team-name { font-weight: 500; font-size: .95rem; }
@@ -381,6 +387,18 @@ export class ScoreEntryComponent implements OnInit, OnDestroy {
 
   // Only shown once a team has been renamed away from its auto-generated "P1 & P2", so
   // the line doesn't just repeat the team name back. Shared with the bracket view.
+  // Odd player out (item 19): which teams are a player short, read from the whole bracket
+  // response because a pool game carries no player names of its own.
+  private solo = computed(() => soloTeams(this.bracketData()));
+
+  soloRule(row: ScoreRow): string {
+    const solo = this.solo();
+    const players = [row.match.team1_id, row.match.team2_id]
+      .map(id => (id != null ? solo.get(id) : undefined))
+      .filter((p): p is string => !!p);
+    return players.length ? soloRuleFor(this.tournament(), players) : '';
+  }
+
   members(teamName: string | null, p1: string | null, p2: string | null): string | null {
     return teamParticipants(teamName, p1, p2);
   }

@@ -22,6 +22,12 @@
  *
  * Either way the team order is random, and that order is the seed order, as it always was.
  *
+ * An odd field doesn't fail either (FEATURE_TRACKER item 19). The odd player out gets a ghost
+ * partner: their pair's second entry is null, and the controller stores a team of one. In a
+ * balanced draw the ghost joins the smaller group, which is the same as pairing one leftover
+ * player from the larger group with nobody, so every other team stays A-with-B. The solo team
+ * lands at a random seed, like any other.
+ *
  * The free generator (frontend shared/blind-draw.ts) mirrors this pairing. Keep them in step.
  *
  * Targets PHP 8.1+, as does the rest of `api/` (see AGENTS.md).
@@ -36,8 +42,8 @@ final class BlindDraw
      *        row's 'draw_group' ('A' or 'B', anything else counts as B)
      * @param callable(int): int|null $randomInt returns an integer in [0, $max]; defaults to
      *        random_int, a CSPRNG, so nobody can predict or reproduce the draw
-     * @return array<int, array{0: array<string, mixed>, 1: array<string, mixed>}> pairs in seed
-     *         order. An odd player out is left unpaired; the controller rejects odd fields first.
+     * @return array<int, array{0: array<string, mixed>, 1: array<string, mixed>|null}> pairs in
+     *         seed order. With an odd field exactly one pair is [player, null]: a solo team.
      */
     public static function pair(array $players, string $mode = 'random', ?callable $randomInt = null): array
     {
@@ -45,7 +51,11 @@ final class BlindDraw
         $players = array_values($players);
 
         if ($mode !== 'balanced') {
-            return self::chunk(self::shuffle($players, $randomInt));
+            $pairs = self::chunk(self::shuffle($players, $randomInt));
+            // Pairing in shuffled order leaves the solo team last, which is always the bottom
+            // seed and never gets a bye. Shuffle the teams too, only when there is one, so an
+            // even draw comes out exactly as it always has.
+            return count($players) % 2 === 1 ? self::shuffle($pairs, $randomInt) : $pairs;
         }
 
         $a = [];
@@ -82,11 +92,12 @@ final class BlindDraw
         return $items;
     }
 
+    /** Pairs in order; an odd one out at the end is paired with a ghost (null). */
     private static function chunk(array $players): array
     {
         $pairs = [];
-        for ($i = 0; $i + 1 < count($players); $i += 2) {
-            $pairs[] = [$players[$i], $players[$i + 1]];
+        for ($i = 0; $i < count($players); $i += 2) {
+            $pairs[] = [$players[$i], $players[$i + 1] ?? null];
         }
         return $pairs;
     }

@@ -178,13 +178,41 @@
        live/final team list, so a team looks and edits the same way in every phase.
        Open, it holds the team's name and both players, which is where player names are
        corrected once teams exist: the team list is the only roster on the page then. -->
+  <!-- How a solo team plays (FEATURE_TRACKER item 19). Shown where the organizer meets the
+       odd player out: the draw box, and the solo team itself. Walking is free. -->
+  <ng-template #ghostRuleSetting>
+    <div class="ghost-rule">
+      <label class="section-label" for="ghost-rule">How the solo player plays</label>
+      <select id="ghost-rule" class="input" [ngModel]="ghostRuleDraft() ?? ghostRule()"
+        (ngModelChange)="onGhostRuleChange($event)" [disabled]="ghostRuleBusy()">
+        @for (r of ghostRules; track r.value) {
+          <option [value]="r.value" [disabled]="r.pro && !canUsePaidFeatures() && ghostRule() !== r.value">
+            {{ r.label }}{{ r.pro && !canUsePaidFeatures() ? ' (Pro)' : '' }}
+          </option>
+        }
+      </select>
+      @if ((ghostRuleDraft() ?? ghostRule()) === 'custom') {
+        <div class="row" style="margin-top:8px">
+          <input class="input" type="text" [(ngModel)]="ghostRuleText" [maxlength]="ghostRuleMaxText"
+            placeholder="Write your house rule" aria-label="House rule for a solo player"
+            (keyup.enter)="saveGhostRule('custom', ghostRuleText)" />
+          <button class="btn btn-sm" [disabled]="ghostRuleBusy() || !ghostRuleText.trim()"
+            (click)="saveGhostRule('custom', ghostRuleText)">Save</button>
+        </div>
+      }
+      @if (!canUsePaidFeatures()) {
+        <div class="field-hint">Other rules are a <a routerLink="/pricing">Pro feature</a>.</div>
+      }
+    </div>
+  </ng-template>
+
   <ng-template #teamRow let-team>
     <div class="team-item" [class.is-open]="openTeamId === team.id">
       <ng-template #teamLine>
         <span class="seed">#{{ team.seed }}</span>
         <span class="team-info">
           <span class="team-name">{{ team.name }}</span>
-          <span class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</span>
+          <span class="team-players">{{ team.participant1_name }} · {{ isSolo(team) ? 'solo' : team.participant2_name }}</span>
         </span>
       </ng-template>
       @if (canManageSetup()) {
@@ -216,6 +244,19 @@
                 }
               </div>
             }
+          }
+          @if (isSolo(team) && tournament()?.status !== 'complete') {
+            <div class="solo-panel">
+              <div class="field-hint">{{ soloSentence(team) }}</div>
+              <ng-container *ngTemplateOutlet="ghostRuleSetting" />
+              <div class="section-label">Someone arrived late?</div>
+              <div class="row">
+                <input class="input" type="text" [(ngModel)]="partnerName" placeholder="Their name"
+                  [attr.aria-label]="'New partner for ' + team.participant1_name" (keyup.enter)="addPartner(team)" />
+                <button class="btn btn-sm" [disabled]="addingPartner() || !partnerName.trim()" (click)="addPartner(team)">Add as partner</button>
+              </div>
+              <div class="field-hint">They can take the empty spot until this team's first game is scored.</div>
+            </div>
           }
           @if (isDirectEntry() && tournament()?.status === 'setup') {
             <div class="team-panel-foot">
@@ -362,8 +403,8 @@
                   }
                   @if (pasteRosterAfter() >= 4 && pasteRosterAfter() % 2 === 0) {
                     · {{ pasteRosterAfter() / 2 }} teams
-                  } @else if (pasteRosterAfter() % 2 !== 0) {
-                    <span class="warn-inline">· {{ pasteRosterAfter() }} total, odd number</span>
+                  } @else if (pasteRosterAfter() >= 3) {
+                    · {{ (pasteRosterAfter() + 1) / 2 }} teams, one player solo
                   }
                 } @else if (pastePreview().duplicates.length > 0) {
                   Everyone on that list is already in this tournament.
@@ -402,8 +443,8 @@
       <h2 class="list-head">
         Participants
         <span class="count">{{ approvedParticipants().length }}</span>
-        @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
-          <span class="warn">— Need an even number</span>
+        @if (oddField() && approvedParticipants().length >= 3) {
+          <span class="odd-note">Odd number: one player plays solo</span>
         }
         @if (pendingParticipants().length > 0) {
           <span class="warn">— {{ pendingParticipants().length }} awaiting approval</span>
@@ -476,12 +517,13 @@
       }
 
       <!-- Draw button (before teams exist) -->
-      @if (canManageSetup() && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
+      @if (canManageSetup() && canDrawField() && pendingParticipants().length === 0) {
         <div class="draw-section draw-ready">
           <div>
             <div style="font-weight:500;margin-bottom:4px;">Ready to draw teams?</div>
             <div style="font-size:.8rem;color:var(--text-dim);">
-              {{ approvedParticipants().length }} participants → {{ approvedParticipants().length / 2 }} teams.
+              {{ approvedParticipants().length }} participants → {{ drawTeamCount() }} teams.
+              @if (oddField()) { {{ oddDrawSentence() }} }
               @if (isManualSeeding()) {
                 This will {{ pairingPhrase() }}. You'll set the final seed order before generating the bracket.
               } @else if (isPoolPlay()) {
@@ -490,6 +532,10 @@
                 This will {{ pairingPhrase() }}, seed them, and generate the bracket.
               }
             </div>
+            <!-- Chosen before drawing, so it sits above the button. -->
+            @if (oddField()) {
+              <div class="draw-odd"><ng-container *ngTemplateOutlet="ghostRuleSetting" /></div>
+            }
           </div>
           <button class="btn btn-primary" [disabled]="drawing()" (click)="drawTeams()">
             @if (drawing()) {

@@ -142,6 +142,9 @@
         }
         <button type="button" class="btn btn-sm kiosk-exit" (click)="setKiosk(false)">Exit TV mode</button>
     </div>
+    @if (soloNotice()) {
+    <div class="kiosk-solo">{{ soloNotice() }}</div>
+    }
     } @else {
     <div class="page-header" style="max-width:680px;margin:0 auto 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
     <div style="min-width:0;">
@@ -168,6 +171,10 @@
             title="Scale the bracket to fill the screen — for a TV or projector">TV mode</button>
     </div>
     </div>
+    }
+
+    @if (soloNotice() && !kiosk()) {
+    <p class="solo-note">{{ soloNotice() }}</p>
     }
 
     @if (!loading() && showBoards() && !kiosk()) {

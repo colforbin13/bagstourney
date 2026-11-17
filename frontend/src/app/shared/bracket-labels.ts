@@ -79,12 +79,14 @@ export function championName(data: BracketData | null): string | null {
 
 /**
  * Participant names to show beneath a team name, or null when they'd just repeat it.
- * Only useful once a team has been renamed away from the auto-generated "P1 & P2" —
- * the same default-name comparison the backend uses in ParticipantController::update()
- * to decide whether a team name is still auto-generated.
+ * Only useful once a team has been renamed away from the auto-generated "P1 & P2", or
+ * "P1 (solo)" for a team of one (FEATURE_TRACKER item 19) — the same default names
+ * api/lib/SoloTeam.php::defaultName() gives, which ParticipantController::update() compares
+ * against to decide whether a team name is still auto-generated.
  */
 export function teamParticipants(teamName: string | null, p1: string | null, p2: string | null): string | null {
-  if (!teamName || !p1 || !p2) return null;
+  if (!teamName || !p1) return null;
+  if (!p2) return teamName === `${p1} (solo)` ? null : `${p1} (solo)`;
   if (teamName === `${p1} & ${p2}`) return null;
   return `${p1} · ${p2}`;
 }

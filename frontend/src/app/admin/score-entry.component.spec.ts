@@ -241,6 +241,22 @@ describe('ScoreEntryComponent', () => {
     httpMock.expectNone(r => r.url.includes('/tournaments/'));
   });
 
+  describe('solo team (ghost partner)', () => {
+    const withSolo = singleEliminationBracket({
+      1: [
+        match({ id: 101, match_number: 1, team2_name: 'Cy (solo)', team2_participant2_name: null }),
+        match({ id: 102, match_number: 2, team1_id: 12, team2_id: 13 }),
+      ],
+    });
+
+    it('tells the scorer the house rule on a game with a solo team, and only there', () => {
+      bootstrap({ ...tournamentWith(scorer), ghost_rule: 'four_bags' }, withSolo);
+      const notes = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.score-card'))
+        .map(card => card.querySelector('.solo-rule')?.textContent?.trim() ?? null);
+      expect(notes).toEqual(['Cy plays solo, throwing only their own four bags each inning.', null]);
+    });
+  });
+
   describe('pool play', () => {
     function pool(over: Partial<PoolData> = {}): PoolData {
       return {

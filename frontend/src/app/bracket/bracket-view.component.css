@@ -472,6 +472,19 @@ Double elimination: the two trees stacked
     white-space: nowrap;
 }
 .kiosk-dots { display: inline-flex; gap: 6px; }
+
+/* Odd player out (item 19): how the solo team plays, one line, on the page and the TV. */
+.solo-note { max-width: 680px; margin: -12px auto 20px; font-size: .9rem; color: var(--text-dim); }
+.kiosk-solo {
+    flex-shrink: 0;
+    padding: 6px 20px;
+    font-size: 1rem;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .kiosk-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--text-dim); }
 .kiosk-dot.on { background: var(--text); border-color: var(--text); }
 .pool-board { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0; color: var(--accent); font-weight: 600; }

@@ -89,6 +89,10 @@ export interface Tournament {
   team_entry_mode: 'auto_draft' | 'direct';
   // Balanced (A/B) draw, migration 021. Optional so responses predating it still parse.
   draw_mode?: 'random' | 'balanced';
+  // How a solo team plays (item 19, migration 023): walking is free, the rest Pro. Only
+  // `custom` carries text. Optional so responses predating the migration still parse.
+  ghost_rule?: 'walk' | 'four_bags' | 'sub' | 'custom';
+  ghost_rule_text?: string | null;
   // FEATURE_TRACKER item 16. Double elimination is a paid-plan feature and locks once the
   // bracket is generated. Optional so responses predating migration 016 still parse.
   format?: 'single' | 'double';
@@ -172,9 +176,10 @@ export interface Team {
   tournament_id: number;
   name: string;
   participant1_id: number;
-  participant2_id: number;
+  /** Null for a solo team, whose partner is a ghost (FEATURE_TRACKER item 19). */
+  participant2_id: number | null;
   participant1_name: string;
-  participant2_name: string;
+  participant2_name: string | null;
   seed: number;
 }
 

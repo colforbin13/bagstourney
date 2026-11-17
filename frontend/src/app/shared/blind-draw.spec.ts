@@ -30,15 +30,31 @@ describe('blind draw generator', () => {
       expect(teamName(teams[0])).toBe('Ann & Bob');
     });
 
-    it('leaves an odd player out', () => {
-      expect(pairTeams(players(5)).length).toBe(2);
+    it('gives an odd player out a ghost partner', () => {
+      const teams = pairTeams(players(5));
+      expect(teams.length).toBe(3);
+      expect(teams.filter(t => t.players[1] === null).length).toBe(1);
+      expect(teams.map(t => t.seed)).toEqual([1, 2, 3]);
+    });
+
+    it('names a team of one as solo', () => {
+      expect(teamName({ seed: 1, players: ['Sam', null] })).toBe('Sam (solo)');
+    });
+
+    it('puts the solo team at a random seed, not always the bottom', () => {
+      const seeds = new Set<number>();
+      for (let run = 0; run < 200; run++) {
+        const solo = pairTeams(players(7)).find(t => t.players[1] === null)!;
+        seeds.add(solo.seed);
+      }
+      expect(seeds.size).toBe(4);
     });
   });
 
   describe('pairBalanced', () => {
     const as = (n: number) => Array.from({ length: n }, (_, i) => `A${i + 1}`);
     const bs = (n: number) => Array.from({ length: n }, (_, i) => `B${i + 1}`);
-    const kind = (t: DrawnTeam) => t.players.map(p => p[0]).join('');
+    const kind = (t: DrawnTeam) => t.players.map(p => p?.[0] ?? '-').join('');
 
     it('pairs every A with a B and seeds the teams 1, 2, 3', () => {
       for (let run = 0; run < 100; run++) {
