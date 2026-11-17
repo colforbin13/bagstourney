@@ -21,6 +21,7 @@ deploy.ps1
 
 # Launch-video render output and composition sources (/brag skill)
 brag-output/
+brag-output-*/
 
 # OS
 .DS_Store

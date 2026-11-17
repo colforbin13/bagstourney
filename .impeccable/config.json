@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "brag-output-2026-11-16-210908/composition/index.html"
+        ],
+        "createdAt": "2026-11-17T03:19:21.550Z",
+        "reason": "user confirmed: video composition, text is legible in motion (label fades in as its badge turns green)"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "brag-output-2026-11-16-210908/composition/index.html"
+        ],
+        "createdAt": "2026-11-17T03:19:21.647Z",
+        "reason": "user confirmed: video composition, sign-up sheet names rest on their ruled lines by design"
+      }
+    ]
+  }
+}
