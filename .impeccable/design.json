@@ -1,46 +1,276 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-16T00:00:00Z",
+  "generatedAt": "2026-11-17T03:03:56Z",
   "title": "Design System: Bracketway",
   "extensions": {
     "colorMeta": {
-      "sheet": { "role": "primary", "displayName": "Sheet Green", "canonical": "#1FBF6B", "tonalRamp": ["#06301A", "#0B5230", "#117A47", "#17A35A", "#1FBF6B", "#5FD596", "#A5E8C4", "#E3F8EC"] },
-      "sheet-deep": { "role": "primary", "displayName": "Sheet Green, Pressed", "canonical": "#17A35A", "tonalRamp": ["#06301A", "#0B5230", "#117A47", "#17A35A", "#1FBF6B", "#5FD596", "#A5E8C4", "#E3F8EC"] },
-      "toner": { "role": "primary", "displayName": "Toner", "canonical": "#141414", "tonalRamp": ["#141414", "#2A2A2A", "#444444", "#666666", "#8A8A8A", "#B0B0B0", "#D6D6D6", "#F2F2F2"] },
-      "toner-pressed": { "role": "primary", "displayName": "Toner, Pressed", "canonical": "#33383A", "tonalRamp": ["#141414", "#2A2A2A", "#444444", "#666666", "#8A8A8A", "#B0B0B0", "#D6D6D6", "#F2F2F2"] },
-      "highlight": { "role": "secondary", "displayName": "Highlighter Pink", "canonical": "#FF7AA8", "tonalRamp": ["#4A0F25", "#7D1F42", "#B83A66", "#E85C8E", "#FF7AA8", "#FFA3C3", "#FFCBDD", "#FFEEF4"] },
-      "marker": { "role": "tertiary", "displayName": "Marker Green", "canonical": "#0B7A43", "tonalRamp": ["#032A17", "#064D2A", "#0B7A43", "#2B9A62", "#5DB888", "#96D3B1", "#C8E8D6", "#ECF7F1"] },
-      "danger": { "role": "tertiary", "displayName": "Correction Red", "canonical": "#B3261E", "tonalRamp": ["#3D0B08", "#6E1611", "#B3261E", "#D24A42", "#E27A74", "#EDA9A5", "#F6D2D0", "#FCEFEE"] },
-      "white-stock": { "role": "neutral", "displayName": "White Stock", "canonical": "#FFFFFF", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#FFFFFF"] },
-      "recessed-stock": { "role": "neutral", "displayName": "Recessed Stock", "canonical": "#EDF0EB", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] },
-      "ruled-line": { "role": "neutral", "displayName": "Ruled Line", "canonical": "#868E86", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] },
-      "toner-dim": { "role": "neutral", "displayName": "Toner, Dimmed", "canonical": "#3C423D", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] },
-      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#5F685F", "tonalRamp": ["#1E221E", "#3C423D", "#5F685F", "#868E86", "#A9B0A9", "#CBD0CA", "#EDF0EB", "#F8F9F7"] }
+      "sheet": {
+        "role": "primary",
+        "displayName": "Sheet Green",
+        "canonical": "#1FBF6B",
+        "tonalRamp": [
+          "#06301A",
+          "#0B5230",
+          "#117A47",
+          "#17A35A",
+          "#1FBF6B",
+          "#5FD596",
+          "#A5E8C4",
+          "#E3F8EC"
+        ]
+      },
+      "sheet-deep": {
+        "role": "primary",
+        "displayName": "Sheet Green, Pressed",
+        "canonical": "#17A35A",
+        "tonalRamp": [
+          "#06301A",
+          "#0B5230",
+          "#117A47",
+          "#17A35A",
+          "#1FBF6B",
+          "#5FD596",
+          "#A5E8C4",
+          "#E3F8EC"
+        ]
+      },
+      "toner": {
+        "role": "primary",
+        "displayName": "Toner",
+        "canonical": "#141414",
+        "tonalRamp": [
+          "#141414",
+          "#2A2A2A",
+          "#444444",
+          "#666666",
+          "#8A8A8A",
+          "#B0B0B0",
+          "#D6D6D6",
+          "#F2F2F2"
+        ]
+      },
+      "toner-pressed": {
+        "role": "primary",
+        "displayName": "Toner, Pressed",
+        "canonical": "#33383A",
+        "tonalRamp": [
+          "#141414",
+          "#2A2A2A",
+          "#444444",
+          "#666666",
+          "#8A8A8A",
+          "#B0B0B0",
+          "#D6D6D6",
+          "#F2F2F2"
+        ]
+      },
+      "highlight": {
+        "role": "secondary",
+        "displayName": "Highlighter Pink",
+        "canonical": "#FF7AA8",
+        "tonalRamp": [
+          "#4A0F25",
+          "#7D1F42",
+          "#B83A66",
+          "#E85C8E",
+          "#FF7AA8",
+          "#FFA3C3",
+          "#FFCBDD",
+          "#FFEEF4"
+        ]
+      },
+      "marker": {
+        "role": "tertiary",
+        "displayName": "Marker Green",
+        "canonical": "#0B7A43",
+        "tonalRamp": [
+          "#032A17",
+          "#064D2A",
+          "#0B7A43",
+          "#2B9A62",
+          "#5DB888",
+          "#96D3B1",
+          "#C8E8D6",
+          "#ECF7F1"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Correction Red",
+        "canonical": "#B3261E",
+        "tonalRamp": [
+          "#3D0B08",
+          "#6E1611",
+          "#B3261E",
+          "#D24A42",
+          "#E27A74",
+          "#EDA9A5",
+          "#F6D2D0",
+          "#FCEFEE"
+        ]
+      },
+      "white-stock": {
+        "role": "neutral",
+        "displayName": "White Stock",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#1E221E",
+          "#3C423D",
+          "#5F685F",
+          "#868E86",
+          "#A9B0A9",
+          "#CBD0CA",
+          "#EDF0EB",
+          "#FFFFFF"
+        ]
+      },
+      "recessed-stock": {
+        "role": "neutral",
+        "displayName": "Recessed Stock",
+        "canonical": "#EDF0EB",
+        "tonalRamp": [
+          "#1E221E",
+          "#3C423D",
+          "#5F685F",
+          "#868E86",
+          "#A9B0A9",
+          "#CBD0CA",
+          "#EDF0EB",
+          "#F8F9F7"
+        ]
+      },
+      "ruled-line": {
+        "role": "neutral",
+        "displayName": "Ruled Line",
+        "canonical": "#868E86",
+        "tonalRamp": [
+          "#1E221E",
+          "#3C423D",
+          "#5F685F",
+          "#868E86",
+          "#A9B0A9",
+          "#CBD0CA",
+          "#EDF0EB",
+          "#F8F9F7"
+        ]
+      },
+      "toner-dim": {
+        "role": "neutral",
+        "displayName": "Toner, Dimmed",
+        "canonical": "#3C423D",
+        "tonalRamp": [
+          "#1E221E",
+          "#3C423D",
+          "#5F685F",
+          "#868E86",
+          "#A9B0A9",
+          "#CBD0CA",
+          "#EDF0EB",
+          "#F8F9F7"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#5F685F",
+        "tonalRamp": [
+          "#1E221E",
+          "#3C423D",
+          "#5F685F",
+          "#868E86",
+          "#A9B0A9",
+          "#CBD0CA",
+          "#EDF0EB",
+          "#F8F9F7"
+        ]
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "The home headline only. Step numerals, step titles and the list title share its 106% width." },
-      "headline": { "displayName": "Headline", "purpose": "Page titles on working screens; marketing page titles run larger." },
-      "title": { "displayName": "Title", "purpose": "Card and panel headings, pricing tier names, the sign-up sheet title." },
-      "body": { "displayName": "Body", "purpose": "Running copy. Emphasis comes from weight, not colour." },
-      "label": { "displayName": "Label", "purpose": "Board names, toolbar group labels, small metadata. Sentence case, no tracking." }
+      "display": {
+        "displayName": "Display",
+        "purpose": "The home headline. Step numerals, step titles and the list title share its 106% width, as do the sheet head and sheet foot lines on the other Persuade pages."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles on working screens; marketing page titles run larger."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and panel headings, pricing tier names, the sign-up sheet title."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running copy. Emphasis comes from weight, not colour."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Board names, toolbar group labels, small metadata. Sentence case, no tracking."
+      }
     },
     "shadows": [
-      { "name": "sheet-edge", "value": "0 1px 0 rgba(0, 0, 0, .22), 0 14px 22px -16px rgba(0, 0, 0, .45)", "purpose": "The white sign-up sheet resting on the green hero." },
-      { "name": "menu-edge", "value": "0 10px 18px -8px rgba(0, 0, 0, .35)", "purpose": "The header dropdown menu, a white sheet over the page." },
-      { "name": "lifted", "value": "0 4px 14px rgba(0, 0, 0, 0.18)", "purpose": "A row while it is being dragged." }
+      {
+        "name": "sheet-edge",
+        "value": "0 1px 0 rgba(0, 0, 0, .22), 0 14px 22px -16px rgba(0, 0, 0, .45)",
+        "purpose": "The white sign-up sheet resting on the green hero."
+      },
+      {
+        "name": "menu-edge",
+        "value": "0 10px 18px -8px rgba(0, 0, 0, .35)",
+        "purpose": "Any dropdown menu or modal, a white sheet with a 1.5px toner rule."
+      },
+      {
+        "name": "lifted",
+        "value": "0 4px 14px rgba(0, 0, 0, 0.18)",
+        "purpose": "A row while it is being dragged."
+      }
     ],
     "motion": [
-      { "name": "ease-settle", "value": "cubic-bezier(.16, 1, .3, 1)", "purpose": "Paper settling: drawn team rows, tab lettering, the hero action lift, list row indent, disclosure chevron." },
-      { "name": "set-down", "value": "0.5s ease-settle, 70ms stagger, from translate(-18px, -12px) rotate(-3deg)", "purpose": "Drawn teams landing on the sign-up sheet. Rows stay readable throughout; off under reduced motion." },
-      { "name": "state", "value": "0.15s", "purpose": "Background, border and colour changes on hover and focus." },
-      { "name": "toast-in", "value": "0.2s ease, 8px rise", "purpose": "Toast entrance." }
+      {
+        "name": "ease-settle",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Paper settling: drawn team rows, tab lettering, the hero action lift, list row indent, sheet-foot row inset, disclosure chevron."
+      },
+      {
+        "name": "set-down",
+        "value": "0.5s ease-settle, 70ms stagger, from translate(-18px, -12px) rotate(-3deg)",
+        "purpose": "Drawn teams landing on the sign-up sheet. Rows stay readable throughout; off under reduced motion."
+      },
+      {
+        "name": "state",
+        "value": "0.15s",
+        "purpose": "Background, border and colour changes on hover and focus."
+      },
+      {
+        "name": "toast-in",
+        "value": "0.2s ease, 8px rise",
+        "purpose": "Toast entrance."
+      }
     ],
     "breakpoints": [
-      { "name": "hero-action-full", "value": "520px" },
-      { "name": "bracket-stack", "value": "600px" },
-      { "name": "nav-collapse", "value": "640px" },
-      { "name": "pricing-columns", "value": "720px" },
-      { "name": "hero-stack", "value": "860px" }
+      {
+        "name": "hero-action-full",
+        "value": "520px"
+      },
+      {
+        "name": "bracket-stack",
+        "value": "600px"
+      },
+      {
+        "name": "nav-collapse",
+        "value": "640px"
+      },
+      {
+        "name": "pricing-columns",
+        "value": "720px"
+      },
+      {
+        "name": "hero-stack",
+        "value": "860px"
+      },
+      {
+        "name": "sheet-foot-stack",
+        "value": "860px"
+      }
     ]
   },
   "components": [
@@ -112,9 +342,17 @@
       "name": "Tear-off Tabs",
       "kind": "custom",
       "refersTo": "tear-off-tab",
-      "description": "The strip along the bottom of the home flyer. Dashed cut lines, lettering on its side, the first tab inked.",
+      "description": "The strip along the bottom of the home flyer, and nowhere else. Dashed cut lines, lettering on its side, the first tab inked.",
       "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab ds-tab-go\" href=\"#\"><span>Start free</span></a><a class=\"ds-tab\" href=\"#\"><span>Blind draw</span></a><a class=\"ds-tab\" href=\"#\"><span>How it works</span></a><a class=\"ds-tab\" href=\"#\"><span>Pricing</span></a></nav>",
       "css": ".ds-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--sheet, #1FBF6B); border-top: 2.5px dashed var(--text, #141414); font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); } .ds-tab { display: flex; align-items: center; justify-content: center; height: 138px; border-right: 2.5px dashed var(--text, #141414); color: var(--text, #141414); text-decoration: none; transition: background .15s; } .ds-tab:last-child { border-right: none; } .ds-tab span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 1rem; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; transition: transform .25s cubic-bezier(.16, 1, .3, 1); } .ds-tab:hover { background: var(--sheet-deep, #17A35A); } .ds-tab:hover span { transform: rotate(180deg) translateY(6px); } .ds-tab:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: -5px; } .ds-tab-go { background: var(--text, #141414); color: var(--sheet, #1FBF6B); } .ds-tab-go:hover { background: var(--accent-dim, #33383A); } .ds-tab-go:focus-visible { outline-color: var(--sheet, #1FBF6B); }"
+    },
+    {
+      "name": "Sheet Foot",
+      "kind": "custom",
+      "refersTo": "sheet-foot",
+      "description": "The only footer of a Persuade page other than home: the green sheet returns with one closing line and action, the other marketing pages as ruled rows, and the legal links along the bottom.",
+      "html": "<footer class=\"ds-foot\"><div class=\"ds-foot-main\"><div><h2 class=\"ds-foot-line\">Run your own tournament for free</h2><a class=\"ds-foot-go\" href=\"#\">Start free</a></div><nav class=\"ds-foot-index\"><a class=\"ds-foot-row\" href=\"#\"><span class=\"ds-foot-label\">How it works</span><span class=\"ds-foot-note\">From sign-ups to a champion, step by step</span><svg width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3 9h11M9.5 4l5 5-5 5\" stroke=\"currentColor\" stroke-width=\"2\"/></svg></a><a class=\"ds-foot-row\" href=\"#\"><span class=\"ds-foot-label\">Pricing</span><span class=\"ds-foot-note\">Free for tournaments up to 32 players</span><svg width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3 9h11M9.5 4l5 5-5 5\" stroke=\"currentColor\" stroke-width=\"2\"/></svg></a><a class=\"ds-foot-row\" href=\"#\"><span class=\"ds-foot-label\">Sports</span><span class=\"ds-foot-note\">Any game played in two-player teams</span><svg width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3 9h11M9.5 4l5 5-5 5\" stroke=\"currentColor\" stroke-width=\"2\"/></svg></a></nav></div><div class=\"ds-foot-base\"><a class=\"ds-foot-brand\" href=\"#\"><svg width=\"20\" height=\"17\" viewBox=\"0 0 30 26\" fill=\"none\" aria-hidden=\"true\"><circle cx=\"4\" cy=\"4\" r=\"3.2\" fill=\"currentColor\"/><circle cx=\"4\" cy=\"22\" r=\"3.2\" fill=\"currentColor\"/><circle cx=\"26\" cy=\"13\" r=\"3\" fill=\"#1FBF6B\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M7 4H14C16 4 16 13 18 13\" stroke=\"currentColor\" stroke-width=\"1.6\" fill=\"none\"/><path d=\"M7 22H14C16 22 16 13 18 13\" stroke=\"currentColor\" stroke-width=\"1.6\" fill=\"none\"/></svg><span>Bracketway</span></a><div class=\"ds-foot-legal\"><a href=\"#\">Terms</a><a href=\"#\">Refunds</a><a href=\"#\">Privacy</a></div></div></footer>",
+      "css": ".ds-foot { background: var(--sheet, #1FBF6B); color: var(--text, #141414); border-top: 2.5px dashed var(--text, #141414); padding: 40px 24px 0; font-family: var(--sans, 'Archivo', 'Helvetica Neue', Arial, sans-serif); } .ds-foot-main { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: start; } .ds-foot-line { max-width: 11ch; margin: 0; font-size: 2.6rem; font-weight: 900; font-stretch: 106%; line-height: .95; letter-spacing: -.04em; text-wrap: balance; } .ds-foot-go { display: inline-flex; align-items: center; justify-content: center; min-height: 56px; margin-top: 24px; padding: 0 28px; background: var(--text, #141414); color: var(--surface, #FFFFFF); font-size: 1.2rem; font-weight: 800; letter-spacing: -.01em; text-decoration: none; transition: transform .18s cubic-bezier(.16, 1, .3, 1), background .15s; } .ds-foot-go:hover { background: var(--accent-dim, #33383A); transform: translateY(-2px); } .ds-foot-go:active { transform: translateY(0); } .ds-foot-index { border-top: 3px solid var(--text, #141414); } .ds-foot-row { display: grid; grid-template-columns: 9rem minmax(0, 1fr) auto; align-items: baseline; column-gap: 16px; padding: 15px 0; border-bottom: 1.5px solid var(--text, #141414); color: var(--text, #141414); text-decoration: none; transition: background .15s, padding .25s cubic-bezier(.16, 1, .3, 1); } .ds-foot-row:hover { background: var(--sheet-deep, #17A35A); padding-left: 8px; padding-right: 8px; } .ds-foot-row svg { align-self: center; } .ds-foot-label { font-size: 1.15rem; font-weight: 800; font-stretch: 106%; letter-spacing: -.015em; } .ds-foot-note { font-size: .95rem; font-weight: 500; } .ds-foot-base { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 24px; margin-top: 40px; padding: 6px 0 10px; border-top: 1.5px solid var(--text, #141414); } .ds-foot-brand { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--text, #141414); font-size: 1.1rem; font-weight: 900; font-stretch: 112%; letter-spacing: -.03em; text-decoration: none; } .ds-foot-legal { display: flex; gap: 24px; } .ds-foot-legal a { display: inline-flex; align-items: center; min-height: 44px; color: var(--text, #141414); font-size: .875rem; font-weight: 600; text-decoration: none; } .ds-foot-legal a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; } .ds-foot a:focus-visible { outline: 3px solid var(--text, #141414); outline-offset: 2px; } .ds-foot-row:focus-visible { outline-offset: -3px; }"
     },
     {
       "name": "Sign-up Sheet",
@@ -137,12 +375,36 @@
       "Paper depth and paper motion only"
     ],
     "rules": [
-      { "name": "The One Ink Rule", "body": "Type, links and primary actions are toner. A link is marked by its underline (1.5px, thickening to 2.5px on hover), never by a colour. Marker green and correction red are the only other inks, and each has one job.", "section": "colors" },
-      { "name": "The Highlighter Rule", "body": "Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. Text selection is toner turned inside out for the same reason.", "section": "colors" },
-      { "name": "The Sheet and Stock Rule", "body": "Persuade surfaces print on the green sheet. Working screens are white stock under the green header. The header is what makes a working page recognisably Bracketway without colouring the work.", "section": "colors" },
-      { "name": "The One Face Rule", "body": "Archivo is the only typeface. Hierarchy comes from weight and width, never from a second family.", "section": "typography" },
-      { "name": "The Sentence Case Rule", "body": "Everything is sentence case. No uppercase, no tracked-out labels, no small label sitting above a heading.", "section": "typography" },
-      { "name": "The Sheet's Edge Rule", "body": "Shadows belong to a sheet's edge. Cards, buttons, inputs and badges are flat at rest and flat on hover.", "section": "elevation" }
+      {
+        "name": "The One Ink Rule",
+        "body": "Type, links and primary actions are toner. A link is marked by its underline (1.5px, thickening to 2.5px on hover), never by a colour. Marker green and correction red are the only other inks, and each has one job.",
+        "section": "colors"
+      },
+      {
+        "name": "The Highlighter Rule",
+        "body": "Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. A made-up example tournament is never live, whatever its seeded state, so an example in progress gets an outlined \"In progress\" badge instead. Text selection is toner turned inside out for the same reason.",
+        "section": "colors"
+      },
+      {
+        "name": "The Sheet and Stock Rule",
+        "body": "Persuade surfaces print on the green sheet. Working screens are white stock under the green header. The header is what makes a working page recognisably Bracketway without colouring the work.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Face Rule",
+        "body": "Archivo is the only typeface. Hierarchy comes from weight and width, never from a second family.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Everything is sentence case. No uppercase, no tracked-out labels, no small label sitting above a heading.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sheet's Edge Rule",
+        "body": "Shadows belong to a sheet's edge. Cards, buttons, inputs and badges are flat at rest and flat on hover.",
+        "section": "elevation"
+      }
     ],
     "dos": [
       "Do print Persuade surfaces on the green sheet edge to edge, and keep working screens on white stock under the green header.",

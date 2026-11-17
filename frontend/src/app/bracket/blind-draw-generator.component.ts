@@ -21,17 +21,17 @@ import {
   standalone: true,
   imports: [RouterLink],
   template: `
-    <div class="page">
-      <header class="intro">
-        <h1>Blind draw generator</h1>
-        <p class="lede">
-          Paste in your players and get random two-player teams and a seeded bracket, ready for
-          cornhole, bags, darts, pickleball or any doubles game. Free, no account, nothing to
-          install.
-        </p>
-      </header>
+    <header class="sheet-head">
+      <h1>Blind draw generator</h1>
+      <p class="lede">
+        Paste in your players and get random two-player teams and a seeded bracket, ready for
+        cornhole, bags, darts, pickleball or any doubles game. Free, no account, nothing to
+        install.
+      </p>
+    </header>
 
-      <section class="card tool">
+    <div class="sheet-body">
+      <section class="card tool measure">
         <label for="names" class="section-label">{{ balanced() ? 'A players (stronger), one per line' : 'Players, one per line' }}</label>
         <textarea id="names" class="input" rows="8" [value]="text()" (input)="onInput($event)"
           placeholder="Ann&#10;Bob&#10;Cara&#10;Dev"></textarea>
@@ -63,7 +63,7 @@ import {
       </section>
 
       @if (teams(); as list) {
-        <section class="result">
+        <section class="result ruled">
           <h2>Teams</h2>
           <ol class="teams">
             @for (team of list; track team.seed) {
@@ -88,7 +88,7 @@ import {
         </section>
       }
 
-      <section class="card live">
+      <section class="card live measure">
         <h2>Run it live</h2>
         <p>
           Players sign up from a QR code at the door, you tap in scores from your phone, winners
@@ -102,7 +102,7 @@ import {
         }
       </section>
 
-      <section class="about">
+      <section class="about ruled measure">
         <h2>How a blind draw works</h2>
         <p>
           In a blind draw, players sign up on their own and are paired into teams at random, so
@@ -131,14 +131,13 @@ import {
     </div>
   `,
   styles: [`
-    .intro { margin-bottom: 24px; }
-    .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
-    .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
     .tool textarea { width: 100%; resize: vertical; font: inherit; }
     .status { font-size: 0.85rem; color: var(--text-dim); margin: 8px 0 12px; }
     .status.warn { color: var(--accent); }
     .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-    h2 { font-size: 1.15rem; margin: 28px 0 12px; }
+    h2 { font-size: clamp(1.3rem, 2.2vw, 1.6rem); font-weight: 900; font-stretch: 106%; margin: 28px 0 12px; }
+    .result, .about { margin-top: clamp(32px, 4vw, 44px); }
+    .result > h2:first-child, .about > h2:first-child { margin-top: 0; }
     .teams { list-style: none; padding: 0; display: grid; gap: 6px; }
     .teams li { display: flex; gap: 10px; align-items: baseline; }
     .seed { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); min-width: 22px; text-align: right; }
@@ -155,7 +154,7 @@ import {
     .match span { padding: 6px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .match span + span { border-top: 1px solid var(--border); }
     .match.bye { opacity: .6; }
-    .live { margin-top: 32px; }
+    .live { margin-top: clamp(32px, 4vw, 44px); }
     .live h2 { margin-top: 0; }
     .live p { color: var(--text-dim); line-height: 1.6; margin-bottom: 16px; }
     .group-b { margin-top: 14px; }

@@ -12,8 +12,6 @@
 // Those copies need a deploy to change. If the call fails, the built-in prices stay up; if
 // billing is off on this installation, the tiers are still described without price lines.
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { AuthService } from '../shared/services/auth.service';
 import { BillingService } from '../shared/services/billing.service';
 import { BillingPlanOption } from '../shared/models/tournament.models';
 import { LEGAL } from '../shared/legal';
@@ -37,26 +35,27 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
 @Component({
   selector: 'app-pricing',
   standalone: true,
-  imports: [RouterLink],
   template: `
-    <div class="page">
-      <header class="intro">
-        <h1>Free to run. Pro when it gets big.</h1>
-        <p class="lede">
-          Most tournaments never need to pay for anything. Upgrade when your field outgrows the
-          free tier or you want double elimination, pool play or board assignments, either for every tournament you run or
-          just for one.
-        </p>
-      </header>
+    <header class="sheet-head">
+      <h1>Free to run. Pro when it gets big.</h1>
+      <p class="lede">
+        Most tournaments never need to pay for anything. Upgrade when your field outgrows the
+        free tier or you want double elimination, pool play or board assignments, either for every tournament you run or
+        just for one.
+      </p>
+    </header>
+
+    <div class="sheet-body">
 
       @if (billingUnavailable()) {
         <div class="notice">Paid plans aren't on sale yet. Everything in Free works today.</div>
       }
 
-      <div class="tiers">
+      <div class="tiers ruled">
         <section class="tier">
           <h2 class="tier-name">Free</h2>
           <div class="tier-price">{{ zeroPrice() }}</div>
+          <p class="tier-pitch">For trying it out, or any smaller event.</p>
           <ul class="tier-list">
             <li>Up to {{ freeCap() }} players per tournament ({{ freeCap() / 2 }} two-player teams)</li>
             <li>Single elimination</li>
@@ -110,7 +109,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
         <p class="tax-note">Sales tax is added at checkout where it applies.</p>
       }
 
-      <section class="faq">
+      <section class="faq ruled">
         <h2 class="faq-title">Questions</h2>
         @for (item of faq; track item.q) {
           <details class="faq-item">
@@ -120,22 +119,9 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
         }
       </section>
 
-      <div class="closing">
-        @if (auth.isLoggedIn()) {
-          <a class="btn btn-primary" routerLink="/admin/billing">Go to billing</a>
-          <a class="btn" routerLink="/admin">Your tournaments</a>
-        } @else {
-          <a class="btn btn-primary" routerLink="/admin/register">Create a free account</a>
-          <a class="btn" routerLink="/how-it-works">How it works</a>
-        }
-      </div>
     </div>
   `,
   styles: [`
-    .intro { margin-bottom: 32px; }
-    .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
-    .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
-
     .notice {
       padding: 12px 16px;
       margin-bottom: 20px;
@@ -148,9 +134,6 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
 
     /* Stacked on a phone, three across once there's room. */
     .tiers { display: grid; gap: 16px; grid-template-columns: 1fr; }
-    @media (min-width: 720px) {
-      .tiers { grid-template-columns: repeat(3, 1fr); }
-    }
     .tier {
       display: flex;
       flex-direction: column;
@@ -159,9 +142,12 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       border: 1.5px solid var(--text);
       border-radius: var(--radius);
     }
-    .tier-featured { border: 2px solid var(--accent); }
-    .tier-name { font-size: 1.5rem; margin-bottom: 6px; }
-    .tier-price { font-size: 1.6rem; font-weight: 600; line-height: 1.2; }
+    /* Pro stands out by a heavier frame and marker-green name and price; marker, not sheet
+       green, because sheet green is too light to read as text on white. */
+    .tier-featured { border: 3px solid var(--text); padding: 18.5px; }
+    .tier-featured .tier-name, .tier-featured .tier-price { color: var(--marker); }
+    .tier-name { font-size: 1.5rem; font-stretch: 106%; margin-bottom: 6px; }
+    .tier-price { font-size: 1.9rem; font-weight: 800; line-height: 1.2; }
     .per { font-size: 0.85rem; font-weight: 400; color: var(--text-dim); }
     .tier-alt { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
     .tier-pitch { font-size: 0.85rem; color: var(--text-dim); margin-top: 8px; }
@@ -188,10 +174,21 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       border-bottom: 2px solid var(--text);
       transform: rotate(45deg);
     }
+    /* Across, each card shares the row's five tracks (name, price, yearly price, pitch,
+       features), so every feature list starts on the same line whatever sits above it. */
+    @media (min-width: 720px) {
+      .tiers { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(5, auto); row-gap: 0; }
+      .tier { display: grid; grid-row: span 5; grid-template-rows: subgrid; align-content: start; }
+      .tier-name { grid-row: 1; }
+      .tier-price { grid-row: 2; }
+      .tier-alt { grid-row: 3; }
+      .tier-pitch { grid-row: 4; }
+      .tier-list { grid-row: 5; align-self: start; }
+    }
     .tax-note { font-size: 0.78rem; color: var(--muted); margin-top: 12px; }
 
-    .faq { margin-top: 40px; }
-    .faq-title { font-size: 1.4rem; margin-bottom: 8px; }
+    .faq { margin-top: clamp(40px, 5vw, 64px); max-width: 820px; }
+    .faq-title { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 900; font-stretch: 106%; margin-bottom: 12px; }
     .faq-item { border-top: 1.5px solid var(--text); }
     .faq-item:last-child { border-bottom: 1.5px solid var(--text); }
     .faq-item summary {
@@ -207,11 +204,9 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       padding-bottom: 14px;
     }
 
-    .closing { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px; }
   `]
 })
 export class PricingComponent implements OnInit {
-  auth = inject(AuthService);
   billing = inject(BillingService);
 
   private plans = signal<BillingPlanOption[]>(FALLBACK_PLANS);

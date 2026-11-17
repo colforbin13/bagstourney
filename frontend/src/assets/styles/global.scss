@@ -202,6 +202,39 @@ h1, h2, h3 {
 /* Small help text under a form control. */
 .field-hint { font-size: 0.78rem; line-height: 1.4; color: var(--muted); }
 
+/* ── The flyer on Persuade pages (DESIGN.md, Sheet and Stock) ──
+   The head prints on the green sheet edge to edge, cut from the white stock below by a
+   dashed line; the body sits on the same gutter as the nav; a heavy toner rule opens each
+   section. The page then closes on the footer's sheet foot (footer.component.ts). */
+.sheet-head {
+  background: var(--sheet);
+  padding: clamp(32px, 5vw, 64px) var(--page-gutter) clamp(32px, 4.5vw, 56px);
+  border-bottom: 2.5px dashed var(--text);
+  h1 {
+    max-width: 15ch;
+    font-size: clamp(2.6rem, 6.4vw, 5rem);
+    font-weight: 900;
+    font-stretch: 106%;
+    line-height: .95;
+    letter-spacing: -.04em;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 62ch;
+    margin-top: clamp(14px, 2vw, 22px);
+    font-size: clamp(1rem, 1.35vw, 1.2rem);
+    line-height: 1.5;
+    font-weight: 500;
+    color: var(--text);
+    text-wrap: pretty;
+    a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+  }
+}
+.sheet-body { padding: clamp(28px, 4vw, 48px) var(--page-gutter) clamp(40px, 5vw, 64px); }
+/* Running prose keeps a readable line inside the wide body. */
+.measure { max-width: 760px; }
+.ruled { border-top: 3px solid var(--text); padding-top: clamp(18px, 2.4vw, 28px); }
+
 .page-header {
   display: flex;
   align-items: center;

@@ -5,8 +5,6 @@
 // now sport-neutral and this page carries the specifics instead. Keeping the naming in
 // one place means adding a sport is an edit here, not a sweep through every page.
 import { Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { AuthService } from '../shared/services/auth.service';
 
 interface SportGroup {
   name: string;
@@ -17,31 +15,32 @@ interface SportGroup {
 @Component({
   selector: 'app-sports',
   standalone: true,
-  imports: [RouterLink],
   template: `
-    <div class="page">
-      <header class="intro">
-        <h1>If it's two-player teams, it runs here.</h1>
-        <p class="lede">
-          Bracketway doesn't know or care what game you're playing. It draws teams of two,
-          seeds them, builds the bracket, and tracks a score per side. Any
-          game that fits that shape fits here — these are the ones organizers actually run.
-        </p>
-      </header>
+    <header class="sheet-head">
+      <h1>If it's two-player teams, it runs here.</h1>
+      <p class="lede">
+        Bracketway doesn't know or care what game you're playing. It draws teams of two,
+        seeds them, builds the bracket, and tracks a score per side. Any
+        game that fits that shape fits here — these are the ones organizers actually run.
+      </p>
+    </header>
 
-      @for (group of groups; track group.name) {
-        <section class="group">
-          <h2 class="group-name">{{ group.name }}</h2>
-          <p class="group-blurb">{{ group.blurb }}</p>
-          <ul class="sports">
-            @for (sport of group.sports; track sport) {
-              <li>{{ sport }}</li>
-            }
-          </ul>
-        </section>
-      }
+    <div class="sheet-body">
+      <div class="groups">
+        @for (group of groups; track group.name) {
+          <section class="group ruled">
+            <h2 class="group-name">{{ group.name }}</h2>
+            <p class="group-blurb">{{ group.blurb }}</p>
+            <ul class="sports">
+              @for (sport of group.sports; track sport) {
+                <li>{{ sport }}</li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
 
-      <section class="aside">
+      <section class="aside measure">
         <h2 class="aside-title">Don't see yours?</h2>
         <p>
           The list isn't a set of modes you pick from — there's no sport field on a
@@ -55,24 +54,13 @@ interface SportGroup {
           and advances whoever's is higher.
         </p>
       </section>
-
-      <div class="closing">
-        @if (auth.isLoggedIn()) {
-          <a class="btn btn-primary" routerLink="/admin">Set one up</a>
-        } @else {
-          <a class="btn btn-primary" routerLink="/admin/register">Create an account</a>
-        }
-        <a class="btn" routerLink="/how-it-works">How it works</a>
-      </div>
     </div>
   `,
   styles: [`
-    .intro { margin-bottom: 40px; }
-    .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
-    .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
-
-    .group { border-top: 2px solid var(--border); padding-top: 16px; margin-bottom: 32px; }
-    .group-name { font-size: 1.4rem; margin-bottom: 8px; }
+    /* Two groups across once there's room; each opens on a toner rule. */
+    .groups { display: grid; gap: clamp(28px, 4vw, 44px) clamp(24px, 4vw, 56px); }
+    @media (min-width: 860px) { .groups { grid-template-columns: 1fr 1fr; } }
+    .group-name { font-size: clamp(1.4rem, 2.4vw, 1.8rem); font-weight: 900; font-stretch: 106%; margin-bottom: 8px; }
     .group-blurb {
       font-size: 0.85rem;
       line-height: 1.6;
@@ -90,7 +78,7 @@ interface SportGroup {
     .sports li {
       padding: 7px 12px;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
       font-family: var(--mono);
       font-size: 0.78rem;
@@ -98,10 +86,10 @@ interface SportGroup {
     }
 
     .aside {
-      margin-top: 8px;
+      margin-top: clamp(36px, 5vw, 56px);
       padding: 18px;
       background: var(--surface-2);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
     }
     .aside-title { font-size: 1.2rem; margin-bottom: 10px; }
@@ -112,8 +100,6 @@ interface SportGroup {
       & + p { margin-top: 12px; }
     }
     .aside strong { color: var(--text); font-weight: 600; }
-
-    .closing { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px; }
   `]
 })
 export class SportsComponent {
@@ -164,6 +150,4 @@ export class SportsComponent {
       ],
     },
   ];
-
-  constructor(public auth: AuthService) {}
 }

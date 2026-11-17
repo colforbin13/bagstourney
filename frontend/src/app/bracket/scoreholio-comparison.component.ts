@@ -7,9 +7,8 @@
 // that only flatters us reads as an ad and earns neither rankings nor trust. Every Scoreholio
 // fact here came from scoreholio.com and docs.scoreholio.com, checked in October 2026 (see
 // CHECKED below). Their plans change; re-check before editing, and update CHECKED when you do.
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../shared/services/auth.service';
 
 interface Row {
   topic: string;
@@ -22,18 +21,18 @@ interface Row {
   standalone: true,
   imports: [RouterLink],
   template: `
-    <article class="page">
-      <header class="intro">
-        <h1>Bracketway vs Scoreholio</h1>
-        <p class="lede">
-          Scoreholio is the best-known tournament app in cornhole, and for good reason. Bracketway
-          is a simpler tool built for a different night: a fundraiser, a bar tournament or a
-          backyard bracket, where nobody should have to download anything. Here's an honest look
-          at how they differ, so you can pick the one that fits your event.
-        </p>
-      </header>
+    <header class="sheet-head">
+      <h1>Bracketway vs Scoreholio</h1>
+      <p class="lede">
+        Scoreholio is the best-known tournament app in cornhole, and for good reason. Bracketway
+        is a simpler tool built for a different night: a fundraiser, a bar tournament or a
+        backyard bracket, where nobody should have to download anything. Here's an honest look
+        at how they differ, so you can pick the one that fits your event.
+      </p>
+    </header>
 
-      <section>
+    <article class="sheet-body">
+      <section class="ruled measure">
         <h2>Side by side</h2>
         <div class="rows">
           @for (row of rows; track row.topic) {
@@ -49,7 +48,7 @@ interface Row {
         <p class="checked">Scoreholio details from scoreholio.com and its documentation, checked {{ checked }}.</p>
       </section>
 
-      <section>
+      <section class="ruled measure">
         <h2>When Scoreholio is the better choice</h2>
         <ul>
           <li>You run a <strong>weekly league</strong> or a season, and want standings that carry over from week to week.</li>
@@ -59,7 +58,7 @@ interface Row {
         </ul>
       </section>
 
-      <section>
+      <section class="ruled measure">
         <h2>When Bracketway is the better choice</h2>
         <ul>
           <li>
@@ -87,42 +86,31 @@ interface Row {
         </ul>
       </section>
 
-      <section class="card cta">
+      <section class="card cta measure">
         <h2>Try Bracketway free</h2>
         <p>
           Free for tournaments up to 32 players, with nothing to install for you or your players.
           Pro adds bigger fields, double elimination, pool play and board assignments.
         </p>
-        <div class="actions">
-          @if (auth.isLoggedIn()) {
-            <a class="btn btn-primary" routerLink="/admin">Create a tournament</a>
-          } @else {
-            <a class="btn btn-primary" routerLink="/admin/register">Create a free account</a>
-          }
-          <a class="btn" routerLink="/how-it-works">How it works</a>
-        </div>
         <p class="aside">
           Planning a fundraiser? Read <a routerLink="/cornhole-fundraiser">how to run a cornhole fundraiser</a>.
         </p>
       </section>
 
-      <p class="disclaimer">
+      <p class="disclaimer measure">
         Scoreholio is a trademark of its owner. Bracketway is not affiliated with or endorsed by
         Scoreholio. Spotted something out of date? Email support&#64;bracketway.com and we'll fix it.
       </p>
     </article>
   `,
   styles: [`
-    .intro { margin-bottom: 28px; }
-    .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
-    .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
-    section { margin-bottom: 32px; }
-    h2 { font-size: 1.4rem; margin-bottom: 12px; }
+    section { margin-bottom: clamp(32px, 4vw, 44px); }
+    h2 { font-size: clamp(1.5rem, 2.6vw, 1.9rem); font-weight: 900; font-stretch: 106%; margin-bottom: 12px; }
     p, li { color: var(--text-dim); line-height: 1.65; }
     strong { color: var(--text); font-weight: 600; }
     ul { padding-left: 20px; display: grid; gap: 8px; }
     .rows { display: grid; gap: 10px; }
-    .row { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 12px 14px; }
+    .row { border: 1.5px solid var(--text); border-radius: var(--radius); background: var(--surface); padding: 12px 14px; }
     .row h3 { font-size: 0.95rem; margin-bottom: 8px; }
     .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.85rem; line-height: 1.5; color: var(--text-dim); }
     @media (max-width: 520px) { .cols { grid-template-columns: 1fr; gap: 8px; } }
@@ -132,12 +120,10 @@ interface Row {
     }
     .checked, .disclaimer { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
     .cta h2 { margin-top: 0; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 12px; }
-    .aside { font-size: 0.85rem; }
+    .aside { font-size: 0.85rem; margin-top: 12px; }
   `],
 })
 export class ScoreholioComparisonComponent {
-  readonly auth = inject(AuthService);
   /** When the Scoreholio facts below were last verified. */
   readonly checked = 'October 2026';
 

@@ -22,10 +22,4 @@ describe('FundraiserGuideComponent', () => {
     expect(text).toContain('free for up to 32 players');
     expect(text).toContain('$12.99');
   });
-
-  it('should send signed-out visitors to sign up and organizers to their dashboard', () => {
-    expect(render(false).querySelector('.cta .btn-primary')!.getAttribute('href')).toBe('/admin/register');
-    TestBed.resetTestingModule();
-    expect(render(true).querySelector('.cta .btn-primary')!.getAttribute('href')).toBe('/admin');
-  });
 });

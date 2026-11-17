@@ -122,6 +122,11 @@ components:
   tear-off-tab-go:
     backgroundColor: "{colors.toner}"
     textColor: "{colors.sheet}"
+  sheet-foot:
+    backgroundColor: "{colors.sheet}"
+    textColor: "{colors.toner}"
+  sheet-foot-row-hover:
+    backgroundColor: "{colors.sheet-deep}"
 ---
 
 # Design System: Bracketway
@@ -149,8 +154,8 @@ It should feel as easy as a sign-up sheet to a first-time organizer standing at 
 A two-colour print job: saturated green paper and black toner, with white stock for the work and a pink highlighter held back for one meaning.
 
 ### Primary
-- **Sheet Green** (`sheet`, #1FBF6B): the copy-paper sheet. Fills Persuade surfaces edge to edge (the home hero and its tear-off tabs) and the header of every screen. On working screens it appears nowhere else at size; its only other use is the small square bullet on the home feature list.
-- **Sheet Green, Pressed** (`sheet-deep`, #17A35A): hover and open state for things printed on the sheet (tabs, nav dropdown triggers).
+- **Sheet Green** (`sheet`, #1FBF6B): the copy-paper sheet. Fills Persuade surfaces edge to edge (the home hero and its tear-off tabs, and the sheet head and sheet foot of every other Persuade page) and the header of every screen. On working screens it appears nowhere else at size; its only other use is the small square bullet on the home feature list.
+- **Sheet Green, Pressed** (`sheet-deep`, #17A35A): hover and open state for things printed on the sheet (tabs, sheet-foot rows, nav dropdown triggers).
 - **Toner** (`toner`, #141414): the only ink. All type, primary actions, links, card rules, focus rings, progress fills and the bracket mark.
 - **Toner, Pressed** (`toner-pressed`, #33383A): hover state of a toner-filled action.
 
@@ -158,7 +163,7 @@ A two-colour print job: saturated green paper and black toner, with white stock 
 - **Highlighter Pink** (`highlight`, #FF7AA8): "live right now". Shipped use: the Live status badge, with toner text on it.
 
 ### Tertiary
-- **Marker Green** (`marker`, #0B7A43): won or confirmed. Winning team name and score, champion line, "Won by" text, success toasts. Also used as a faint tint behind a winning row (8% over white) and a 40% border on a completed match.
+- **Marker Green** (`marker`, #0B7A43): won or confirmed. Winning team name and score, champion line, "Won by" text, success toasts, and the recommended plan's name and price on Pricing (the Pro card, whose frame is 3px toner). Also used as a faint tint behind a winning row (8% over white) and a 40% border on a completed match.
 - **Correction Red** (`danger`, #B3261E): destructive actions and errors only. Outline that fills on hover.
 
 ### Neutral
@@ -203,6 +208,8 @@ Loaded from Google Fonts with the width axis 62 to 125 and weight axis 100 to 90
 Working screens are a single centred column: 680px maximum with a 16px gutter and 24px top padding. The bracket itself breaks out to full width and scrolls horizontally. Marketing content aligns to 1100px, and the home hero and header align to 1320px with a fluid gutter of clamp(16px, 4vw, 56px).
 
 The home hero is the whole first viewport as one green sheet: copy on the left, the white sign-up sheet in a 280 to 360px column on the right, and a strip of seven tear-off tabs along the bottom edge. Below it, each step gets one full-width ruled band on white (numeral, title, copy in three columns).
+
+The other Persuade pages (How it works, Pricing, Sports, Blind draw generator, Fundraiser guide, Scoreholio comparison) print the same flyer in three parts. The **sheet head** is the page title at display scale (weight 900, 106% width, up to 5rem) and the lede, on the green sheet edge to edge and closed by a dashed cut line. The **stock body** below sits on the header's `--page-gutter`, with running prose held to a 760px measure and each section opened by a 3px toner rule. The page ends on the **sheet foot**, where the green sheet returns edge to edge and is the page's only footer (see Navigation). The shared pieces are the global `.sheet-head`, `.sheet-body`, `.measure` and `.ruled` classes; the foot is drawn by `<app-footer>`, which picks it by route.
 
 Rhythm is tight and list-like: 12px between controls, 20px inside cards, 24 to 32px between sections. Lists are ruled rows, not stacked cards.
 
@@ -274,10 +281,11 @@ Plain and flat, like a filled or outlined box on a form.
 - **Header:** 52px, sticky, sheet green on every screen. Wordmark left, links right at weight 600 with no underline at rest; hover and the current page take a 2px underline.
 - **Dropdowns:** triggers are ruled left and right in 1.5px toner and press to the deeper sheet green. The menu is a white sheet with a 1.5px toner rule and the menu-edge shadow; items hover to recessed stock.
 - **Mobile:** see Layout. Three 2px toner bars for the menu button.
-- **Footer:** opens with a full-width dashed cut line. Centred: the "Run your own tournament for free" link at weight 800, "Powered by Bracketway" with the mark, then quiet links in dimmed toner.
+- **Footer:** opens with a full-width dashed cut line. Centred: the "Run your own tournament for free" link at weight 800, "Powered by Bracketway" with the mark, then quiet links in dimmed toner. This is the footer of brackets, working screens, the legal pages and the home page.
+- **Sheet foot:** the footer of every other Persuade page, and the only ending those pages have. Green sheet edge to edge, opened by a dashed cut line and aligned to the header's `--page-gutter`, all in toner (dimmed toner falls under 4.5:1 on the sheet). Left: one closing line in the display voice (900, 106% width, up to 3.75rem) over a hero action. Right: the other marketing pages as ruled rows, opened by a 3px toner rule and divided by 1.5px toner rules, each a label at weight 800, a few words on what the page is for, and a drawn arrow; the current page is left out. Hover presses a row to the deeper green and insets it 8px. Along the bottom, under a 1.5px toner rule: the mark and wordmark, then Terms, Refunds and Privacy. At 860px and below the index drops under the closing line with the action out at the right edge; at 520px and below the action goes full width and each row's note drops under its label.
 
 ### Tear-off Tabs
-The strip along the bottom of the home flyer. Seven equal tabs divided by dashed cut lines, lettering turned on its side at weight 800. The first tab is inverted (toner fill, sheet-green lettering) and carries the primary action. Hover presses the tab to the deeper green and nudges the lettering 6px.
+The strip along the bottom of the home flyer, and nowhere else: tabs hang off the bottom edge of the green sheet, so they only make sense where the sheet is the whole screen. (A strip at the foot of the other Persuade pages was tried and dropped on 2026-11-16: under white stock it read as a second footer.) Seven equal tabs divided by dashed cut lines, lettering turned on its side at weight 800. The first tab is inverted (toner fill, sheet-green lettering) and carries the primary action. Hover presses the tab to the deeper green and nudges the lettering 6px.
 
 ### Sign-up Sheet
 White stock on the green hero, slightly rotated, with the sheet-edge shadow. A title over a 3px toner rule, numbered lines ruled in 1.5px toner, and a full-width 54px toner bar. Pressing the bar pairs the names into teams in place; each row slides and settles (0.5s, cubic-bezier(.16, 1, .3, 1), 70ms stagger) and stays readable throughout. Disabled under reduced motion.
@@ -321,5 +329,5 @@ A drawn chevron in the 2px square stroke replaces the browser triangle and turns
 Not yet decided or not yet brought into this system. These are gaps, not rules.
 
 - The signed-in screens were reviewed in a browser on 2026-11-16 at desktop and phone width. Admin tables (users, audit log, traffic) use `.page-table`, which holds them to the header's `--page-gutter` instead of the window edge.
-- Outside the home page the world is mostly a green header over white stock. Carrying more of the flyer (rule weights, cut lines, a second type width) to other pages is undecided.
+- The public bracket page is still a green header over white stock. A green band carrying the tournament name is planned (`.scratch/flyer-across-pages/issues/03-bracket-page-band.md`).
 - Other sheet colours (yellow or pink stock for other Persuade pages) are undecided. Only the green sheet is established.

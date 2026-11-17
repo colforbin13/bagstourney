@@ -28,10 +28,4 @@ describe('ScoreholioComparisonComponent', () => {
     expect(text).toContain('When Scoreholio is the better choice');
     expect(text).toContain('not affiliated');
   });
-
-  it('should send signed-out visitors to sign up and organizers to their dashboard', () => {
-    expect(render(false).querySelector('.cta .btn-primary')!.getAttribute('href')).toBe('/admin/register');
-    TestBed.resetTestingModule();
-    expect(render(true).querySelector('.cta .btn-primary')!.getAttribute('href')).toBe('/admin');
-  });
 });

@@ -59,20 +59,6 @@ describe('SportsComponent', () => {
     expect(text).toContain('no sport field on a tournament');
   });
 
-  it('should close with sign-up actions for an anonymous reader', () => {
-    setup();
-    const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
-      .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/admin/register', '/how-it-works']);
-  });
-
-  it('should close with in-app actions for a signed-in reader', () => {
-    setup(true);
-    const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
-      .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/admin', '/how-it-works']);
-  });
-
   // Guards the one spelling Matt called out explicitly. "Can Jam"/"Kan Jam" are wrong.
   it('should spell KanJam as one word', () => {
     setup();

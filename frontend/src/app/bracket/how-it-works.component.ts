@@ -1,25 +1,24 @@
 // src/app/bracket/how-it-works.component.ts
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../shared/services/auth.service';
 
 @Component({
   selector: 'app-how-it-works',
   standalone: true,
   imports: [RouterLink],
   template: `
-    <div class="page">
-      <header class="intro">
-        <h1>From a pile of players to a champion.</h1>
-        <p class="lede">
-          The whole run of a tournament, start to finish, so you know what you're getting into
-          before you set one up. It takes about five minutes of actual work. Nothing below
-          depends on which game you're playing — see
-          <a routerLink="/sports">the sports people run</a> if you're wondering whether yours
-          fits.
-        </p>
-      </header>
+    <header class="sheet-head">
+      <h1>From a pile of players to a champion.</h1>
+      <p class="lede">
+        The whole run of a tournament, start to finish, so you know what you're getting into
+        before you set one up. It takes about five minutes of actual work. Nothing below
+        depends on which game you're playing — see
+        <a routerLink="/sports">the sports people run</a> if you're wondering whether yours
+        fits.
+      </p>
+    </header>
 
+    <div class="sheet-body">
       <!-- The same walkthrough, watched instead of read. Deliberately click-to-play with
            preload="none": it carries a music and sound track, so it isn't wallpaper, and an
            unplayed visit should cost the poster and nothing else. Everything the video says
@@ -32,8 +31,8 @@ import { AuthService } from '../shared/services/auth.service';
         </figcaption>
       </figure>
 
-      <ol class="walkthrough">
-        <li class="chapter">
+      <ol class="walkthrough measure">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 01</span>
           <h2>Create the tournament</h2>
           <p>
@@ -90,7 +89,7 @@ import { AuthService } from '../shared/services/auth.service';
           </dl>
         </li>
 
-        <li class="chapter">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 02</span>
           <h2>Get your players in</h2>
           <p>
@@ -106,7 +105,7 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
         </li>
 
-        <li class="chapter">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 03</span>
           <h2>Draw the teams</h2>
           <p>
@@ -122,7 +121,7 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
         </li>
 
-        <li class="chapter">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 04</span>
           <h2>The bracket gets built</h2>
           <p>
@@ -144,7 +143,7 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
         </li>
 
-        <li class="chapter">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 05</span>
           <h2>Score it as you play</h2>
           <p>
@@ -164,7 +163,7 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
         </li>
 
-        <li class="chapter">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 06</span>
           <h2>Put it on the wall</h2>
           <p>
@@ -181,7 +180,7 @@ import { AuthService } from '../shared/services/auth.service';
           </p>
         </li>
 
-        <li class="chapter">
+        <li class="chapter ruled">
           <span class="chapter-num">Step 07</span>
           <h2>Someone wins</h2>
           <p>
@@ -192,7 +191,7 @@ import { AuthService } from '../shared/services/auth.service';
         </li>
       </ol>
 
-      <section class="aside">
+      <section class="aside measure">
         <h2 class="aside-title">A note on who can do what</h2>
         <p>
           You don't have to run everything yourself. A tournament's owner can add other people
@@ -202,34 +201,19 @@ import { AuthService } from '../shared/services/auth.service';
           redraw your teams by accident.
         </p>
       </section>
-
-      <div class="closing">
-        @if (auth.isLoggedIn()) {
-          <a class="btn btn-primary" routerLink="/admin">Set one up</a>
-          <a class="btn" routerLink="/tournaments">Browse tournaments</a>
-        } @else {
-          <a class="btn btn-primary" routerLink="/admin/register">Create an account</a>
-          <a class="btn" routerLink="/">Back to home</a>
-        }
-      </div>
     </div>
   `,
   styles: [`
-    .intro { margin-bottom: 40px; }
-    .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
-    .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
-
     /* The tour is a 16:9 frame authored at 1920px, and its bracket scenes stop being
-       readable somewhere below 900px wide. Let it break out of the page's 680px column
-       wherever the viewport can hold it, and fall back to the column width below that. */
-    .tour { width: 960px; margin: 0 0 40px calc(50% - 480px); }
+       readable somewhere below 900px wide, so it runs wider than the prose column. */
+    .tour { max-width: 960px; margin: 0 0 clamp(36px, 5vw, 56px); }
     .tour video {
       display: block;
       width: 100%;
       height: auto;
       aspect-ratio: 16 / 9;
       background: var(--surface-2);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
     }
     .tour figcaption {
@@ -237,21 +221,16 @@ import { AuthService } from '../shared/services/auth.service';
       font-size: 0.82rem;
       line-height: 1.5;
       color: var(--text-dim);
-      text-align: center;
-    }
-    @media (max-width: 1060px) {
-      .tour { width: 100%; margin-left: 0; }
     }
 
     .walkthrough { display: flex; flex-direction: column; gap: 36px; list-style: none; }
-    .chapter { border-top: 2px solid var(--border); padding-top: 16px; }
-    .chapter-num {
+        .chapter-num {
       font-family: var(--mono);
       font-size: 0.78rem;
       letter-spacing: 0;
       color: var(--accent);
     }
-    .chapter h2 { font-size: 1.6rem; margin: 8px 0 12px; }
+    .chapter h2 { font-size: clamp(1.6rem, 2.8vw, 2rem); font-weight: 900; font-stretch: 106%; margin: 8px 0 12px; }
     .chapter p {
       font-size: 0.9rem;
       line-height: 1.65;
@@ -264,7 +243,7 @@ import { AuthService } from '../shared/services/auth.service';
       margin-top: 16px;
       padding: 14px;
       background: var(--surface);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
     }
     .choices dt {
@@ -282,19 +261,15 @@ import { AuthService } from '../shared/services/auth.service';
     }
 
     .aside {
-      margin-top: 40px;
+      margin-top: clamp(36px, 5vw, 56px);
       padding: 18px;
       background: var(--surface-2);
-      border: 1px solid var(--border);
+      border: 1.5px solid var(--text);
       border-radius: var(--radius);
     }
     .aside-title { font-size: 1.2rem; margin-bottom: 10px; }
     .aside p { font-size: 0.85rem; line-height: 1.6; color: var(--text-dim); }
     .aside strong { color: var(--text); font-weight: 600; }
-
-    .closing { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 36px; }
   `]
 })
-export class HowItWorksComponent {
-  constructor(public auth: AuthService) {}
-}
+export class HowItWorksComponent {}

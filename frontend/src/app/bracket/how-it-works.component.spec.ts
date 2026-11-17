@@ -112,20 +112,6 @@ describe('HowItWorksComponent', () => {
     expect(link.getAttribute('href')).toBe('/sports');
   });
 
-  it('should close with sign-up actions for an anonymous reader', () => {
-    setup();
-    const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
-      .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/admin/register', '/']);
-  });
-
-  it('should close with in-app actions for a signed-in reader', () => {
-    setup(true);
-    const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
-      .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/admin', '/tournaments']);
-  });
-
   it('should offer the tour above the walkthrough without downloading it unasked', () => {
     setup();
     const video: HTMLVideoElement = fixture.nativeElement.querySelector('.tour video');

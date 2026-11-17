@@ -155,20 +155,4 @@ describe('PricingComponent', () => {
     expect(text()).toContain('refundable for 14 days');
     expect(text()).toContain('7 days (monthly) or 30 days (annual)');
   });
-
-  it('should close with sign-up actions for an anonymous visitor', () => {
-    setup();
-    httpMock.expectOne(plansUrl).flush(livePlans);
-    const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
-      .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/admin/register', '/how-it-works']);
-  });
-
-  it('should send a signed-in organizer to Billing', () => {
-    setup(true);
-    httpMock.expectOne(plansUrl).flush(livePlans);
-    const hrefs = Array.from<HTMLAnchorElement>(fixture.nativeElement.querySelectorAll('.closing a'))
-      .map(a => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/admin/billing', '/admin']);
-  });
 });

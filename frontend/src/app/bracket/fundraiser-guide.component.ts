@@ -7,27 +7,26 @@
 //
 // The numbers in it (game length, boards per team) are rules of thumb, worded as such. Prices
 // and the free cap come from the same facts as the pricing page; update both together.
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../shared/services/auth.service';
 
 @Component({
   selector: 'app-fundraiser-guide',
   standalone: true,
   imports: [RouterLink],
   template: `
-    <article class="page">
-      <header class="intro">
-        <h1>How to run a cornhole fundraiser tournament</h1>
-        <p class="lede">
-          A cornhole tournament is one of the easiest fundraisers to put on. Almost anyone can
-          play, the equipment is cheap or borrowed, and players stick around for food and drinks
-          between games. Here's how to plan one, from the first meeting to handing over the
-          trophy.
-        </p>
-      </header>
+    <header class="sheet-head">
+      <h1>How to run a cornhole fundraiser tournament</h1>
+      <p class="lede">
+        A cornhole tournament is one of the easiest fundraisers to put on. Almost anyone can
+        play, the equipment is cheap or borrowed, and players stick around for food and drinks
+        between games. Here's how to plan one, from the first meeting to handing over the
+        trophy.
+      </p>
+    </header>
 
-      <section id="timeline">
+    <article class="sheet-body">
+      <section class="ruled measure" id="timeline">
         <h2>A planning timeline</h2>
         <dl class="timeline">
           <dt>6 to 8 weeks out</dt>
@@ -54,7 +53,7 @@ import { AuthService } from '../shared/services/auth.service';
         </dl>
       </section>
 
-      <section id="format">
+      <section class="ruled measure" id="format">
         <h2>Pick a format</h2>
         <p>
           <strong>Blind draw or bring a partner.</strong> In a blind draw, people sign up on
@@ -79,7 +78,7 @@ import { AuthService } from '../shared/services/auth.service';
         </p>
       </section>
 
-      <section id="money">
+      <section class="ruled measure" id="money">
         <h2>Set prices and raise more</h2>
         <ul>
           <li>
@@ -107,7 +106,7 @@ import { AuthService } from '../shared/services/auth.service';
         </ul>
       </section>
 
-      <section id="equipment">
+      <section class="ruled measure" id="equipment">
         <h2>Boards, bags and space</h2>
         <p>
           Plan on one set of boards (two boards and eight bags) for every four to six teams, so
@@ -119,7 +118,7 @@ import { AuthService } from '../shared/services/auth.service';
         </p>
       </section>
 
-      <section id="signups">
+      <section class="ruled measure" id="signups">
         <h2>Sign-ups</h2>
         <p>
           Collecting names online before the day saves a long line at the door. Share one
@@ -130,7 +129,7 @@ import { AuthService } from '../shared/services/auth.service';
         </p>
       </section>
 
-      <section id="day-of">
+      <section class="ruled measure" id="day-of">
         <h2>Running the day</h2>
         <ol>
           <li>Check players in as they arrive, and approve any walk-ups.</li>
@@ -141,7 +140,7 @@ import { AuthService } from '../shared/services/auth.service';
         </ol>
       </section>
 
-      <section id="after">
+      <section class="ruled measure" id="after">
         <h2>After the final</h2>
         <p>
           Announce the champions, take the photo with the trophy, and share the final bracket
@@ -150,7 +149,7 @@ import { AuthService } from '../shared/services/auth.service';
         </p>
       </section>
 
-      <section class="card cta">
+      <section class="card cta measure">
         <h2>Run it on Bracketway</h2>
         <p>
           Bracketway handles the sign-up link and QR sign, the blind draw, the bracket on the
@@ -158,14 +157,6 @@ import { AuthService } from '../shared/services/auth.service';
           For a bigger field or double elimination, upgrade that one tournament for $12.99, with
           no subscription.
         </p>
-        <div class="actions">
-          @if (auth.isLoggedIn()) {
-            <a class="btn btn-primary" routerLink="/admin">Create a tournament</a>
-          } @else {
-            <a class="btn btn-primary" routerLink="/admin/register">Start your fundraiser free</a>
-          }
-          <a class="btn" routerLink="/how-it-works">How it works</a>
-        </div>
         <p class="aside">
           Just need teams? The free <a routerLink="/blind-draw-generator">blind draw generator</a>
           pairs players and drafts a bracket with no account.
@@ -174,11 +165,8 @@ import { AuthService } from '../shared/services/auth.service';
     </article>
   `,
   styles: [`
-    .intro { margin-bottom: 28px; }
-    .intro h1 { font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1; margin-bottom: 16px; }
-    .lede { font-size: 1rem; line-height: 1.6; color: var(--text-dim); }
-    section { margin-bottom: 32px; }
-    h2 { font-size: 1.4rem; margin-bottom: 12px; }
+    section { margin-bottom: clamp(32px, 4vw, 44px); }
+    h2 { font-size: clamp(1.5rem, 2.6vw, 1.9rem); font-weight: 900; font-stretch: 106%; margin-bottom: 12px; }
     p, li, dd { color: var(--text-dim); line-height: 1.65; }
     p + p { margin-top: 12px; }
     strong { color: var(--text); font-weight: 600; }
@@ -187,10 +175,7 @@ import { AuthService } from '../shared/services/auth.service';
     .timeline dt:first-child { margin-top: 0; }
     .timeline dd { margin: 4px 0 0; }
     .cta h2 { margin-top: 0; }
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 12px; }
-    .aside { font-size: 0.85rem; }
+    .aside { font-size: 0.85rem; margin-top: 12px; }
   `],
 })
-export class FundraiserGuideComponent {
-  readonly auth = inject(AuthService);
-}
+export class FundraiserGuideComponent {}
