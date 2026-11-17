@@ -1,5 +1,4 @@
 .section-label {
-  font-family: var(--mono);
   font-size: 0.78rem;
   letter-spacing: 0;
   color: var(--text-dim);
@@ -21,7 +20,7 @@
   border: 1px solid var(--border);
   border-radius: 0;
   background: var(--surface);
-  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 0.78rem;
   color: var(--muted);
 }
@@ -52,8 +51,8 @@
 .advanced { margin-top: 12px; font-size: .85rem; }
 .advanced summary { cursor: pointer; color: var(--text-dim); font-size: .8rem; }
 .advanced .check { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; }
-.group-count { font-family: var(--mono); color: var(--muted); letter-spacing: 0; }
-.group-toggle { min-width: 32px; font-family: var(--mono); font-weight: 600; }
+.group-count { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.group-toggle { min-width: 32px; font-weight: 700; }
 .group-toggle.is-a { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .count {
   background: var(--surface);
@@ -75,14 +74,14 @@
 /* Toolbar row */
 .tm-toolbar-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 28px;
 }
-.tm-badges { display: flex; gap: 6px; flex-wrap: wrap; }
-.tm-actions-row { display: flex; align-items: center; gap: 8px; }
+.tm-badges { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; }
+.tm-upgrade { font-size: .8rem; font-weight: 600; }
+.tm-actions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Actions dropdown */
 .dropdown { position: relative; }
@@ -150,7 +149,7 @@
 .qr-modal-sub { font-size: .8rem; color: var(--text-dim); margin-bottom: 12px; }
 .qr-modal-hint { font-size: .8rem; color: var(--text-dim); margin-top: 12px; text-align: center; }
 .qr-modal-url {
-  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
   font-size: 0.78rem;
   color: var(--muted);
   margin-top: 6px;
@@ -162,18 +161,6 @@
 .qr-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
 .qr-modal-close { margin-top: 8px; border: none; color: var(--text-dim); }
 
-/* Participants */
-.participant-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.participant-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: .875rem;
-}
 .notify-status { color: var(--text-dim); font-size: 0.78rem; }
 
 /* Inline edit forms (participant / team) */
@@ -190,17 +177,6 @@
   flex-wrap: wrap;
 }
 
-/* Seed reorder (manual seeding) */
-.team-seed-list { display: flex; flex-direction: column; gap: 8px; }
-.team-seed-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
 .drag-handle {
   cursor: grab;
   color: var(--muted);
@@ -210,41 +186,41 @@
   flex-shrink: 0;
 }
 
-/* Teams */
-.team-list { display: flex; flex-direction: column; gap: 8px; }
-.team-item {
+/* Folded sections: Settings and Staff & access. One line until opened. */
+.fold {
+  margin: 32px 0 24px;
+  border-top: 1.5px solid var(--text);
+  border-bottom: 1.5px solid var(--text);
+}
+.fold:has(+ .fold) { margin-bottom: 0; }
+.fold + .fold { margin-top: 0; border-top: none; }
+.card + .fold { margin-top: 0; }
+.fold > summary {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  min-height: 52px;
+  padding: 14px 0;
 }
-.seed {
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  color: var(--text-dim);
-  width: 24px;
-  flex-shrink: 0;
+.fold-title { font-weight: 800; }
+.fold-summary { font-size: .8rem; color: var(--text-dim); }
+.fold-body { display: flex; flex-direction: column; gap: 20px; padding: 4px 0 20px; }
+
+/* The result, at the top of a finished tournament. */
+.champion {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  border: 1.5px solid var(--marker);
+  color: var(--marker);
 }
-.team-info { display: flex; flex-direction: column; gap: 2px; }
-.team-name { font-weight: 500; font-size: .875rem; }
+.champion-label { font-size: .78rem; font-weight: 600; margin-bottom: 4px; }
+.champion-name { font-size: 1.25rem; font-weight: 800; }
 .team-players { font-size: 0.78rem; color: var(--text-dim); }
 
 /* Staff & Access */
-.member-list { display: flex; flex-direction: column; gap: 6px; }
-.member-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
 .member-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.member-name { font-weight: 500; font-size: .875rem; }
+.member-name { font-weight: 700; overflow-wrap: anywhere; }
 .member-meta { font-size: 0.78rem; color: var(--text-dim); }
 .badge-owner { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
 .badge-cap-warning { background: rgba(var(--danger-rgb), 0.1); color: var(--danger); border: 1px solid rgba(var(--danger-rgb), 0.35); }
@@ -279,3 +255,161 @@
   &:hover { background: var(--bg); }
 }
 .dim { color: var(--text-dim); }
+
+/* ── Ruled rows ──
+   Lists are ruled rows, not stacked boxes (DESIGN.md, List Rows): a heading over a 2px
+   toner rule, then rows divided by the 1px ruled line. The row itself is the button that
+   opens it, so there is no column of identical Edit buttons down the right edge. */
+.list-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--text);
+  font-size: 1rem;
+  font-weight: 800;
+  font-stretch: 106%;
+  letter-spacing: -.01em;
+}
+.list-head .count { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* A line of guidance under a list heading, before its first row. */
+.list-hint { margin: 10px 0 4px; }
+
+.participant-list,
+.team-list,
+.team-seed-list,
+.member-list { display: flex; flex-direction: column; margin-bottom: 8px; }
+
+.participant-item,
+.team-item,
+.member-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--border);
+  font-size: .9rem;
+}
+.member-item { padding: 10px 0; }
+
+/* The row's own button: everything but any side control on the row. */
+.row-toggle,
+.row-line {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 4px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.row-toggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background .15s, padding .2s cubic-bezier(.16, 1, .3, 1);
+  &:hover { background: var(--surface-2); padding-left: 12px; padding-right: 12px; }
+  &:focus-visible { outline-offset: -3px; }
+}
+.row-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+/* Says what tapping the row does, without being a second button. */
+.row-cue {
+  flex-shrink: 0;
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: .16em;
+}
+.row-toggle:hover .row-cue { text-decoration-thickness: 2.5px; }
+.participant-item > .edit-form { padding: 12px 0; }
+
+.seed {
+  flex-shrink: 0;
+  width: 28px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.team-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.team-name { font-weight: 700; overflow-wrap: anywhere; }
+.team-players { font-size: .8rem; color: var(--text-dim); }
+
+/* An open team row: its name and both players, on recessed stock so it reads as opened. */
+.team-item.is-open { background: var(--surface-2); }
+.team-panel {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 4px 16px 44px;
+}
+.team-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-height: 44px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.team-player-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.team-panel-foot { display: flex; justify-content: flex-end; }
+.edit-form-remove { margin-right: auto; }
+
+/* Manual seeding: the handle sits beside the row, in the gutter. */
+.team-seed-item { display: flex; align-items: flex-start; }
+.team-seed-item > .team-item { flex: 1; min-width: 0; }
+.team-seed-item .drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 56px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.draw-ready { margin-top: 24px; }
+
+/* ── Touch ──
+   The organizer runs this one-handed at a venue, so on a touch screen every control
+   reaches 44px (DESIGN.md). Desktop keeps the denser small buttons. */
+@media (pointer: coarse) {
+  .btn.btn-sm { min-height: 44px; padding-left: 14px; padding-right: 14px; }
+  .input:not(textarea) { min-height: 44px; }
+  .group-toggle { min-width: 44px; }
+  .dropdown-item { min-height: 44px; display: flex; align-items: center; font-size: .875rem; }
+  .search-result { min-height: 44px; }
+  .link-btn { min-height: 44px; display: inline-flex; align-items: center; }
+  .tm-back { display: inline-flex; align-items: center; min-height: 44px; }
+}
+/* A tapped row would otherwise keep its hover indent until the next tap elsewhere. */
+@media (hover: none) {
+  .row-toggle:hover { background: transparent; padding-left: 4px; padding-right: 4px; }
+}
+
+/* Actions trigger: a drawn caret in the 2px stroke, turning when open. */
+.caret { transition: transform .2s cubic-bezier(.16, 1, .3, 1); }
+.caret.is-open { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
+
+/* Picking a staff member: the routine choices, then the one-way handover on its own line. */
+.staff-pick { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.staff-transfer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}

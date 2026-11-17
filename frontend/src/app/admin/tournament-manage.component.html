@@ -8,7 +8,7 @@
   <!-- Header -->
   <div class="page-header" style="margin-bottom:14px;">
     <div>
-      <a routerLink="/admin" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Admin</a>
+      <a routerLink="/admin" class="tm-back" style="color:var(--text-dim);font-size:.8rem;"><svg width="14" height="14" viewBox="0 0 18 18" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M15 9H4M8.5 4l-5 5 5 5" stroke="currentColor" stroke-width="2"/></svg> Admin</a>
       <h1 style="margin-top:4px;">{{ tournament()?.name }}</h1>
     </div>
   </div>
@@ -18,12 +18,6 @@
       <div class="tm-badges">
         <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status === 'active' ? 'Live' : tournament()!.status === 'complete' ? 'Final' : 'Setup' }}</span>
         <span class="badge badge-visibility-{{ tournament()!.visibility }}">{{ tournament()!.visibility === 'private' ? 'Private' : 'Public' }}</span>
-        @if (tournament()!.format === 'double') {
-          <span class="badge badge-visibility-private">Double elimination</span>
-        }
-        @if (tournament()!.seeding_mode === 'manual') {
-          <span class="badge badge-visibility-private">Manual seeding</span>
-        }
         @if (participantCap() !== null) {
           <span class="badge" [class.badge-cap-warning]="participantCount()! >= participantCap()!"
             title="Participant limit for this tournament's plan">
@@ -34,22 +28,12 @@
           <!-- FEATURE_TRACKER item 13: a one-time purchase that upgrades this one
                tournament, with no subscription. Owners only — this spends money — and
                hidden entirely when the installation has no Stripe keys. -->
-          <button class="btn btn-sm btn-primary" [disabled]="unlockBusy()" (click)="buyTournamentUnlock()"
+          <button type="button" class="link-btn tm-upgrade" [disabled]="unlockBusy()" (click)="buyTournamentUnlock()"
             title="Upgrade just this tournament with a one-time payment">
             @if (unlockBusy()) {
               <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
             } @else {
               Upgrade this tournament
-            }
-          </button>
-        }
-        @if (isSuperAdmin()) {
-          <button class="btn btn-sm" [disabled]="paidOverrideBusy()" (click)="togglePaidOverride()"
-            title="Grant this tournament the paid tier by hand, without a payment">
-            @if (paidOverrideBusy()) {
-              <span class="spinner" style="width:10px;height:10px;border-width:1px"></span>
-            } @else {
-              {{ tournament()!.paid_override ? 'Remove plan override' : 'Grant plan override' }}
             }
           </button>
         }
@@ -62,12 +46,16 @@
         <a class="btn btn-sm" [class.btn-primary]="!canScore() || tournament()!.status !== 'active'"
           [routerLink]="['/bracket', tournamentId]">View bracket</a>
 
-        @if (canManageSetup() || canDelete()) {
+        @if (canManageSetup() || canDelete() || isSuperAdmin()) {
           <div class="dropdown">
-            <button class="btn btn-sm" (click)="toggleActionsMenu()">Actions ▾</button>
+            <button #actionsTrigger class="btn btn-sm" (click)="toggleActionsMenu()"
+              [attr.aria-expanded]="actionsMenuOpen()" aria-controls="tm-actions-menu">
+              Actions
+              <svg class="caret" [class.is-open]="actionsMenuOpen()" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 3.5L5 7l3.5-3.5" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
             @if (actionsMenuOpen()) {
               <div class="dropdown-backdrop" (click)="closeActionsMenu()"></div>
-              <div class="dropdown-menu">
+              <div class="dropdown-menu" id="tm-actions-menu">
                 @if (canManageSetup()) {
                   <button class="dropdown-item" (click)="copyPublicLink(); closeActionsMenu()">Copy link</button>
                   <!-- For spectators: scanning this just opens the bracket to follow
@@ -83,8 +71,17 @@
                     Make {{ tournament()!.visibility === 'private' ? 'public' : 'private' }}
                   </button>
                 }
-                @if (canDelete()) {
+                @if (isSuperAdmin()) {
+                  <!-- The super admin's manual comp lever. It lives here rather than beside
+                       the status badges, where it sat on every tournament's first screen. -->
                   @if (canManageSetup()) { <div class="dropdown-divider"></div> }
+                  <button class="dropdown-item" [disabled]="paidOverrideBusy()" (click)="togglePaidOverride(); closeActionsMenu()"
+                    title="Grant this tournament the paid tier by hand, without a payment">
+                    {{ tournament()!.paid_override ? 'Remove plan override' : 'Grant plan override' }}
+                  </button>
+                }
+                @if (canDelete()) {
+                  @if (canManageSetup() || isSuperAdmin()) { <div class="dropdown-divider"></div> }
                   <button class="dropdown-item dropdown-item-danger" [disabled]="deletingTournament()" (click)="deleteTournamentAction()">
                     @if (deletingTournament()) { Deleting… } @else { Delete tournament }
                   </button>
@@ -95,117 +92,212 @@
         }
       </div>
     </div>
+
+    <!-- The result is the first thing a finished tournament's page says. -->
+    @if (tournament()!.status === 'complete' && champion()) {
+      <div class="champion">
+        <div class="champion-label">Champion</div>
+        <div class="champion-name">{{ champion() }}</div>
+      </div>
+    }
   }
 
-  <!-- ── STAFF & ACCESS ── -->
-  @if (staffVisible()) {
-    <div class="card" style="margin-bottom:24px">
-      <div class="section-label">Staff &amp; access</div>
-
-      <div class="member-list">
-        @for (m of members(); track m.user_id) {
-          <div class="member-item">
-            <div class="member-info">
-              <span class="member-name">{{ m.username ?? m.email }}</span>
-              <span class="member-meta">{{ m.email }} · {{ m.global_role }}</span>
-            </div>
-            @if (m.role === 'owner') {
-              <span class="badge badge-owner">Owner</span>
-            } @else {
-              <select class="input" style="width:140px;flex:none"
-                [ngModel]="m.role"
-                (ngModelChange)="changeMemberRole(m, $event)"
-                [disabled]="memberBusyUserId() === m.user_id">
-                <option value="manager">Manager</option>
-                <option value="scorekeeper">Scorekeeper</option>
-              </select>
-              <button class="btn btn-sm btn-danger"
-                [disabled]="memberBusyUserId() === m.user_id"
-                (click)="removeMember(m)">Remove</button>
-            }
-          </div>
-        }
-      </div>
-
-      @if (memberError()) { <div class="form-error">{{ memberError() }}</div> }
-
-      <hr class="divider" />
-
-      <div class="section-label">Add or transfer staff</div>
-      <div class="user-search">
-        <input class="input" type="text" [(ngModel)]="staffSearchQuery"
-          (ngModelChange)="onStaffSearchInput()"
-          placeholder="Search by username or email (2+ characters)" />
-        @if (staffSearchResults().length > 0) {
-          <div class="search-results">
-            @for (u of staffSearchResults(); track u.id) {
-              <button type="button" class="search-result" (click)="selectStaffUser(u)">
-                {{ u.username }} <span class="dim">({{ u.email }} · {{ u.role }})</span>
-              </button>
-            }
-          </div>
-        }
-      </div>
-
-      @if (selectedStaffUser()) {
-        <div class="row" style="margin-top:8px;align-items:center;flex-wrap:wrap">
-          <span>Selected: <strong>{{ selectedStaffUser()!.username }}</strong></span>
-          <button class="btn btn-sm btn-primary" [disabled]="staffActionBusy()" (click)="addStaffMember('manager')">Add as manager</button>
-          <button class="btn btn-sm btn-primary" [disabled]="staffActionBusy()" (click)="addStaffMember('scorekeeper')">Add as scorekeeper</button>
-          <button class="btn btn-sm btn-danger" [disabled]="staffActionBusy()" (click)="transferOwnershipTo()">Transfer ownership</button>
-          <button class="btn btn-sm" [disabled]="staffActionBusy()" (click)="cancelStaffSelection()">Cancel</button>
-        </div>
-      }
+  <!-- Format and boards are drawn once and placed in two spots: folded into Settings
+       during setup and while live, and standing alone at the pool-play-finished step,
+       where choosing the format is the decision in front of the organizer. -->
+  <ng-template #formatSetting>
+    <div class="setting">
+      <div class="section-label">Format</div>
+      <select class="input" [ngModel]="tournament()!.format || 'single'"
+        (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
+        <option value="single">Single elimination — one loss and a team is out</option>
+        <option value="double" [disabled]="!canUseDoubleElimination()">
+          Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (Pro)' }}
+        </option>
+      </select>
+      <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
+      @if (formatError()) { <div class="form-error">{{ formatError() }}</div> }
     </div>
-  }
-
-  <ng-template #formatCard>
-      <div class="card" style="margin-bottom:24px">
-        <div class="section-label">Format</div>
-        <select class="input" [ngModel]="tournament()!.format || 'single'"
-          (ngModelChange)="updateFormat($event)" [disabled]="formatBusy()">
-          <option value="single">Single elimination — one loss and a team is out</option>
-          <option value="double" [disabled]="!canUseDoubleElimination()">
-            Double elimination — a team is out after two losses{{ canUseDoubleElimination() ? '' : ' (Pro)' }}
-          </option>
-        </select>
-        <div class="field-hint" style="margin-top:6px">Locked once the bracket is generated.</div>
-        @if (formatError()) { <div class="form-error">{{ formatError() }}</div> }
-      </div>
   </ng-template>
 
   <!-- Board assignments (FEATURE_TRACKER item 8). Changeable during setup and while the
        tournament is live: a board breaks, or another one frees up mid-event. -->
-  <ng-template #boardsCard>
-      <div class="card" style="margin-bottom:24px">
-        <div class="section-label">{{ word().many }}</div>
-        <div class="row" style="align-items:center;flex-wrap:wrap;gap:8px">
-          <select class="input" style="max-width:240px" [ngModel]="tournament()!.boards ?? 0"
-            (ngModelChange)="updateBoards($event)"
-            [disabled]="boardsBusy() || (!canUsePaidFeatures() && !tournament()!.boards)"
-            [attr.aria-label]="'Number of ' + word().many.toLowerCase()">
-            <option [ngValue]="0">Off — no {{ word().one.toLowerCase() }} assignments</option>
-            @for (n of boardChoices; track n) {
-              <option [ngValue]="n">{{ n }} {{ (n === 1 ? word().one : word().many).toLowerCase() }}</option>
-            }
-          </select>
-          <!-- The word only: board for bags, court for pickleball. Free on any plan. -->
-          <select class="input" style="max-width:180px" [ngModel]="word().value"
-            (ngModelChange)="updateBoardLabel($event)" [disabled]="boardsBusy()"
-            aria-label="What to call them">
-            @for (w of boardWords; track w.value) {
-              <option [ngValue]="w.value">Call them {{ w.many.toLowerCase() }}</option>
-            }
-          </select>
-        </div>
-        <div class="field-hint" style="margin-top:6px">
-          Each game goes to the next free {{ word().one.toLowerCase() }} automatically. The bracket and TV
-          view show who's on which {{ word().one.toLowerCase() }} and who's up next, and staff can move a
-          game from Enter scores.
-          @if (!canUsePaidFeatures()) { {{ word().one }} assignments are a <a routerLink="/pricing">Pro feature</a>. }
-        </div>
-        @if (boardsError()) { <div class="form-error">{{ boardsError() }}</div> }
+  <ng-template #boardsSetting>
+    <div class="setting">
+      <div class="section-label">{{ word().many }}</div>
+      <div class="row" style="align-items:center;flex-wrap:wrap;gap:8px">
+        <select class="input" style="max-width:240px" [ngModel]="tournament()!.boards ?? 0"
+          (ngModelChange)="updateBoards($event)"
+          [disabled]="boardsBusy() || (!canUsePaidFeatures() && !tournament()!.boards)"
+          [attr.aria-label]="'Number of ' + word().many.toLowerCase()">
+          <option [ngValue]="0">Off — no {{ word().one.toLowerCase() }} assignments</option>
+          @for (n of boardChoices; track n) {
+            <option [ngValue]="n">{{ n }} {{ (n === 1 ? word().one : word().many).toLowerCase() }}</option>
+          }
+        </select>
+        <!-- The word only: board for bags, court for pickleball. Free on any plan. -->
+        <select class="input" style="max-width:180px" [ngModel]="word().value"
+          (ngModelChange)="updateBoardLabel($event)" [disabled]="boardsBusy()"
+          aria-label="What to call them">
+          @for (w of boardWords; track w.value) {
+            <option [ngValue]="w.value">Call them {{ w.many.toLowerCase() }}</option>
+          }
+        </select>
       </div>
+      <div class="field-hint" style="margin-top:6px">
+        Each game goes to the next free {{ word().one.toLowerCase() }} automatically. The bracket and TV
+        view show who's on which {{ word().one.toLowerCase() }} and who's up next, and staff can move a
+        game from Enter scores.
+        @if (!canUsePaidFeatures()) { {{ word().one }} assignments are a <a routerLink="/pricing">Pro feature</a>. }
+      </div>
+      @if (boardsError()) { <div class="form-error">{{ boardsError() }}</div> }
+    </div>
+  </ng-template>
+
+  <!-- One editor for a player's name and notification email, used in the pre-draw
+       roster and inside an open team row. -->
+  <ng-template #participantEditor let-p let-removable="removable">
+    <div class="edit-form">
+      <div class="edit-form-fields">
+        <input class="input" style="flex:1;min-width:140px" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [attr.aria-label]="'Name for ' + p.name" [disabled]="savingParticipantId() === p.id" />
+        <input class="input" style="flex:1;min-width:140px" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [attr.aria-label]="'Email for ' + p.name" [disabled]="savingParticipantId() === p.id" />
+      </div>
+      <div class="edit-form-actions">
+        @if (removable) {
+          <button class="btn btn-sm btn-danger edit-form-remove" [disabled]="savingParticipantId() === p.id" (click)="deleteParticipant(p)">Remove player</button>
+        }
+        <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
+        <button class="btn btn-sm btn-primary" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
+          @if (savingParticipantId() === p.id) { Saving… } @else { Save }
+        </button>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- A team row. Shared by the setup seed list, the pool-finished seed list and the
+       live/final team list, so a team looks and edits the same way in every phase.
+       Open, it holds the team's name and both players, which is where player names are
+       corrected once teams exist: the team list is the only roster on the page then. -->
+  <ng-template #teamRow let-team>
+    <div class="team-item" [class.is-open]="openTeamId === team.id">
+      <ng-template #teamLine>
+        <span class="seed">#{{ team.seed }}</span>
+        <span class="team-info">
+          <span class="team-name">{{ team.name }}</span>
+          <span class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</span>
+        </span>
+      </ng-template>
+      @if (canManageSetup()) {
+        <button type="button" class="row-toggle" [attr.aria-expanded]="openTeamId === team.id"
+          [attr.aria-label]="(openTeamId === team.id ? 'Close ' : 'Edit ') + team.name" (click)="toggleTeam(team)">
+          <ng-container *ngTemplateOutlet="teamLine" />
+          <span class="row-cue">{{ openTeamId === team.id ? 'Done' : 'Edit' }}</span>
+        </button>
+      } @else {
+        <div class="row-line"><ng-container *ngTemplateOutlet="teamLine" /></div>
+      }
+      @if (openTeamId === team.id) {
+        <div class="team-panel">
+          <div class="row">
+            <input class="input" type="text" [(ngModel)]="editingTeamName" aria-label="Team name" (keyup.enter)="saveTeam(team)" />
+            <button class="btn btn-sm" (click)="saveTeam(team)">Rename</button>
+          </div>
+          @for (pid of [team.participant1_id, team.participant2_id]; track pid) {
+            @if (participantById().get(pid); as p) {
+              <div class="team-player">
+                @if (editingParticipantId === p.id) {
+                  <ng-container *ngTemplateOutlet="participantEditor; context: { $implicit: p }" />
+                } @else {
+                  <span class="team-player-name">
+                    {{ p.name }}
+                    @if (notificationStatusLabel(p); as label) { <span class="notify-status">— {{ label }}</span> }
+                  </span>
+                  <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit player</button>
+                }
+              </div>
+            }
+          }
+          @if (isDirectEntry() && tournament()?.status === 'setup') {
+            <div class="team-panel-foot">
+              <button class="btn btn-sm btn-danger" [disabled]="deletingTeamId() === team.id" (click)="deleteTeam(team)">Remove team</button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </ng-template>
+
+  <!-- Settings: the four setup choices, already made on the create form, folded to one
+       line. While live only the board count can still change. -->
+  <ng-template #settings>
+    @if (canManageSetup() && tournament()!.status !== 'complete') {
+      <details class="fold">
+        <summary>
+          <span class="fold-title">Settings</span>
+          <span class="fold-summary">{{ settingsSummary() }}</span>
+        </summary>
+        <div class="fold-body">
+          @if (tournament()!.status === 'setup' && teams().length === 0) {
+            <div class="setting">
+              <div class="section-label">Team entry</div>
+              <select class="input" [ngModel]="tournament()!.team_entry_mode"
+                (ngModelChange)="updateTeamEntryMode($event)" [disabled]="teamEntryModeBusy()">
+                <option value="auto_draft">Blind draw — add players, randomly pair them into teams</option>
+                <option value="direct">Direct entry — create each team by typing both member names</option>
+              </select>
+              @if (!isDirectEntry()) {
+                <!-- Kept behind a disclosure so the plain blind draw stays the one obvious path. -->
+                <details class="advanced" [open]="isBalancedDraw()">
+                  <summary>Advanced</summary>
+                  <label class="check">
+                    <input type="checkbox" [checked]="isBalancedDraw()" [disabled]="drawModeBusy()"
+                      (change)="updateDrawMode($any($event.target).checked ? 'balanced' : 'random')" />
+                    Balanced draw (A/B)
+                  </label>
+                  <div class="field-hint">
+                    Mark your stronger players A. Every A is paired with a random B, so the weakest
+                    players never end up on the same team.
+                  </div>
+                </details>
+              }
+            </div>
+            <div class="setting">
+              <div class="section-label">Seeding</div>
+              <select class="input" [ngModel]="tournament()!.seeding_mode"
+                (ngModelChange)="updateSeedingMode($event)" [disabled]="seedingModeBusy()">
+                <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
+                <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
+                <option value="pool_play" [disabled]="!canUsePaidFeatures()">
+                  Pool play — teams play pool games first, and the standings set the seeds{{ canUsePaidFeatures() ? '' : ' (Pro)' }}
+                </option>
+              </select>
+              @if (isPoolPlay()) {
+                <div class="row" style="align-items:center;margin-top:10px">
+                  <select class="input" style="max-width:240px" [ngModel]="tournament()!.pool_games ?? 3"
+                    (ngModelChange)="updatePoolGames($event)" [disabled]="seedingModeBusy()" aria-label="Pool games per team">
+                    @for (n of poolGameChoices; track n) {
+                      <option [ngValue]="n">{{ n }} pool games per team</option>
+                    }
+                  </select>
+                </div>
+                <div class="field-hint" style="margin-top:6px">Every team plays this many games before the bracket, with no rematches.</div>
+              }
+              @if (seedingError()) { <div class="form-error">{{ seedingError() }}</div> }
+            </div>
+          } @else if (tournament()!.status === 'setup') {
+            <div class="field-hint">Team entry and seeding are locked once teams are drawn.</div>
+          }
+          <!-- Format only locks once the bracket is generated, not once teams are drawn,
+               so a manual-seeding organizer can still change it while arranging the ladder. -->
+          @if (tournament()!.status === 'setup') {
+            <ng-container *ngTemplateOutlet="formatSetting" />
+          } @else {
+            <div class="field-hint">Team entry, seeding and format are locked now that play has started.</div>
+          }
+          <ng-container *ngTemplateOutlet="boardsSetting" />
+        </div>
+      </details>
+    }
   </ng-template>
 
   <!-- ── SETUP PHASE ── -->
@@ -230,62 +322,7 @@
       </div>
     }
 
-    <!-- Mode selectors: only choosable before teams exist -->
-    @if (canManageSetup() && teams().length === 0) {
-      <div class="card" style="margin-bottom:24px">
-        <div class="section-label">Team entry</div>
-        <select class="input" [ngModel]="tournament()!.team_entry_mode"
-          (ngModelChange)="updateTeamEntryMode($event)" [disabled]="teamEntryModeBusy()">
-          <option value="auto_draft">Blind draw — add players, randomly pair them into teams</option>
-          <option value="direct">Direct entry — create each team by typing both member names</option>
-        </select>
-        @if (!isDirectEntry()) {
-          <!-- Kept behind a disclosure so the plain blind draw stays the one obvious path. -->
-          <details class="advanced" [open]="isBalancedDraw()">
-            <summary>Advanced</summary>
-            <label class="check">
-              <input type="checkbox" [checked]="isBalancedDraw()" [disabled]="drawModeBusy()"
-                (change)="updateDrawMode($any($event.target).checked ? 'balanced' : 'random')" />
-              Balanced draw (A/B)
-            </label>
-            <div class="field-hint">
-              Mark your stronger players A. Every A is paired with a random B, so the weakest
-              players never end up on the same team.
-            </div>
-          </details>
-        }
-      </div>
-      <div class="card" style="margin-bottom:24px">
-        <div class="section-label">Seeding</div>
-        <select class="input" [ngModel]="tournament()!.seeding_mode"
-          (ngModelChange)="updateSeedingMode($event)" [disabled]="seedingModeBusy()">
-          <option value="automatic">Automatic — seed by draw order and generate the bracket immediately</option>
-          <option value="manual">Manual — draw teams, then set the final seed order yourself</option>
-          <option value="pool_play" [disabled]="!canUsePaidFeatures()">
-            Pool play — teams play pool games first, and the standings set the seeds{{ canUsePaidFeatures() ? '' : ' (Pro)' }}
-          </option>
-        </select>
-        @if (isPoolPlay()) {
-          <div class="row" style="align-items:center;margin-top:10px">
-            <select class="input" style="max-width:240px" [ngModel]="tournament()!.pool_games ?? 3"
-              (ngModelChange)="updatePoolGames($event)" [disabled]="seedingModeBusy()" aria-label="Pool games per team">
-              @for (n of poolGameChoices; track n) {
-                <option [ngValue]="n">{{ n }} pool games per team</option>
-              }
-            </select>
-          </div>
-          <div class="field-hint" style="margin-top:6px">Every team plays this many games before the bracket, with no rematches.</div>
-        }
-        @if (seedingError()) { <div class="form-error">{{ seedingError() }}</div> }
-      </div>
-    }
-    <!-- Format sits outside the teams().length === 0 guard above on purpose: it only
-         locks once the bracket is generated, not once teams are drawn, so a
-         manual-seeding organizer can still change it while arranging the ladder. -->
-    @if (canManageSetup() && tournament()!.status === 'setup') {
-      <ng-container *ngTemplateOutlet="formatCard" />
-      <ng-container *ngTemplateOutlet="boardsCard" />
-    }
+    <ng-container *ngTemplateOutlet="settings" />
 
     @if (isDirectEntry()) {
       <!-- Add team (direct entry) -->
@@ -307,9 +344,9 @@
           @if (addTeamError()) { <div class="form-error">{{ addTeamError() }}</div> }
         </div>
       }
-    } @else {
+    } @else if (teams().length === 0) {
       <!-- Add participants (auto-draft): paste a whole list, or one at a time -->
-      @if (canManageSetup() && teams().length === 0) {
+      @if (canManageSetup()) {
         <div class="card" style="margin-bottom:24px">
           @if (pasteMode()) {
             <div class="section-label">Add players</div>
@@ -346,7 +383,7 @@
             <div class="section-label">Add participant</div>
             <div class="row">
               <input class="input" type="text" [(ngModel)]="newParticipant"
-                placeholder="Full name" (keyup.enter)="addParticipant()" />
+                placeholder="Full name" aria-label="Player name" (keyup.enter)="addParticipant()" />
               <button class="btn btn-primary" [disabled]="adding()" (click)="addParticipant()">
                 @if (adding()) { <span class="spinner" style="width:12px;height:12px;border-width:1.5px"></span> }
                 Add
@@ -360,26 +397,23 @@
         </div>
       }
 
-      @if (pendingParticipants().length > 0) {
-        <div class="card" style="margin-bottom:16px;border-color:var(--accent)">
-          {{ pendingParticipants().length }} self-registration{{ pendingParticipants().length === 1 ? '' : 's' }}
-          awaiting approval — approve or reject before drawing teams.
-        </div>
-      }
-
-      <!-- Participants list -->
-      <div class="section-label">
+      <!-- Participants list: the roster before the draw. Afterwards the team list
+           replaces it. -->
+      <h2 class="list-head">
         Participants
         <span class="count">{{ approvedParticipants().length }}</span>
         @if (approvedParticipants().length % 2 !== 0 && approvedParticipants().length > 0) {
           <span class="warn">— Need an even number</span>
         }
+        @if (pendingParticipants().length > 0) {
+          <span class="warn">— {{ pendingParticipants().length }} awaiting approval</span>
+        }
         @if (isBalancedDraw() && approvedParticipants().length > 0) {
           <span class="group-count">{{ groupCounts().a }} A · {{ groupCounts().b }} B</span>
         }
-      </div>
+      </h2>
       @if (isBalancedDraw() && canManageSetup() && approvedParticipants().length > 0) {
-        <div class="field-hint" style="margin:-4px 0 10px">
+        <div class="field-hint list-hint">
           Tap a player's letter to switch them between A and B.
           @if (groupCounts().a !== groupCounts().b) {
             The groups are uneven, so {{ groupCounts().extra }} {{ groupCounts().a > groupCounts().b ? 'A' : 'B' }}
@@ -399,10 +433,10 @@
         </div>
       } @else {
         <div class="participant-list">
-          @for (p of participants(); track p.id) {
+          @for (p of rosterInOrder(); track p.id) {
             <div class="participant-item">
               @if (p.registration_status === 'pending') {
-                <span style="flex:1">{{ p.name }} <span class="notify-status">— pending approval</span></span>
+                <span class="row-line row-name">{{ p.name }} <span class="notify-status">— pending approval</span></span>
                 @if (canManageSetup()) {
                   <div style="display:flex;gap:6px">
                     <button class="btn btn-sm btn-primary" [disabled]="approvingParticipantId() === p.id" (click)="approveParticipant(p)">Approve</button>
@@ -410,40 +444,31 @@
                   </div>
                 }
               } @else if (editingParticipantId === p.id) {
-                <div class="edit-form">
-                  <div class="edit-form-fields">
-                    <input class="input" style="flex:1;min-width:140px" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
-                    <input class="input" style="flex:1;min-width:140px" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
-                  </div>
-                  <div class="edit-form-actions">
-                    <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
-                    <button class="btn btn-sm btn-primary" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
-                      @if (savingParticipantId() === p.id) { Saving… } @else { Save }
-                    </button>
-                  </div>
-                </div>
+                <ng-container *ngTemplateOutlet="participantEditor; context: { $implicit: p, removable: true }" />
+              } @else if (canManageSetup()) {
+                <button type="button" class="row-toggle" aria-expanded="false" [attr.aria-label]="'Edit ' + p.name" (click)="startEditParticipant(p)">
+                  <span class="row-name">
+                    {{ p.name }}
+                    @if (notificationStatusLabel(p); as label) {
+                      <span class="notify-status">— {{ label }}</span>
+                    }
+                  </span>
+                  <span class="row-cue">Edit</span>
+                </button>
+                @if (isBalancedDraw()) {
+                  <button class="btn btn-sm group-toggle" [class.is-a]="p.draw_group === 'A'"
+                    [disabled]="groupingParticipantId() === p.id" (click)="toggleDrawGroup(p)"
+                    [attr.aria-label]="p.name + ' is in group ' + (p.draw_group ?? 'B') + '. Switch group.'">
+                    {{ p.draw_group ?? 'B' }}
+                  </button>
+                }
               } @else {
-                <span style="flex:1">
+                <span class="row-line row-name">
                   {{ p.name }}
                   @if (notificationStatusLabel(p); as label) {
                     <span class="notify-status">— {{ label }}</span>
                   }
                 </span>
-                @if (canManageSetup()) {
-                  <div style="display:flex;gap:6px">
-                    @if (isBalancedDraw()) {
-                      <button class="btn btn-sm group-toggle" [class.is-a]="p.draw_group === 'A'"
-                        [disabled]="groupingParticipantId() === p.id" (click)="toggleDrawGroup(p)"
-                        [attr.aria-label]="p.name + ' is in group ' + (p.draw_group ?? 'B') + '. Switch group.'">
-                        {{ p.draw_group ?? 'B' }}
-                      </button>
-                    }
-                    <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
-                    @if (teams().length === 0) {
-                      <button class="btn btn-sm btn-danger" (click)="deleteParticipant(p)">✕</button>
-                    }
-                  </div>
-                }
               }
             </div>
           }
@@ -451,9 +476,8 @@
       }
 
       <!-- Draw button (before teams exist) -->
-      @if (canManageSetup() && teams().length === 0 && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
-        <hr class="divider" />
-        <div class="draw-section">
+      @if (canManageSetup() && approvedParticipants().length >= 4 && approvedParticipants().length % 2 === 0 && pendingParticipants().length === 0) {
+        <div class="draw-section draw-ready">
           <div>
             <div style="font-weight:500;margin-bottom:4px;">Ready to draw teams?</div>
             <div style="font-size:.8rem;color:var(--text-dim);">
@@ -481,34 +505,29 @@
     }
 
     <!-- Teams: seed order + bracket generation, shared by both entry modes -->
-    @if (canManageSetup() && teams().length > 0) {
-      <hr class="divider" />
-      <div class="section-label">
+    @if (teams().length > 0) {
+      <h2 class="list-head">
         Teams
         <span class="count">{{ teams().length }}</span>
-      </div>
-      @if (isManualSeeding()) {
-        <div style="font-size:.8rem;color:var(--text-dim);margin-bottom:10px">
+      </h2>
+      @if (isManualSeeding() && canManageSetup()) {
+        <div class="field-hint list-hint">
           Drag to reorder — seed 1 plays the bracket's lowest seed first.
         </div>
       }
       <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
         @for (team of teams(); track team.id) {
-          <div class="team-seed-item" cdkDrag [cdkDragDisabled]="!isManualSeeding()">
-            @if (isManualSeeding()) {
+          <!-- The handle stays out here: a cdkDragHandle inside the shared template would
+               resolve its drag parent where the template is declared, and find none. -->
+          <div class="team-seed-item" cdkDrag [cdkDragDisabled]="!isManualSeeding() || !canManageSetup()">
+            @if (isManualSeeding() && canManageSetup()) {
               <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
             }
-            <span class="seed">#{{ team.seed }}</span>
-            <div class="team-info">
-              <div class="team-name">{{ team.name }}</div>
-              <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
-            </div>
-            @if (isDirectEntry()) {
-              <button class="btn btn-sm btn-danger" [disabled]="deletingTeamId() === team.id" (click)="deleteTeam(team)">✕</button>
-            }
+            <ng-container *ngTemplateOutlet="teamRow; context: { $implicit: team }" />
           </div>
         }
       </div>
+      @if (canManageSetup()) {
       <div class="draw-section" style="margin-top:16px">
         @if (isDirectEntry()) {
           @if (teams().length < 2) {
@@ -544,16 +563,14 @@
           </button>
         }
       </div>
+      }
       @if (drawError()) { <div class="form-error" style="margin-top:12px">{{ drawError() }}</div> }
       @if (generateBracketError()) { <div class="form-error" style="margin-top:12px">{{ generateBracketError() }}</div> }
     }
   }
 
   <!-- ── ACTIVE / COMPLETE PHASE ── -->
-  @if (tournament()?.status !== 'setup') {
-    @if (tournament()?.status === 'active' && canManageSetup()) {
-      <ng-container *ngTemplateOutlet="boardsCard" />
-    }
+  @if (tournament() && tournament()!.status !== 'setup') {
     <!-- Pool play (FEATURE_TRACKER item 18): standings while the pool runs, then the
          seed-and-generate step once every pool game is in. -->
     @if (pool(); as p) {
@@ -567,132 +584,143 @@
           }
         </div>
       }
-      @if (p.complete && !p.locked && canManageSetup()) {
-        <div class="card pool-ready" style="margin-bottom:24px">
-          <div class="section-label">Pool play finished</div>
-          <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px">
-            Seeds follow the standings. Drag to adjust if you need to, then generate the bracket.
-            Correcting a pool score afterwards resets the order to the standings.
-          </div>
-          <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
-            @for (team of teams(); track team.id) {
-              <div class="team-seed-item" cdkDrag>
-                <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
-                <span class="seed">#{{ team.seed }}</span>
-                <div class="team-info">
-                  <div class="team-name">{{ team.name }}</div>
-                  <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
-                </div>
-              </div>
-            }
-          </div>
+    }
+
+    @if (pool()?.complete && !pool()?.locked && canManageSetup()) {
+      <!-- Pool finished: this seed list is the team list for this step. -->
+      <div class="card pool-ready" style="margin-bottom:24px">
+        <div class="section-label">Pool play finished</div>
+        <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px">
+          Seeds follow the standings. Drag to adjust if you need to, then generate the bracket.
+          Correcting a pool score afterwards resets the order to the standings.
         </div>
-        <ng-container *ngTemplateOutlet="formatCard" />
-        <div class="draw-section" style="margin-bottom:24px">
-          <div style="font-size:.85rem;color:var(--text-dim)">{{ teams().length }} teams, seeded from the pool.</div>
-          <button class="btn btn-primary" [disabled]="generatingBracket()" (click)="confirmGenerateBracket()">
-            @if (generatingBracket()) {
-              <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
-              Generating…
-            } @else {
-              Generate bracket
-            }
-          </button>
+        <div cdkDropList class="team-seed-list" (cdkDropListDropped)="onSeedDrop($event)">
+          @for (team of teams(); track team.id) {
+            <div class="team-seed-item" cdkDrag>
+              <span class="drag-handle" cdkDragHandle aria-label="Drag to reorder">⠿</span>
+              <ng-container *ngTemplateOutlet="teamRow; context: { $implicit: team }" />
+            </div>
+          }
         </div>
-        @if (generateBracketError()) { <div class="form-error" style="margin:-12px 0 24px">{{ generateBracketError() }}</div> }
+      </div>
+      <div class="card" style="margin-bottom:24px">
+        <ng-container *ngTemplateOutlet="formatSetting" />
+      </div>
+      <div class="draw-section" style="margin-bottom:24px">
+        <div style="font-size:.85rem;color:var(--text-dim)">{{ teams().length }} teams, seeded from the pool.</div>
+        <button class="btn btn-primary" [disabled]="generatingBracket()" (click)="confirmGenerateBracket()">
+          @if (generatingBracket()) {
+            <span class="spinner" style="width:13px;height:13px;border-width:1.5px"></span>
+            Generating…
+          } @else {
+            Generate bracket
+          }
+        </button>
+      </div>
+      @if (generateBracketError()) { <div class="form-error" style="margin:-12px 0 24px">{{ generateBracketError() }}</div> }
+    } @else {
+      <h2 class="list-head">
+        Teams
+        <span class="count">{{ teams().length }}</span>
+      </h2>
+      @if (teams().length === 0) {
+        <div class="empty">No teams.</div>
+      } @else {
+        <div class="team-list">
+          @for (team of teams(); track team.id) {
+            <ng-container *ngTemplateOutlet="teamRow; context: { $implicit: team }" />
+          }
+        </div>
       }
     }
 
-    <div class="section-label" style="margin-bottom:10px">Participants</div>
-    @if (participants().length === 0) {
-      <div class="empty">No participants.</div>
-    } @else {
-      <div class="participant-list">
-        @for (p of participants(); track p.id) {
-          <div class="participant-item">
-            @if (editingParticipantId === p.id) {
-              <div class="edit-form">
-                <div class="edit-form-fields">
-                  <input class="input" style="flex:1;min-width:140px" type="text" [(ngModel)]="editingParticipantName" placeholder="Name" [disabled]="savingParticipantId() === p.id" />
-                  <input class="input" style="flex:1;min-width:140px" type="email" [(ngModel)]="editingParticipantEmail" placeholder="Email (optional)" [disabled]="savingParticipantId() === p.id" />
-                </div>
-                <div class="edit-form-actions">
-                  <button class="btn btn-sm" [disabled]="savingParticipantId() === p.id" (click)="cancelEditParticipant()">Cancel</button>
-                  <button class="btn btn-sm btn-primary" [disabled]="savingParticipantId() === p.id" (click)="saveParticipant(p)">
-                    @if (savingParticipantId() === p.id) { Saving… } @else { Save }
-                  </button>
-                </div>
-              </div>
-            } @else {
-              <span style="flex:1">
-                {{ p.name }}
-                @if (notificationStatusLabel(p); as label) {
-                  <span class="notify-status">— {{ label }}</span>
-                }
-              </span>
-              @if (canManageSetup()) {
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-sm" (click)="startEditParticipant(p)">Edit</button>
-                </div>
-              }
-            }
-          </div>
-        }
-      </div>
-    }
+    <ng-container *ngTemplateOutlet="settings" />
+  }
 
-    <hr class="divider" />
-    <div class="section-label" style="margin-bottom:10px">Teams</div>
-    @if (teams().length === 0) {
-      <div class="empty">No teams.</div>
-    } @else {
-      <div class="team-list">
-        @for (team of teams(); track team.id) {
-          <div class="team-item">
-            <span class="seed">#{{ team.seed }}</span>
-            <div class="team-info" style="flex:1">
-              @if (editingTeamId === team.id) {
-                <div class="edit-form">
-                  <input class="input" type="text" [(ngModel)]="editingTeamName" />
-                  <div class="edit-form-actions">
-                    <button class="btn btn-sm" (click)="cancelEditTeam()">Cancel</button>
-                    <button class="btn btn-sm btn-primary" (click)="saveTeam(team)">Save</button>
-                  </div>
-                </div>
+  <!-- ── STAFF & ACCESS ── Owners only, and rarely needed, so it closes the page folded. -->
+  @if (staffVisible()) {
+    <details class="fold" [open]="!!selectedStaffUser()">
+      <summary>
+        <span class="fold-title">Staff &amp; access</span>
+        <span class="fold-summary">{{ members().length }} {{ members().length === 1 ? 'person' : 'people' }}</span>
+      </summary>
+      <div class="fold-body">
+        <div class="member-list">
+          @for (m of members(); track m.user_id) {
+            <div class="member-item">
+              <div class="member-info">
+                <span class="member-name">{{ m.username ?? m.email }}</span>
+                <span class="member-meta">{{ m.email }} · {{ m.global_role }}</span>
+              </div>
+              @if (m.role === 'owner') {
+                <span class="badge badge-owner">Owner</span>
               } @else {
-                <div class="team-name">{{ team.name }}</div>
+                <select class="input" style="width:140px;flex:none"
+                  [ngModel]="m.role"
+                  (ngModelChange)="changeMemberRole(m, $event)"
+                  [disabled]="memberBusyUserId() === m.user_id"
+                  [attr.aria-label]="'Role for ' + (m.username ?? m.email)">
+                  <option value="manager">Manager</option>
+                  <option value="scorekeeper">Scorekeeper</option>
+                </select>
+                <button class="btn btn-sm btn-danger"
+                  [disabled]="memberBusyUserId() === m.user_id"
+                  (click)="removeMember(m)">Remove</button>
               }
-              <div class="team-players">{{ team.participant1_name }} · {{ team.participant2_name }}</div>
             </div>
-            @if (canManageSetup() && editingTeamId !== team.id) {
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-sm" (click)="startEditTeam(team)">Edit</button>
-              </div>
-            }
+          }
+        </div>
+
+        @if (memberError()) { <div class="form-error">{{ memberError() }}</div> }
+
+        <div class="section-label" style="margin-top:16px">Add or transfer staff</div>
+        <div class="user-search">
+          <input class="input" type="text" [(ngModel)]="staffSearchQuery"
+            (ngModelChange)="onStaffSearchInput()"
+            aria-label="Search for a user"
+            placeholder="Search by username or email (2+ characters)" />
+          @if (staffSearchResults().length > 0) {
+            <div class="search-results">
+              @for (u of staffSearchResults(); track u.id) {
+                <button type="button" class="search-result" (click)="selectStaffUser(u)">
+                  {{ u.username }} <span class="dim">({{ u.email }} · {{ u.role }})</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        @if (selectedStaffUser()) {
+          <div class="staff-pick">
+            <div>Selected: <strong>{{ selectedStaffUser()!.username }}</strong></div>
+            <div class="row" style="align-items:center;flex-wrap:wrap">
+              <button class="btn btn-sm btn-primary" [disabled]="staffActionBusy()" (click)="addStaffMember('manager')">Add as manager</button>
+              <button class="btn btn-sm btn-primary" [disabled]="staffActionBusy()" (click)="addStaffMember('scorekeeper')">Add as scorekeeper</button>
+              <button class="btn btn-sm" [disabled]="staffActionBusy()" (click)="cancelStaffSelection()">Cancel</button>
+            </div>
+            <!-- Kept apart from the Add buttons: it hands the whole tournament over and
+                 demotes the current owner, so it should never be a mis-tap away. -->
+            <div class="staff-transfer">
+              <span class="field-hint">Or hand the tournament over. You'll become a manager.</span>
+              <button class="btn btn-sm btn-danger" [disabled]="staffActionBusy()" (click)="transferOwnershipTo()">Transfer ownership</button>
+            </div>
           </div>
         }
       </div>
-    }
-
-    @if (tournament()?.status === 'complete') {
-      <hr class="divider" />
-      <div class="card" style="border-color:var(--marker);background:var(--surface);text-align:center;color:var(--marker)">
-        <div style="font-family:var(--mono);font-size: 0.78rem;letter-spacing: 0;color:var(--marker);margin-bottom:6px">CHAMPION</div>
-        <div style="font-size:1.1rem;font-weight:600;color:var(--marker)">{{ champion() }}</div>
-      </div>
-    }
+    </details>
   }
 
   <!-- Toast -->
   @if (toast()) {
-    <div class="toast toast-success">{{ toast() }}</div>
+    <div class="toast" [class.toast-success]="toastKind() === 'success'" [class.toast-error]="toastKind() === 'error'"
+      role="status" aria-live="polite">{{ toast() }}</div>
   }
 
   <!-- QR code — registration (sign me up) or bracket (let me watch) -->
   @if (qrKind(); as kind) {
     <div class="qr-modal-backdrop" (click)="closeQrModal()">
-      <div class="qr-modal" (click)="$event.stopPropagation()">
-        <div class="qr-modal-title">{{ kind === 'bracket' ? 'Bracket QR code' : 'Registration QR code' }}</div>
+      <div class="qr-modal" role="dialog" aria-modal="true" aria-labelledby="tm-qr-title" (click)="$event.stopPropagation()">
+        <div class="qr-modal-title" id="tm-qr-title">{{ kind === 'bracket' ? 'Bracket QR code' : 'Registration QR code' }}</div>
         <div class="qr-modal-sub">{{ tournament()?.name }}</div>
         <canvas #qrCanvas class="qr-canvas"></canvas>
         <div class="qr-modal-hint">

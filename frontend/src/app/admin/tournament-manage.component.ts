@@ -1,5 +1,5 @@
 // src/app/admin/tournament-manage.component.ts
-import { Component, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, signal, computed, ElementRef, ViewChild, HostListener } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { confirmService } from '../shared/services/confirm.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -60,6 +60,26 @@ export class TournamentManageComponent implements OnInit {
   actionsMenuOpen = signal(false);
   approvedParticipants = computed(() => this.participants().filter(p => p.registration_status !== 'pending'));
   pendingParticipants = computed(() => this.participants().filter(p => p.registration_status === 'pending'));
+  // Self sign-ups waiting on approval sort first, so they are the first thing an organizer
+  // sees in the list; the setup checklist already says how many there are.
+  rosterInOrder = computed(() => [...this.pendingParticipants(), ...this.approvedParticipants()]);
+  // Once teams exist the team list is the only roster on the page; a player's name and
+  // email are corrected from inside their team's row, so this looks them up by id.
+  participantById = computed(() => new Map(this.participants().map(p => [p.id, p])));
+  // One line standing in for the four setup choices, all of which were already made on
+  // the create form. The controls live behind it, folded away.
+  settingsSummary = computed(() => {
+    const t = this.tournament();
+    if (!t) return '';
+    const entry = t.team_entry_mode === 'direct' ? 'Entered teams' : (t.draw_mode === 'balanced' ? 'Balanced blind draw' : 'Blind draw');
+    const seeding = t.seeding_mode === 'manual' ? 'Manual seeding' : t.seeding_mode === 'pool_play' ? 'Pool play' : 'Automatic seeding';
+    const format = t.format === 'double' ? 'Double elimination' : 'Single elimination';
+    const n = t.boards ?? 0;
+    const w = this.word();
+    const boards = n ? `${n} ${(n === 1 ? w.one : w.many).toLowerCase()}` : `No ${w.one.toLowerCase()} assignments`;
+    return [entry, seeding, format, boards].join(' · ');
+  });
+  openTeamId: number | null = null;
   isManualSeeding = computed(() => this.tournament()?.seeding_mode === 'manual');
   isPoolPlay = computed(() => this.tournament()?.seeding_mode === 'pool_play');
   // Pool play (FEATURE_TRACKER item 18). Loaded with the bracket once the tournament is live;
@@ -173,6 +193,7 @@ export class TournamentManageComponent implements OnInit {
   drawError = signal('');
   generateBracketError = signal('');
   toast = signal('');
+  toastKind = signal<'success' | 'error'>('success');
 
   newParticipant = '';
   // Fast blind-draw setup. Paste mode is the default while the roster is empty (set in
@@ -282,7 +303,7 @@ export class TournamentManageComponent implements OnInit {
       next: session => this.billing.redirectTo(session.url),
       error: err => {
         this.unlockBusy.set(false);
-        this.showToast(err?.error?.error ?? 'Could not start checkout. Please try again.');
+        this.showToast(err?.error?.error ?? 'Could not start checkout. Please try again.', 'error');
       },
     });
   }
@@ -342,7 +363,7 @@ export class TournamentManageComponent implements OnInit {
       },
       error: () => {
         this.visibilityBusy.set(false);
-        this.showToast('Failed to update visibility.');
+        this.showToast('Failed to update visibility.', 'error');
       },
     });
   }
@@ -363,13 +384,25 @@ export class TournamentManageComponent implements OnInit {
       },
       error: err => {
         this.paidOverrideBusy.set(false);
-        this.showToast(err?.error?.error ?? 'Failed to update plan override.');
+        this.showToast(err?.error?.error ?? 'Failed to update plan override.', 'error');
       },
     });
   }
 
   toggleActionsMenu() {
     this.actionsMenuOpen.update(open => !open);
+  }
+
+  @ViewChild('actionsTrigger') actionsTriggerRef?: ElementRef<HTMLButtonElement>;
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    if (this.actionsMenuOpen()) {
+      this.closeActionsMenu();
+      this.actionsTriggerRef?.nativeElement.focus();
+    } else if (this.qrKind()) {
+      this.closeQrModal();
+    }
   }
 
   closeActionsMenu() {
@@ -386,7 +419,7 @@ export class TournamentManageComponent implements OnInit {
       next: () => this.router.navigate(['/admin']),
       error: (err) => {
         this.deletingTournament.set(false);
-        this.showToast(err?.error?.error ?? 'Failed to delete tournament.');
+        this.showToast(err?.error?.error ?? 'Failed to delete tournament.', 'error');
       },
     });
   }
@@ -516,7 +549,7 @@ export class TournamentManageComponent implements OnInit {
       },
       error: err => {
         this.drawModeBusy.set(false);
-        this.showToast(err?.error?.error || 'Failed to update the draw.');
+        this.showToast(err?.error?.error || 'Failed to update the draw.', 'error');
         const t = this.tournament();
         if (t) this.tournament.set({ ...t }); // re-sync the checkbox
       },
@@ -533,7 +566,7 @@ export class TournamentManageComponent implements OnInit {
       },
       error: err => {
         this.groupingParticipantId.set(null);
-        this.showToast(err?.error?.error || 'Failed to change the group.');
+        this.showToast(err?.error?.error || 'Failed to change the group.', 'error');
       },
     });
   }
@@ -548,7 +581,7 @@ export class TournamentManageComponent implements OnInit {
       },
       error: () => {
         this.teamEntryModeBusy.set(false);
-        this.showToast('Failed to update team entry mode.');
+        this.showToast('Failed to update team entry mode.', 'error');
       },
     });
   }
@@ -562,7 +595,7 @@ export class TournamentManageComponent implements OnInit {
     if (!uuid) return;
     navigator.clipboard.writeText(`${location.origin}${environment.baseHref}bracket/${uuid}`).then(
       () => this.showToast('Link copied!'),
-      () => this.showToast('Could not copy link.'),
+      () => this.showToast('Could not copy link.', 'error'),
     );
   }
 
@@ -577,7 +610,7 @@ export class TournamentManageComponent implements OnInit {
     if (!url) return;
     navigator.clipboard.writeText(url).then(
       () => this.showToast('Registration link copied!'),
-      () => this.showToast('Could not copy link.'),
+      () => this.showToast('Could not copy link.', 'error'),
     );
   }
 
@@ -604,7 +637,7 @@ export class TournamentManageComponent implements OnInit {
       const canvas = this.qrCanvasRef?.nativeElement;
       if (!canvas) return;
       QRCode.toCanvas(canvas, url, { width: 240, margin: 2 }, err => {
-        if (err) this.showToast('Could not generate QR code.');
+        if (err) this.showToast('Could not generate QR code.', 'error');
       });
     });
   }
@@ -630,7 +663,7 @@ export class TournamentManageComponent implements OnInit {
     if (!url) return;
     navigator.clipboard.writeText(url).then(
       () => this.showToast('Link copied!'),
-      () => this.showToast('Could not copy link.'),
+      () => this.showToast('Could not copy link.', 'error'),
     );
   }
 
@@ -841,7 +874,7 @@ export class TournamentManageComponent implements OnInit {
       },
       error: err => {
         this.deletingTeamId.set(null);
-        this.showToast(err?.error?.error ?? 'Failed to delete team.');
+        this.showToast(err?.error?.error ?? 'Failed to delete team.', 'error');
       },
     });
   }
@@ -892,7 +925,7 @@ export class TournamentManageComponent implements OnInit {
               this.savingParticipantId.set(null);
             },
             error: () => {
-              this.showToast('Failed to update notification email.');
+              this.showToast('Failed to update notification email.', 'error');
               this.savingParticipantId.set(null);
             },
           });
@@ -902,7 +935,7 @@ export class TournamentManageComponent implements OnInit {
         this.cancelEditParticipant();
       },
       error: () => {
-        this.showToast('Failed to update participant.');
+        this.showToast('Failed to update participant.', 'error');
         this.savingParticipantId.set(null);
       },
     });
@@ -913,7 +946,7 @@ export class TournamentManageComponent implements OnInit {
     // drawn (manual seeding leaves a tournament in 'setup' with teams formed while
     // awaiting bracket generation — the roster is locked for that window too).
     if (this.tournament()?.status !== 'setup' || this.teams().length > 0) {
-      this.showToast('Cannot delete participants after teams have been drawn.');
+      this.showToast('Cannot delete participants after teams have been drawn.', 'error');
       return;
     }
     // A pending self-registration is a real row — rejecting it is just deleting it —
@@ -925,7 +958,7 @@ export class TournamentManageComponent implements OnInit {
     if (!ok) return;
     this.svc.deleteParticipant(p.id).subscribe({
       next: () => this.participants.update(list => list.filter(x => x.id !== p.id)),
-      error: (err) => this.showToast(err?.error?.error ?? 'Failed to delete participant.'),
+      error: (err) => this.showToast(err?.error?.error ?? 'Failed to delete participant.', 'error'),
     });
   }
 
@@ -938,7 +971,7 @@ export class TournamentManageComponent implements OnInit {
       },
       error: err => {
         this.approvingParticipantId.set(null);
-        this.showToast(err?.error?.error ?? 'Failed to approve participant.');
+        this.showToast(err?.error?.error ?? 'Failed to approve participant.', 'error');
       },
     });
   }
@@ -979,7 +1012,7 @@ export class TournamentManageComponent implements OnInit {
     this.svc.reorderTeams(this.tournamentId, renumbered.map(t => t.id)).subscribe({
       error: () => {
         this.teams.set(previous);
-        this.showToast('Failed to save new seed order.');
+        this.showToast('Failed to save new seed order.', 'error');
       },
     });
   }
@@ -1002,6 +1035,20 @@ export class TournamentManageComponent implements OnInit {
     });
   }
 
+  // A team row opens into a small panel: the team's name, its two players, and (for an
+  // entered team still in setup) removal. Only one is open at a time.
+  toggleTeam(t: Team) {
+    if (this.openTeamId === t.id) {
+      this.openTeamId = null;
+      this.cancelEditTeam();
+      this.cancelEditParticipant();
+    } else {
+      this.openTeamId = t.id;
+      this.cancelEditParticipant();
+      this.startEditTeam(t);
+    }
+  }
+
   // Team inline edit
   startEditTeam(t: Team) {
     this.editingTeamId = t.id;
@@ -1019,13 +1066,14 @@ export class TournamentManageComponent implements OnInit {
     this.svc.updateTeam(t.id, { name }).subscribe({
       next: updated => {
         this.teams.set(this.teams().map(item => item.id === t.id ? updated : item));
-        this.cancelEditTeam();
+        this.showToast('Team name saved.');
       },
-      error: () => this.showToast('Failed to update team.'),
+      error: () => this.showToast('Failed to update team.', 'error'),
     });
   }
 
-  private showToast(msg: string) {
+  private showToast(msg: string, kind: 'success' | 'error' = 'success') {
+    this.toastKind.set(kind);
     this.toast.set(msg);
     setTimeout(() => this.toast.set(''), 2500);
   }

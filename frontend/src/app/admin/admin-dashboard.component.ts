@@ -91,7 +91,7 @@ import { confirmService } from '../shared/services/confirm.service';
       </div>
 
       <!-- Tournament list -->
-      <div class="section-label">Tournaments</div>
+      <h2 class="list-head">Tournaments</h2>
       @if (loading()) {
         <div class="empty"><span class="spinner"></span></div>
       } @else if (tournaments().length === 0) {
@@ -109,7 +109,6 @@ import { confirmService } from '../shared/services/confirm.service';
               </div>
               <div class="list-actions">
                 <a class="btn btn-sm" [routerLink]="['/bracket', t.id]">View</a>
-                <a class="btn btn-sm" [routerLink]="['/admin/tournament', t.id]">Manage</a>
                 <button class="btn btn-sm btn-danger" (click)="delete(t)">Delete</button>
               </div>
             </div>
@@ -124,7 +123,6 @@ import { confirmService } from '../shared/services/confirm.service';
   `,
   styles: [`
     .section-label {
-      font-family: var(--mono);
       font-size: 0.78rem;
       letter-spacing: 0;
       color: var(--text-dim);
@@ -148,32 +146,50 @@ import { confirmService } from '../shared/services/confirm.service';
       min-width: 160px;
     }
     .form-error { font-size: 0.8rem; color: var(--danger); margin-top: 8px; }
-    .list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    /* Ruled rows, as on the public tournament list: a heading over a 2px toner rule,
+       rows divided by the 1px ruled line. */
+    .list-head {
+      margin: 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--text);
+      font-size: 1rem;
+      font-weight: 800;
+      font-stretch: 106%;
+      letter-spacing: -.01em;
+    }
+    .list { display: flex; flex-direction: column; }
     .list-item {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      gap: 8px 12px;
+      min-height: 56px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
     }
     /* The 220px basis is what lets the row wrap: with a basis of 0 the name shrank to
        "Sat…" on a phone instead of the buttons dropping onto their own line. */
-    .list-main { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; min-width: 0; }
+    .list-main { display: flex; align-items: center; gap: 6px 10px; flex: 1 1 160px; min-width: 0; flex-wrap: wrap; }
     .list-name {
-      font-weight: 500;
-      font-size: 0.9rem;
+      font-weight: 700;
+      font-size: 0.95rem;
       color: var(--text);
-      text-decoration: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      &:hover { color: var(--accent); }
+      /* The name is the way into a tournament, so it reads as a link: underlined in
+         toner, per the One Ink Rule, thickening on hover. */
+      text-decoration: underline;
+      text-decoration-thickness: 1.5px;
+      text-underline-offset: .16em;
+      /* Wraps rather than clipping: "Saturday Night Bags at…" told an organizer nothing. */
+      overflow-wrap: anywhere;
+      &:hover { text-decoration-thickness: 2.5px; }
     }
     .list-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    /* One-handed at a venue: 44px controls on a touch screen (DESIGN.md). */
+    @media (pointer: coarse) {
+      .btn.btn-sm { min-height: 44px; padding-left: 14px; padding-right: 14px; }
+      .list-name { display: inline-flex; align-items: center; min-height: 44px; }
+    }
   `]
 })
 export class AdminDashboardComponent implements OnInit {

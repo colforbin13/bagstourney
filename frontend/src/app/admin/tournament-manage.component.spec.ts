@@ -1190,6 +1190,145 @@ describe('TournamentManageComponent', () => {
     });
   });
 
+  // The page shows one roster: the player list before the draw, the team list after it.
+  // Player names are corrected from inside a team's row once teams exist.
+  describe('one roster', () => {
+    const players: Participant[] = [
+      { id: 11, tournament_id: tournamentId, name: 'Ann', registration_status: 'approved' },
+      { id: 12, tournament_id: tournamentId, name: 'Bob', registration_status: 'approved' },
+      { id: 13, tournament_id: tournamentId, name: 'Cara', registration_status: 'approved' },
+      { id: 14, tournament_id: tournamentId, name: 'Dan', registration_status: 'approved' },
+    ];
+    const teamList: Team[] = [
+      { id: 21, tournament_id: tournamentId, name: 'Ann & Bob', participant1_id: 11, participant2_id: 12, participant1_name: 'Ann', participant2_name: 'Bob', seed: 1 },
+      { id: 22, tournament_id: tournamentId, name: 'Cara & Dan', participant1_id: 13, participant2_id: 14, participant1_name: 'Cara', participant2_name: 'Dan', seed: 2 },
+    ];
+
+    function live(status: 'active' | 'complete' = 'active') {
+      bootstrapCore(managerCapabilities);
+      component.tournament.update(t => ({ ...t!, status }));
+      component.participants.set(players);
+      component.teams.set(teamList);
+      fixture.detectChanges();
+    }
+
+    it('lists teams only once play has started, not the players a second time', () => {
+      live();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelectorAll('.participant-item').length).toBe(0);
+      expect(el.querySelectorAll('.team-item').length).toBe(2);
+    });
+
+    it("opens a team row to correct either player's name", () => {
+      live();
+      const el: HTMLElement = fixture.nativeElement;
+      el.querySelector<HTMLButtonElement>('.team-item .row-toggle')!.click();
+      fixture.detectChanges();
+
+      const playerNames = Array.from(el.querySelectorAll('.team-player-name')).map(n => n.textContent!.trim());
+      expect(playerNames).toEqual(['Ann', 'Bob']);
+
+      el.querySelector<HTMLButtonElement>('.team-player .btn')!.click();
+      fixture.detectChanges();
+      expect(component.editingParticipantId).toBe(11);
+      expect(el.querySelector<HTMLInputElement>('.team-player input[type=text]')).not.toBeNull();
+    });
+
+    it('closes the open row again, dropping any half-made edit', () => {
+      live();
+      component.toggleTeam(teamList[0]);
+      component.startEditParticipant(players[0]);
+      component.toggleTeam(teamList[0]);
+      expect(component.openTeamId).toBeNull();
+      expect(component.editingParticipantId).toBeNull();
+    });
+
+    it('puts the champion above the team list on a finished tournament', () => {
+      live('complete');
+      component.champion.set('Ann & Bob');
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      const champion = el.querySelector('.champion')!;
+      const firstTeam = el.querySelector('.team-item')!;
+      expect(champion.textContent).toContain('Ann & Bob');
+      expect(champion.compareDocumentPosition(firstTeam) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('sorts self sign-ups awaiting approval to the top of the setup roster', () => {
+      bootstrapCore(managerCapabilities);
+      component.participants.set([
+        players[0],
+        { id: 15, tournament_id: tournamentId, name: 'Eve', registration_status: 'pending' },
+      ]);
+      fixture.detectChanges();
+      const first = fixture.nativeElement.querySelector('.participant-item') as HTMLElement;
+      expect(first.textContent).toContain('Eve');
+      expect(first.textContent).toContain('pending approval');
+    });
+
+    it('opens a setup roster row to edit or remove the player, with no separate cross button', () => {
+      bootstrapCore(managerCapabilities);
+      component.participants.set([players[0]]);
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.participant-item .btn-danger')).toBeNull();
+
+      el.querySelector<HTMLButtonElement>('.participant-item .row-toggle')!.click();
+      fixture.detectChanges();
+      expect(component.editingParticipantId).toBe(11);
+      expect(el.querySelector('.participant-item .edit-form-remove')!.textContent).toContain('Remove player');
+    });
+
+    it('sums up the setup choices in one line', () => {
+      bootstrapCore(managerCapabilities);
+      component.tournament.update(t => ({ ...t!, team_entry_mode: 'auto_draft', format: 'double', boards: 4 }));
+      expect(component.settingsSummary()).toBe('Blind draw · Automatic seeding · Double elimination · 4 boards');
+    });
+  });
+
+  describe('Actions menu', () => {
+    it('says whether it is open, and closes on Escape', () => {
+      bootstrapCore(managerCapabilities);
+      fixture.detectChanges();
+      const trigger = fixture.nativeElement.querySelector('.dropdown .btn') as HTMLButtonElement;
+      expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+      trigger.click();
+      fixture.detectChanges();
+      expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+      expect(component.actionsMenuOpen()).toBeFalse();
+      expect(fixture.nativeElement.querySelector('.dropdown-menu')).toBeNull();
+    });
+  });
+
+  it('shows a failure in the error style, not the success one', () => {
+    bootstrapCore(managerCapabilities);
+    component.startEditTeam({ id: 21, name: 'X' } as Team);
+    component.saveTeam({ id: 21 } as Team);
+    httpMock.expectOne(`${environment.apiUrl}/teams/21`).flush({ error: 'nope' }, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    const toast = fixture.nativeElement.querySelector('.toast') as HTMLElement;
+    expect(toast.classList).toContain('toast-error');
+    expect(toast.classList).not.toContain('toast-success');
+  });
+
+  describe('plan override', () => {
+    it('sits in the Actions menu, not beside the status badges', () => {
+      bootstrapCore({ ...managerCapabilities, is_super_admin: true });
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.tm-badges')!.textContent).not.toContain('plan override');
+
+      component.toggleActionsMenu();
+      fixture.detectChanges();
+      const items = Array.from(el.querySelectorAll('.dropdown-item')).map(i => i.textContent!.trim());
+      expect(items).toContain('Grant plan override');
+    });
+  });
+
   describe('score entry link', () => {
     it('should offer the score screen to someone who can score an active tournament', () => {
       bootstrapCore(managerCapabilities);
