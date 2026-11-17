@@ -23,6 +23,9 @@ deploy.ps1
 brag-output/
 brag-output-*/
 
+# Screenshots for web listings
+listing-screenshots/
+
 # OS
 .DS_Store
 Thumbs.db
