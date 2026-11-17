@@ -199,7 +199,7 @@ describe('TournamentListComponent', () => {
     it('should point the last hero tab at the examples until a real tournament is live', () => {
       setup([makeTournament({ id: 1, status: 'active', created_by_user_id: 5 })]);
       const last = () => Array.from<HTMLAnchorElement>(el().querySelectorAll('.tabs .tab')).pop()!;
-      expect(last().textContent!.trim()).toBe('Example brackets');
+      expect(last().textContent!.trim()).toBe('Examples');
       expect(last().getAttribute('href')).toBe('/#examples');
 
       TestBed.resetTestingModule();

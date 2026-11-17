@@ -100,7 +100,7 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
           @if (hasLive()) {
             <a class="tab" routerLink="/" fragment="tournaments"><span>Live brackets</span></a>
           } @else {
-            <a class="tab" routerLink="/" fragment="examples"><span>Example brackets</span></a>
+            <a class="tab" routerLink="/" fragment="examples"><span>Examples</span></a>
           }
         </nav>
       </header>
