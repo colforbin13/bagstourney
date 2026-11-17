@@ -7,12 +7,33 @@ import { ActivatedRouteSnapshot, RouterStateSnapshot, TitleStrategy } from '@ang
 export const SITE_URL = 'https://bracketway.com';
 export const SITE_NAME = 'Bracketway';
 
-/** Tags this strategy owns. Removed on pages that don't describe themselves. */
-const OWNED_META = ['name="description"', 'property="og:title"', 'property="og:description"', 'property="og:url"', 'property="og:type"'];
+/**
+ * The brand card every described page previews with: the same image, size and card type
+ * api/lib/LinkPreview.php gives a shared bracket link, so a link to the site and a link to
+ * a bracket look alike in a chat. It has to be an absolute URL.
+ */
+export const SHARE_IMAGE = {
+  url: `${SITE_URL}/assets/og-card.png`,
+  width: '1200',
+  height: '630',
+  alt: `${SITE_NAME}: tournament brackets for two-player teams`,
+};
 
 /**
- * Sets each page's <title>, meta description, canonical link and Open Graph basics from
- * its route: `title` on the route, `description` in its `data`.
+ * Tags this strategy owns. Removed on pages that don't describe themselves. Open Graph
+ * tags are keyed by `property` and Twitter's by `name`; some crawlers are strict about it.
+ */
+const OWNED_META = [
+  'name="description"',
+  'property="og:title"', 'property="og:description"', 'property="og:url"', 'property="og:type"',
+  'property="og:site_name"',
+  'property="og:image"', 'property="og:image:width"', 'property="og:image:height"', 'property="og:image:alt"',
+  'name="twitter:card"', 'name="twitter:title"', 'name="twitter:description"', 'name="twitter:image"',
+];
+
+/**
+ * Sets each page's <title>, meta description, canonical link, Open Graph tags and Twitter
+ * card from its route: `title` on the route, `description` in its `data`.
  *
  * On the prerendered pages (app.routes.server.ts) this runs at build time, so the tags are
  * in the HTML that search engines and link previews read. In the browser it keeps them right
@@ -47,6 +68,15 @@ export class SeoTitleStrategy extends TitleStrategy {
     this.meta.updateTag({ property: 'og:description', content: description });
     this.meta.updateTag({ property: 'og:url', content: url });
     this.meta.updateTag({ property: 'og:type', content: 'website' });
+    this.meta.updateTag({ property: 'og:site_name', content: SITE_NAME });
+    this.meta.updateTag({ property: 'og:image', content: SHARE_IMAGE.url });
+    this.meta.updateTag({ property: 'og:image:width', content: SHARE_IMAGE.width });
+    this.meta.updateTag({ property: 'og:image:height', content: SHARE_IMAGE.height });
+    this.meta.updateTag({ property: 'og:image:alt', content: SHARE_IMAGE.alt });
+    this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+    this.meta.updateTag({ name: 'twitter:title', content: pageTitle });
+    this.meta.updateTag({ name: 'twitter:description', content: description });
+    this.meta.updateTag({ name: 'twitter:image', content: SHARE_IMAGE.url });
     this.setCanonical(url);
   }
 

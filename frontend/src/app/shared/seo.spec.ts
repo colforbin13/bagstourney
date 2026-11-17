@@ -56,6 +56,31 @@ describe('SeoTitleStrategy', () => {
     expect(canonical()).toBeNull();
   });
 
+  // A link pasted into a chat only previews with an image if the tag is in the HTML, and
+  // the card has to be an absolute URL. Matches what api/lib/LinkPreview.php gives a bracket.
+  it('should give a described page the brand card and a large Twitter card', async () => {
+    await harness.navigateByUrl('/pricing');
+
+    expect(meta.getTag('property="og:image"')?.content).toBe('https://bracketway.com/assets/og-card.png');
+    expect(meta.getTag('property="og:image:width"')?.content).toBe('1200');
+    expect(meta.getTag('property="og:image:height"')?.content).toBe('630');
+    expect(meta.getTag('property="og:image:alt"')?.content).toContain('Bracketway');
+    expect(meta.getTag('property="og:site_name"')?.content).toBe('Bracketway');
+    expect(meta.getTag('name="twitter:card"')?.content).toBe('summary_large_image');
+    expect(meta.getTag('name="twitter:title"')?.content).toBe('Pricing');
+    expect(meta.getTag('name="twitter:description"')?.content).toBe('Free up to 32 players.');
+    expect(meta.getTag('name="twitter:image"')?.content).toBe('https://bracketway.com/assets/og-card.png');
+  });
+
+  it('should take the card away again on a page without a description', async () => {
+    await harness.navigateByUrl('/pricing');
+    await harness.navigateByUrl('/tournaments');
+
+    expect(meta.getTag('property="og:image"')).toBeNull();
+    expect(meta.getTag('name="twitter:card"')).toBeNull();
+    expect(meta.getTag('name="twitter:image"')).toBeNull();
+  });
+
   it('should fall back to the site name for an untitled page', async () => {
     await harness.navigateByUrl('/pricing');
     await harness.navigateByUrl('/bracket/7');
