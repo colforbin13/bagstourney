@@ -130,7 +130,7 @@
     <div class="kiosk-bar">
         <h1 class="kiosk-title">{{ tournament()?.name }}</h1>
         @if (tournament()) {
-        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status === 'active' ? 'Live' : tournament()!.status === 'complete' ? 'Final' : 'Setup' }}</span>
+        <span class="badge badge-{{ tournament()!.status }}" [class.badge-quiet]="isExample()">{{ statusLabel() }}</span>
         }
         <button type="button" class="btn btn-sm kiosk-exit" (click)="setKiosk(false)">Exit TV mode</button>
     </div>
@@ -146,7 +146,7 @@
 
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         @if (tournament()) {
-        <span class="badge badge-{{ tournament()!.status }}">{{ tournament()!.status === 'active' ? 'Live' : tournament()!.status === 'complete' ? 'Final' : 'Setup' }}</span>
+        <span class="badge badge-{{ tournament()!.status }}" [class.badge-quiet]="isExample()">{{ statusLabel() }}</span>
         }
 
         @if (!auth.isLoggedIn()) {

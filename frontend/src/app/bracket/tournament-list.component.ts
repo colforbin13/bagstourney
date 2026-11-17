@@ -6,7 +6,7 @@ import { TournamentService } from '../shared/services/tournament.service';
 import { AuthService } from '../shared/services/auth.service';
 import { Tournament } from '../shared/models/tournament.models';
 import { DrawnTeam, pairTeams, shuffle } from '../shared/blind-draw';
-import { isExampleTournament } from '../shared/examples';
+import { exampleOrder, exampleShows, isExampleTournament } from '../shared/examples';
 
 interface TournamentGroup {
   key: Tournament['status'] | 'example';
@@ -96,7 +96,12 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
           <a class="tab" routerLink="/pricing"><span>Pricing</span></a>
           <a class="tab" routerLink="/cornhole-fundraiser"><span>Fundraisers</span></a>
           <a class="tab" routerLink="/sports"><span>Sports</span></a>
-          <a class="tab" routerLink="/" fragment="tournaments"><span>Live brackets</span></a>
+          <!-- Points at real play when there is some; until then, at the examples. -->
+          @if (hasLive()) {
+            <a class="tab" routerLink="/" fragment="tournaments"><span>Live brackets</span></a>
+          } @else {
+            <a class="tab" routerLink="/" fragment="examples"><span>Example brackets</span></a>
+          }
         </nav>
       </header>
 
@@ -141,8 +146,35 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
         </ul>
         <a class="walkthrough-link" routerLink="/how-it-works">Read the full walkthrough</a>
       </section>
+
+      <!-- What the three steps end up as. The examples are the only finished brackets a
+           visitor can open, so they sit here, each named for what it shows, and not at the
+           foot of a list of real tournaments they were never part of. -->
+      @if (examples().length > 0) {
+        <section class="examples" id="examples">
+          <h2 class="list-title">Example brackets</h2>
+          <p class="examples-note">Made-up events that show how different formats look. Open one to see its bracket.</p>
+          <div class="examples-list">
+            @for (t of examples(); track t.id) {
+              <a class="example" [routerLink]="['/bracket', t.uuid]">
+                <span class="example-shows">{{ shows(t) }}</span>
+                <span class="example-event">
+                  <span class="example-name">{{ t.name }}</span>
+                  @if (t.stats?.team_count; as count) {
+                    <span class="example-meta">{{ count }} teams</span>
+                  }
+                </span>
+                <svg class="row-arrow" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M3 9h11M9.5 4l5 5-5 5" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </a>
+            }
+          </div>
+        </section>
+      }
     }
 
+    @if (showList()) {
     <div class="page" [class.page-landing]="showLanding()" id="tournaments">
       <div class="list-head">
         @if (showLanding()) {
@@ -159,7 +191,7 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
 
       @if (loading()) {
         <div class="empty"><span class="spinner"></span></div>
-      } @else if (tournaments().length === 0) {
+      } @else if (listed().length === 0) {
         <!-- Keyed on the session rather than the route: an organizer with nothing yet wants
              the shortcut to make one, wherever they're standing. -->
         <div class="empty">
@@ -209,6 +241,7 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
         }
       }
     </div>
+    }
   `,
   styles: [`
     /* ── Landing: the flyer ──
@@ -458,6 +491,33 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
     .list-title { font-size: 1.9rem; font-stretch: 106%; }
     .filter { width: auto; max-width: 220px; font-size: 0.875rem; padding: 7px 10px; }
 
+    /* ── Example brackets: ruled like the steps above them ── */
+    .examples {
+      padding: clamp(32px, 5vw, 56px) var(--page-gutter) clamp(32px, 5vw, 56px);
+      scroll-margin-top: 52px;
+    }
+    .examples-note { margin-top: 8px; color: var(--text-dim); text-wrap: pretty; }
+    .examples-list { margin-top: 20px; border-top: 3px solid var(--text); }
+    .example {
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr) auto;
+      align-items: baseline;
+      column-gap: clamp(16px, 3vw, 40px);
+      padding: 16px 0;
+      border-bottom: 1.5px solid var(--text);
+      color: var(--text);
+      text-decoration: none;
+      transition: background .15s, padding .2s cubic-bezier(.16, 1, .3, 1);
+      &:hover { background: var(--surface-2); padding-left: 8px; padding-right: 8px; text-decoration: none; }
+      &:focus-visible { outline-offset: -3px; }
+      .row-arrow { align-self: center; }
+    }
+    .example-shows { font-size: 1.2rem; font-weight: 800; font-stretch: 106%; letter-spacing: -.015em; }
+    .example-event { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+    .example-name { font-weight: 600; }
+    .example-meta { font-size: 0.875rem; color: var(--muted); }
+    #tournaments { scroll-margin-top: 52px; }
+
     .group + .group { margin-top: 32px; }
     .group-label {
       font-size: 0.85rem;
@@ -509,6 +569,15 @@ const SAMPLE_PLAYERS = ['Dana', 'Marcus', 'Priya', 'Tom', 'Shanice', 'Luis'];
       .step { grid-template-columns: clamp(40px, 12vw, 64px) minmax(0, 1fr); }
       .step-body { grid-column: 2; }
     }
+    @media (max-width: 640px) {
+      /* What it shows over which event, with the arrow held against both lines. */
+      .example { grid-template-columns: minmax(0, 1fr) auto; row-gap: 3px; padding: 14px 0; }
+      .example-shows, .example-event { grid-column: 1; }
+      .example .row-arrow { grid-column: 2; grid-row: 1 / span 2; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .example { transition: none; }
+    }
     @media (max-width: 520px) {
       .tab { height: 138px; }
       .tab span { font-size: .9rem; }
@@ -557,14 +626,36 @@ export class TournamentListComponent implements OnInit {
   // Defaults to showing the landing content when a route doesn't say otherwise.
   showLanding = signal(true);
 
+  // On the landing page the examples have their own band under the steps, so the list
+  // below is real tournaments only. On /tournaments there is no band, and they stay in the
+  // list as a labelled group at the end.
+  readonly examples = computed(() =>
+    this.showLanding()
+      ? this.tournaments().filter(t => isExampleTournament(t)).sort((a, b) => exampleOrder(a) - exampleOrder(b))
+      : []);
+  readonly listed = computed(() =>
+    this.showLanding() ? this.tournaments().filter(t => !isExampleTournament(t)) : this.tournaments());
+
+  // A real game being played right now. Decides where the hero's last tab points.
+  readonly hasLive = computed(() =>
+    this.tournaments().some(t => t.status === 'active' && !isExampleTournament(t)));
+
+  // The landing page only shows the list when it has something to list: a visitor with no
+  // real tournaments to follow gets the examples instead of an empty heading. A signed-in
+  // organizer still gets it, for the shortcut to create their first one.
+  readonly showList = computed(() =>
+    !this.showLanding() || this.auth.isLoggedIn() || (!this.loading() && this.listed().length > 0));
+
   // The filter is noise until there are enough rows to actually get lost in.
-  readonly showFilter = computed(() => this.tournaments().length > 6);
+  readonly showFilter = computed(() => this.listed().length > 6);
 
   private readonly matching = computed(() => {
     const query = this.filter().trim().toLowerCase();
-    const all = this.tournaments();
+    const all = this.listed();
     return query ? all.filter(t => t.name.toLowerCase().includes(query)) : all;
   });
+
+  readonly shows = exampleShows;
 
   // Running tournaments first — someone arriving at the site mid-event is almost always
   // looking for the one happening right now, not the archive. 'setup' only ever appears

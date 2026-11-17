@@ -68,6 +68,15 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   tournament  = signal<Tournament | null>(null);
   // A seeded example says so under its name, so nobody takes it for a real event.
   readonly isExample = computed(() => isExampleTournament(this.tournament()));
+
+  // The pink "Live" badge means a real game is being played right now. A made-up example
+  // is never that, whatever its seeded state, so it says "In progress" on a plain badge,
+  // the same as its row on the home page (DESIGN.md, the Highlighter Rule).
+  readonly statusLabel = computed(() => {
+    const status = this.tournament()?.status;
+    if (status === 'active') return this.isExample() ? 'In progress' : 'Live';
+    return status === 'complete' ? 'Final' : 'Setup';
+  });
   bracketData = signal<BracketData | null>(null);
   loading     = signal(true);
   submitting  = signal<number | null>(null);

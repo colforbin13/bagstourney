@@ -1,6 +1,7 @@
 // src/app/bracket/how-it-works.component.ts
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { EXAMPLE_BRACKETS } from '../shared/examples';
 
 @Component({
   selector: 'app-how-it-works',
@@ -64,6 +65,7 @@ import { RouterLink } from '@angular/router';
               the bracket from the standings: win percentage, then point differential. Every
               team gets more games before the bracket starts.
               <strong>Pool play is a <a routerLink="/pricing">Pro feature</a>.</strong>
+              &ngsp;<a [routerLink]="examples.poolPlay">See an example seeded from pool play</a>.
             </dd>
             <dt>Single or double elimination</dt>
             <dd>
@@ -74,6 +76,7 @@ import { RouterLink } from '@angular/router';
               <strong>Double elimination is a <a routerLink="/pricing">Pro feature</a></strong>, and unlike the other
               choices here it's locked once the bracket is generated, because the bracket's
               whole shape depends on it.
+              <a [routerLink]="examples.doubleElimination">See an example double-elimination bracket</a>.
             </dd>
             <dt>Board assignments</dt>
             <dd>
@@ -83,6 +86,7 @@ import { RouterLink } from '@angular/router';
               game to a different board, and you can change the count mid-event. Not playing on
               boards? Call them courts, lanes, tables, pits or fields instead.
               <strong>Board assignments are a <a routerLink="/pricing">Pro feature</a>.</strong>
+              &ngsp;<a [routerLink]="examples.boards">See an example with boards in use</a>.
             </dd>
           </dl>
         </li>
@@ -260,4 +264,7 @@ import { RouterLink } from '@angular/router';
     .aside strong { color: var(--text); font-weight: 600; }
   `]
 })
-export class HowItWorksComponent {}
+export class HowItWorksComponent {
+  /** Made-up tournaments that show each paid format. */
+  readonly examples = EXAMPLE_BRACKETS;
+}

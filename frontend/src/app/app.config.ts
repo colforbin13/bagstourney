@@ -16,7 +16,7 @@ export const appConfig: ApplicationConfig = {
     // following a link from halfway down one page dropped you halfway down the next.
     // 'enabled' (rather than 'top') still restores the old position on browser back and
     // forward, which is what a reader expects when returning to a long page.
-    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled' })),
+    provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'enabled', anchorScrolling: 'enabled' })),
     provideHttpClient(withInterceptors([authInterceptor])),
     // Prerendered pages are picked up as they are instead of being torn down and redrawn.
     // A no-op on client-rendered routes, which have nothing to hydrate.

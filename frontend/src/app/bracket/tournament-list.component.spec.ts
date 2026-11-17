@@ -156,20 +156,65 @@ describe('TournamentListComponent', () => {
 
   // Seeded examples are public but are not real activity, so they must never be counted
   // under "Live now" or "Completed" on the page that sells the product.
-  it('should list example tournaments in their own labelled group, after real ones', () => {
-    setup([
-      makeTournament({ id: 1, name: 'Demo Night', status: 'active', created_by_user_id: 5 }),
+  describe('example brackets', () => {
+    const mixed = () => [
+      makeTournament({ id: 1, name: 'Demo Night', status: 'active', format: 'double', created_by_user_id: 5 }),
       makeTournament({ id: 2, name: 'Real Final', status: 'complete', created_by_user_id: 1 }),
-      makeTournament({ id: 3, name: 'Demo Final', status: 'complete', created_by_user_id: 5 }),
-    ]);
-    const groups = component.groups();
-    expect(groups.map(g => g.key)).toEqual(['complete', 'example']);
-    expect(groups[0].items.map(t => t.name)).toEqual(['Real Final']);
-    expect(groups[1].items.map(t => t.name)).toEqual(['Demo Night', 'Demo Final']);
+      makeTournament({ id: 3, name: 'Demo Draw', status: 'complete', team_entry_mode: 'auto_draft', created_by_user_id: 5 }),
+    ];
+    const el = (): HTMLElement => fixture.nativeElement;
 
-    const el: HTMLElement = fixture.nativeElement;
-    expect(el.querySelector('.group-note')).toBeTruthy();
-    expect(el.querySelectorAll('.row-example').length).toBe(2);
+    it('should give the examples their own band on the landing page, apart from real tournaments', () => {
+      setup(mixed());
+      expect(component.groups().map(g => g.key)).toEqual(['complete']);
+      expect(component.groups()[0].items.map(t => t.name)).toEqual(['Real Final']);
+
+      const band = el().querySelector('#examples')!;
+      expect(band.querySelector('h2')!.textContent).toBe('Example brackets');
+      expect(band.querySelector('.examples-note')!.textContent).toContain('Made-up events');
+      expect(band.querySelectorAll('.example').length).toBe(2);
+      // The band sits above the list of real tournaments, straight after the steps.
+      expect(band.compareDocumentPosition(el().querySelector('#tournaments')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('should name each example for what it shows, simplest format first', () => {
+      setup(mixed());
+      const shows = Array.from(el().querySelectorAll('.example-shows')).map(n => n.textContent);
+      expect(shows).toEqual(['Blind draw', 'Double elimination, in progress']);
+      expect(el().querySelector('.example-name')!.textContent).toBe('Demo Draw');
+    });
+
+    it('should link each example to its public bracket', () => {
+      setup([makeTournament({ id: 3, uuid: 'abc-123', created_by_user_id: 5 })]);
+      expect(el().querySelector('.example')!.getAttribute('href')).toBe('/bracket/abc-123');
+    });
+
+    it('should not show an empty list of real tournaments to a visitor when there are only examples', () => {
+      setup([makeTournament({ id: 1, created_by_user_id: 5 })]);
+      expect(el().querySelector('#examples')).toBeTruthy();
+      expect(el().querySelector('#tournaments')).toBeNull();
+      expect(el().textContent).not.toContain('Tournaments in play');
+    });
+
+    it('should point the last hero tab at the examples until a real tournament is live', () => {
+      setup([makeTournament({ id: 1, status: 'active', created_by_user_id: 5 })]);
+      const last = () => Array.from<HTMLAnchorElement>(el().querySelectorAll('.tabs .tab')).pop()!;
+      expect(last().textContent!.trim()).toBe('Example brackets');
+      expect(last().getAttribute('href')).toBe('/#examples');
+
+      TestBed.resetTestingModule();
+      setup([makeTournament({ id: 2, status: 'active', created_by_user_id: 1 })]);
+      expect(last().textContent!.trim()).toBe('Live brackets');
+      expect(last().getAttribute('href')).toBe('/#tournaments');
+    });
+
+    it('should keep the examples in the list, as a labelled group at the end, on /tournaments', () => {
+      setup(mixed(), false, false);
+      expect(el().querySelector('#examples')).toBeNull();
+      expect(component.groups().map(g => g.key)).toEqual(['complete', 'example']);
+      expect(el().querySelector('.group-note')).toBeTruthy();
+      expect(el().querySelectorAll('.row-example').length).toBe(2);
+    });
   });
 
   it('should omit groups that have no tournaments', () => {
@@ -261,7 +306,7 @@ describe('TournamentListComponent', () => {
   });
 
   it('should show an empty state when there are no tournaments', () => {
-    setup([]);
+    setup([], false, false);
     expect(fixture.nativeElement.querySelector('.empty').textContent)
       .toContain('No public tournaments running right now');
   });

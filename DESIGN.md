@@ -176,7 +176,7 @@ A two-colour print job: saturated green paper and black toner, with white stock 
 ### Named Rules
 **The One Ink Rule.** Type, links and primary actions are toner. A link is marked by its underline (1.5px, thickening to 2.5px on hover), never by a colour. Marker green and correction red are the only other inks, and each has one job.
 
-**The Highlighter Rule.** Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. A made-up example tournament is never live, whatever its seeded state, so an example in progress gets an outlined "In progress" badge instead. Text selection is toner turned inside out for the same reason.
+**The Highlighter Rule.** Pink means live right now and nothing else. It is never decoration, never a hover, never a brand accent. A made-up example tournament is never live, whatever its seeded state, so an example in progress gets an outlined "In progress" badge instead. That holds on the example's own bracket page and TV view as well as in lists. Text selection is toner turned inside out for the same reason.
 
 **The Sheet and Stock Rule.** Persuade surfaces print on the green sheet. Working screens are white stock under the green header. The header is what makes a working page recognisably Bracketway without colouring the work.
 
@@ -207,7 +207,7 @@ Loaded from Google Fonts with the width axis 62 to 125 and weight axis 100 to 90
 
 Working screens are a single centred column: 680px maximum with a 16px gutter and 24px top padding. The bracket itself breaks out to full width and scrolls horizontally. Marketing content aligns to 1100px, and the home hero and header align to 1320px with a fluid gutter of clamp(16px, 4vw, 56px).
 
-The home hero is the whole first viewport as one green sheet: copy on the left, the white sign-up sheet in a 280 to 360px column on the right, and a strip of seven tear-off tabs along the bottom edge. Below it, each step gets one full-width ruled band on white (numeral, title, copy in three columns).
+The home hero is the whole first viewport as one green sheet: copy on the left, the white sign-up sheet in a 280 to 360px column on the right, and a strip of seven tear-off tabs along the bottom edge. Below it, each step gets one full-width ruled band on white (numeral, title, copy in three columns). Under the steps, the example brackets get the same ruled treatment: one row each, opened by a 3px toner rule, with what the example shows at weight 800 on the left and the made-up event's name and team count beside it. The list of real tournaments follows, and is left out when there are none to show.
 
 The other Persuade pages (How it works, Pricing, Sports, Blind draw generator, Fundraiser guide, Scoreholio comparison) print the same flyer in three parts. The **sheet head** is the page title at display scale (weight 900, 106% width, up to 5rem) and the lede, on the green sheet edge to edge and closed by a dashed cut line. The **stock body** below sits on the header's `--page-gutter`, with running prose held to a 760px measure and each section opened by a 3px toner rule. The page ends on the **sheet foot**, where the green sheet returns edge to edge and is the page's only footer (see Navigation). The shared pieces are the global `.sheet-head`, `.sheet-body`, `.measure` and `.ruled` classes; the foot is drawn by `<app-footer>`, which picks it by route.
 

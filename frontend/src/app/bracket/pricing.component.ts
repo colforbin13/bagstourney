@@ -15,6 +15,8 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { BillingService } from '../shared/services/billing.service';
 import { BillingPlanOption } from '../shared/models/tournament.models';
 import { LEGAL } from '../shared/legal';
+import { RouterLink } from '@angular/router';
+import { EXAMPLE_BRACKETS } from '../shared/examples';
 
 // Mirrors FREEMIUM_*_MAX_PARTICIPANTS in api/middleware/auth.php. Used only until the API
 // answers (or if it can't), so the page never renders a blank where a number belongs.
@@ -35,6 +37,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
 @Component({
   selector: 'app-pricing',
   standalone: true,
+  imports: [RouterLink],
   template: `
     <header class="sheet-head">
       <h1>Free to run. Pro when it gets big.</h1>
@@ -108,6 +111,12 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       @if (hasAnyPrice()) {
         <p class="tax-note">Sales tax is added at checkout where it applies.</p>
       }
+
+      <p class="see-examples">
+        See what Pro adds on made-up events:
+        <a [routerLink]="examples.doubleElimination">double elimination with board assignments</a>
+        and <a [routerLink]="examples.poolPlay">pool play into a bracket</a>.
+      </p>
 
       <section class="faq ruled">
         <h2 class="faq-title">Questions</h2>
@@ -186,6 +195,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
       .tier-list { grid-row: 5; align-self: start; }
     }
     .tax-note { font-size: 0.78rem; color: var(--muted); margin-top: 12px; }
+    .see-examples { margin-top: 20px; max-width: 62ch; font-size: 0.95rem; color: var(--text-dim); }
 
     .faq { margin-top: clamp(40px, 5vw, 64px); max-width: 820px; }
     .faq-title { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 900; font-stretch: 106%; margin-bottom: 12px; }
@@ -220,6 +230,9 @@ export class PricingComponent implements OnInit {
   readonly hasAnyPrice = computed(() => this.plans().some(p => p.unit_amount !== null));
   /** Only an explicit "billing is off" from the API. A failed request keeps the built-in prices. */
   readonly billingUnavailable = computed(() => this.billingEnabled() === false);
+
+  /** Made-up tournaments that show the paid formats. */
+  readonly examples = EXAMPLE_BRACKETS;
   /** $0 in the same currency the paid prices use, so the three columns read alike. */
   readonly zeroPrice = computed(() => this.billing.formatAmount(0, this.plans()[0]?.currency ?? 'usd'));
 

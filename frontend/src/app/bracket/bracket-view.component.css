@@ -428,3 +428,6 @@ Double elimination: the two trees stacked
 
 /* Seeded example tournaments say what they are (shared/examples.ts). */
 .example-note { margin-top: 6px; font-size: 0.9rem; color: var(--text-dim); }
+
+/* An example's status, never the highlighter: see statusLabel(). */
+.badge.badge-quiet { background: var(--surface); color: var(--text); border: 1px solid var(--text); }
