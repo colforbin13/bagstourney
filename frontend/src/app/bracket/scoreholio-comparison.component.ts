@@ -89,7 +89,7 @@ interface Row {
         <h2>Try Bracketway free</h2>
         <p>
           Free for tournaments up to 32 players, with nothing to install for you or your players.
-          Pro adds bigger fields, double elimination, pool play and board assignments.
+          Pro adds bigger fields, double elimination, pool play, board assignments and sponsor logos.
         </p>
         <p class="aside">
           Planning a fundraiser? Read <a routerLink="/cornhole-fundraiser">how to run a cornhole fundraiser</a>.
@@ -166,6 +166,11 @@ export class ScoreholioComparisonComponent {
       topic: 'Boards and courts',
       bracketway: 'Board assignments with an up-next queue on Pro.',
       scoreholio: 'Court assignments on every plan: up to 8 courts free, up to 128 on its top plan.',
+    },
+    {
+      topic: 'Sponsor logos',
+      bracketway: 'Up to 8 logos in a bar along the bottom of the bracket and TV, each linking to the sponsor, on Pro.',
+      scoreholio: 'One sponsor logo free, unlimited on its top plan.',
     },
   ];
 }

@@ -683,6 +683,70 @@
     <ng-container *ngTemplateOutlet="settings" />
   }
 
+  <!-- ── SPONSORS ── (FEATURE_TRACKER item 20) Logos in a bar along the bottom of the public
+       bracket and the TV. Pro to add; anyone with setup access can tidy what is there. -->
+  @if (canManageSetup()) {
+    <details class="fold" (toggle)="onSponsorsToggle($any($event.target).open)">
+      <summary>
+        <span class="fold-title">Sponsors</span>
+        <span class="fold-summary">{{ sponsorsSummary() }}</span>
+      </summary>
+      <div class="fold-body">
+        <div class="field-hint">
+          Logos show in a bar along the bottom of the bracket page and the TV. Add a link and the
+          logo opens the sponsor's site in a new tab.
+        </div>
+        @if (sponsors().length) {
+          <ul class="sponsor-list">
+            @for (s of sponsors(); track s.id; let first = $first; let last = $last) {
+              <li class="sponsor-item">
+                <img class="sponsor-thumb" [src]="sponsorSrc(s)" [alt]="s.name" />
+                <div class="sponsor-info">
+                  <span class="sponsor-name">{{ s.name }}</span>
+                  @if (editingSponsorId === s.id) {
+                    <div class="row">
+                      <input class="input" type="url" [(ngModel)]="editingSponsorUrl" placeholder="joespub.com"
+                        [attr.aria-label]="'Link for ' + s.name" (keyup.enter)="saveSponsorUrl(s)" />
+                      <button class="btn btn-sm" (click)="saveSponsorUrl(s)">Save</button>
+                      <button class="btn btn-sm" (click)="editingSponsorId = null">Cancel</button>
+                    </div>
+                  } @else {
+                    <button type="button" class="sponsor-link" (click)="startEditSponsor(s)">{{ s.url || 'Add a link' }}</button>
+                  }
+                </div>
+                <div class="sponsor-actions">
+                  <button class="btn btn-sm" [disabled]="first" (click)="moveSponsor(s, -1)" [attr.aria-label]="'Move ' + s.name + ' earlier'">↑</button>
+                  <button class="btn btn-sm" [disabled]="last" (click)="moveSponsor(s, 1)" [attr.aria-label]="'Move ' + s.name + ' later'">↓</button>
+                  <button class="btn btn-sm btn-danger" (click)="removeSponsor(s)">Remove</button>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+        @if (!canUsePaidFeatures()) {
+          <div class="field-hint">Sponsor logos are a <a routerLink="/pricing">Pro feature</a>.</div>
+        } @else if (sponsors().length >= maxSponsors) {
+          <div class="field-hint">That's the most a tournament can show ({{ maxSponsors }}). Remove one to add another.</div>
+        } @else if (sponsorsLoaded()) {
+          <div class="sponsor-add">
+            <div class="section-label">Add a sponsor</div>
+            <label class="sponsor-file btn btn-sm">
+              {{ sponsorFileName() || 'Choose logo' }}
+              <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onSponsorFile($event)" />
+            </label>
+            <div class="field-hint">PNG, JPEG or WebP, up to 1 MB. A wide logo on a plain or clear background reads best.</div>
+            <input class="input" type="text" [(ngModel)]="sponsorName" placeholder="Sponsor name" aria-label="Sponsor name" maxlength="120" />
+            <input class="input" type="url" [(ngModel)]="sponsorUrl" placeholder="Website (optional)" aria-label="Sponsor website" />
+            @if (sponsorError()) { <div class="form-error">{{ sponsorError() }}</div> }
+            <button class="btn btn-primary btn-sm" [disabled]="sponsorBusy() || !sponsorImage() || !sponsorName.trim()" (click)="addSponsor()">
+              {{ sponsorBusy() ? 'Adding…' : 'Add sponsor' }}
+            </button>
+          </div>
+        }
+      </div>
+    </details>
+  }
+
   <!-- ── STAFF & ACCESS ── Owners only, and rarely needed, so it closes the page folded. -->
   @if (staffVisible()) {
     <details class="fold" [open]="!!selectedStaffUser()">

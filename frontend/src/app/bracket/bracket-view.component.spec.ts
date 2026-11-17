@@ -58,6 +58,7 @@ describe('BracketViewComponent', () => {
     httpMock.verify();
     // kiosk mode writes to <body>, which outlives the fixture.
     document.body.classList.remove('kiosk-mode');
+    document.body.classList.remove('has-sponsor-bar');
   });
 
   // Triggers ngOnInit (load()) and flushes the tournament/bracket requests it fires in
@@ -906,6 +907,32 @@ describe('BracketViewComponent', () => {
       fixture.detectChanges();
       expect(el.querySelector('.solo-note')).toBeNull();
       expect(el.querySelector('.kiosk-solo')!.textContent).toContain('Sam plays solo');
+    });
+
+    it('shows sponsors in a bar at the bottom of the page, and as the TV band', () => {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush(tournamentWith());
+      httpMock.expectOne(`${environment.apiUrl}/matches/${tournamentId}`).flush({
+        ...singleEliminationBracket({ 1: [live(1, null), live(2, null)] }),
+        sponsors: [{ id: 5, name: "Joe's Pub", url: 'https://joespub.com', width: 200, height: 80, image_url: 'sponsors/5/image?t=x' }],
+      });
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('app-sponsor-bar.sponsor-slot-page a.logo')!.getAttribute('target')).toBe('_blank');
+      // The page's bar is fixed to the window, so the body leaves room for it.
+      expect(document.body.classList.contains('has-sponsor-bar')).toBeTrue();
+
+      queryParams$.next(convertToParamMap({ kiosk: '1' }));
+      fixture.detectChanges();
+      expect(document.body.classList.contains('has-sponsor-bar')).toBeFalse();
+      expect(el.querySelector('app-sponsor-bar.sponsor-slot-page')).toBeNull();
+      expect(el.querySelector('app-sponsor-bar .sponsor-bar.tv img')!.getAttribute('alt')).toBe("Joe's Pub");
+    });
+
+    it('shows no sponsor bar when there are no sponsors', () => {
+      boot();
+      expect(fixture.nativeElement.querySelector('.sponsor-bar')).toBeNull();
+      expect(document.body.classList.contains('has-sponsor-bar')).toBeFalse();
     });
 
     it('says nothing about solo play when every team is a pair', () => {

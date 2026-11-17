@@ -361,6 +361,18 @@ body.kiosk-mode {
   app-nav, app-footer { display: none; }
 }
 
+/* Sponsor bar (FEATURE_TRACKER item 20): fixed to the bottom of the window on the bracket
+   page, so the page keeps room under the footer for it, and toasts sit above it. */
+body.has-sponsor-bar {
+  padding-bottom: 56px;
+
+  .toast { bottom: 76px; }
+}
+@media (max-width: 600px) {
+  body.has-sponsor-bar { padding-bottom: 48px; }
+  body.has-sponsor-bar .toast { bottom: 68px; }
+}
+
 /* ── Printing ──
    Nav and footer are screen furniture; nothing in the app benefits from them on paper.
    `.no-print` marks in-page controls (buttons, tips) that shouldn't print either. */

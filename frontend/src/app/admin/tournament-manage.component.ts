@@ -10,7 +10,7 @@ import { AuthService } from '../shared/services/auth.service';
 import { BillingService } from '../shared/services/billing.service';
 import { championName } from '../shared/bracket-labels';
 import { parseNameList } from '../shared/name-list';
-import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus, PoolData } from '../shared/models/tournament.models';
+import { Tournament, Participant, Team, TournamentMember, UserSearchResult, BillingStatus, PoolData, Sponsor } from '../shared/models/tournament.models';
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { BOARD_WORDS, BoardLabel, boardWord } from '../shared/board-labels';
 import { GHOST_RULES, GHOST_RULE_MAX_TEXT, GhostRule, soloRuleFor } from '../shared/solo-team';
@@ -537,6 +537,122 @@ export class TournamentManageComponent implements OnInit {
         const t = this.tournament();
         if (t) this.tournament.set({ ...t });
       },
+    });
+  }
+
+  // ── Sponsor logos (FEATURE_TRACKER item 20) ───────────────────────────────────────
+  // Pro to add; editing, reordering and removing stay open on any plan. Loaded the first time
+  // the fold opens, since most organizers never will. The server checks every upload's bytes;
+  // the checks here only save a round trip on an obviously wrong file.
+  static readonly SPONSOR_MAX_BYTES = 1048576;
+  static readonly SPONSOR_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+  readonly maxSponsors = 8;
+  sponsors = signal<Sponsor[]>([]);
+  sponsorsLoaded = signal(false);
+  sponsorName = '';
+  sponsorUrl = '';
+  sponsorImage = signal<string | null>(null);
+  sponsorFileName = signal('');
+  sponsorBusy = signal(false);
+  sponsorError = signal('');
+  editingSponsorId: number | null = null;
+  editingSponsorUrl = '';
+  sponsorsSummary = computed(() => {
+    if (!this.sponsorsLoaded()) return this.canUsePaidFeatures() ? 'Logos on the bracket and TV' : 'Pro';
+    const n = this.sponsors().length;
+    return n ? `${n} logo${n === 1 ? '' : 's'}` : 'None yet';
+  });
+
+  onSponsorsToggle(open: boolean) {
+    if (!open || this.sponsorsLoaded()) return;
+    this.svc.getSponsors(this.tournamentId).subscribe({
+      next: list => { this.sponsors.set(list); this.sponsorsLoaded.set(true); },
+      error: () => this.showToast('Could not load the sponsors.', 'error'),
+    });
+  }
+
+  sponsorSrc(s: Sponsor): string {
+    return `${environment.apiUrl}/${s.image_url}`;
+  }
+
+  onSponsorFile(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    this.sponsorError.set('');
+    this.sponsorImage.set(null);
+    this.sponsorFileName.set('');
+    if (!file) return;
+    if (!TournamentManageComponent.SPONSOR_TYPES.includes(file.type)) {
+      this.sponsorError.set('Use a PNG, JPEG or WebP image.');
+      input.value = '';
+      return;
+    }
+    if (file.size > TournamentManageComponent.SPONSOR_MAX_BYTES) {
+      this.sponsorError.set('That image is over 1 MB. Use a smaller logo.');
+      input.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.sponsorImage.set(reader.result as string);
+      this.sponsorFileName.set(file.name);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  addSponsor() {
+    const image = this.sponsorImage();
+    const name = this.sponsorName.trim();
+    if (!image || !name) return;
+    this.sponsorBusy.set(true);
+    this.sponsorError.set('');
+    this.svc.addSponsor(this.tournamentId, name, this.sponsorUrl.trim(), image).subscribe({
+      next: list => {
+        this.sponsors.set(list);
+        this.sponsorBusy.set(false);
+        this.sponsorName = '';
+        this.sponsorUrl = '';
+        this.sponsorImage.set(null);
+        this.sponsorFileName.set('');
+        this.showToast(`Added ${name}.`);
+      },
+      error: err => {
+        this.sponsorBusy.set(false);
+        this.sponsorError.set(err?.error?.error || 'Failed to add the logo.');
+      },
+    });
+  }
+
+  moveSponsor(s: Sponsor, by: -1 | 1) {
+    const list = [...this.sponsors()];
+    const i = list.findIndex(x => x.id === s.id);
+    const j = i + by;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    this.sponsors.set(list);
+    this.svc.reorderSponsors(this.tournamentId, list.map(x => x.id)).subscribe({
+      next: saved => this.sponsors.set(saved),
+      error: () => this.showToast('Failed to reorder the logos.', 'error'),
+    });
+  }
+
+  startEditSponsor(s: Sponsor) {
+    this.editingSponsorId = s.id;
+    this.editingSponsorUrl = s.url ?? '';
+  }
+
+  saveSponsorUrl(s: Sponsor) {
+    this.svc.updateSponsor(s.id, { url: this.editingSponsorUrl.trim() || null }).subscribe({
+      next: list => { this.sponsors.set(list); this.editingSponsorId = null; this.showToast('Link saved.'); },
+      error: err => this.showToast(err?.error?.error || 'Failed to save the link.', 'error'),
+    });
+  }
+
+  async removeSponsor(s: Sponsor) {
+    if (!(await confirmService.confirm(`Remove ${s.name}'s logo from the bracket and TV?`))) return;
+    this.svc.deleteSponsor(s.id).subscribe({
+      next: list => { this.sponsors.set(list); this.showToast(`Removed ${s.name}.`); },
+      error: () => this.showToast('Failed to remove the logo.', 'error'),
     });
   }
 

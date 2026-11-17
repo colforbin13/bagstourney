@@ -4,6 +4,54 @@ Detailed implementation notes, design decisions, and verification history for sh
 items. `FEATURE_TRACKER.md` lists these in one line each with a link into this file;
 this is where the "how" and "how it was verified" live.
 
+### Sponsor logos
+
+`FEATURE_TRACKER.md` item 20, built and deployed 2026-11-17. Board sponsors are how fundraisers
+raise money, and the fundraiser guide tells organizers to sell them; this puts the sponsor on
+the screen everyone watches.
+
+**Decisions** (with Matt): no board-tied sponsors; Pro only, with no free logo; a logo may
+carry a link, opened in a new tab. Placement changed during design: first the TV boards
+column, but that only exists when boards are on and the tournament is live, so instead a
+narrow bar across the bottom of every bracket page and of TV mode, the same spot in every view.
+
+**Display.** `shared/components/sponsor-bar.component.ts`. On the page the bar is fixed to the
+bottom of the window (56px, 48px on a phone); a sticky bar was tried first and sat mid-screen
+on a short bracket. The view toggles `body.has-sponsor-bar`, which pads the page so the footer
+clears it and lifts toasts above it. On a TV it is a 76px band, the last row of the kiosk
+layout, with plain images (nobody taps a TV); more than five take turns in even groups (8
+shows 4 and 4) every 12 seconds. Shown in setup, play and after the final. No sponsors, no bar.
+
+**Upload and storage.** The app's first file upload. Images are stored in
+`tournament_sponsors` (migration `024`), not on disk, because `deploy.ps1` mirrors the web root
+and would delete uploaded files; this also puts them in the database backups. Uploads come as a
+base64 data URL inside JSON, so the router needed no multipart handling. `api/lib/SponsorImage.php`
+(`tests/SponsorImageTest.php`, 13 tests) takes the type from the bytes, never the claimed type,
+allows PNG, JPEG and WebP only (no SVG, which can carry script), caps files at 1 MB and 4000px a
+side, and only stores http(s) links (a bare domain gets https://). `GET /sponsors/{id}/image?t=`
+serves the logo with the sniffed type, `nosniff`, `default-src 'none'` and a one-year immutable
+cache; the random token is both the access check and the cache key, since logos are never
+replaced in place. The bracket response carries the list without image bytes.
+
+**Plan.** `tournamentHasPaidFeatures()` is checked only when a logo is added. Rename, link edit,
+reorder and remove work on any plan, and logos keep showing if the plan lapses. Max 8.
+
+**Manage screen.** A Sponsors fold beside Staff & access, loaded on first open (no request for
+organizers who never open it): thumbnails, editable links, up/down, remove, and an add form with
+a client-side type and size check that only saves a round trip.
+
+**Marketing.** Pricing (both paid tiers), How it works (TV chapter), the fundraiser guide's
+board-sponsors tip, and the Scoreholio comparison (new row; Scoreholio's one-free-logo fact is
+from the October 2026 research). The same pass fixed How it works still saying a draw needs an
+even number of players, wrong since item 19.
+
+**Verified.** PHP 243 and frontend 668 passing. 30 end-to-end API checks on tournament 79,
+restored from the deleted list for the purpose: upload and exact bytes back, response headers,
+wrong or missing token, refusals (SVG, HTML as PNG, `javascript:` link, blank name, no image,
+over 1 MB, anonymous, a ninth logo), bracket payload, reorder, link edits, and the lapsed-plan
+rules. Then the bracket page, TV band and manage fold in Chrome. Tournament 79 was left live
+with 7 sample logos for a look on production.
+
 ### Odd player handling (ghost partner)
 
 `FEATURE_TRACKER.md` item 19, built and deployed 2026-11-17, from the Scoreholio comparison.

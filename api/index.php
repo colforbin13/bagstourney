@@ -17,6 +17,7 @@ require_once __DIR__ . '/lib/BracketBuilder.php';
 require_once __DIR__ . '/lib/NameList.php';
 require_once __DIR__ . '/lib/BlindDraw.php';
 require_once __DIR__ . '/lib/SoloTeam.php';
+require_once __DIR__ . '/lib/SponsorImage.php';
 require_once __DIR__ . '/lib/PoolPlay.php';
 require_once __DIR__ . '/lib/BoardQueue.php';
 require_once __DIR__ . '/lib/PageView.php';
@@ -33,6 +34,7 @@ require_once __DIR__ . '/controllers/NotificationController.php';
 require_once __DIR__ . '/controllers/AuditLogController.php';
 require_once __DIR__ . '/controllers/BillingController.php';
 require_once __DIR__ . '/controllers/AnalyticsController.php';
+require_once __DIR__ . '/controllers/SponsorController.php';
 
 function notFound(): void {
     http_response_code(404);
@@ -43,7 +45,7 @@ function notFound(): void {
 // by the child's own id. 0 when the row does not exist, which requireTournamentRole()
 // answers with a 404. $table is only ever a literal from the routes below.
 function tournamentIdFor(PDO $db, string $table, int $id): int {
-    if (!in_array($table, ['participants', 'teams', 'matches', 'pool_matches'], true)) {
+    if (!in_array($table, ['participants', 'teams', 'matches', 'pool_matches', 'tournament_sponsors'], true)) {
         throw new InvalidArgumentException("Unexpected table: {$table}");
     }
     $stmt = $db->prepare("SELECT tournament_id FROM {$table} WHERE id = ?");
@@ -214,6 +216,34 @@ try {
             } elseif ($method === 'PUT' && $id) {
                 $actor = requireTournamentRole($db, tournamentIdFor($db, 'matches', $id), ['owner', 'manager', 'scorekeeper']);
                 $ctrl->updateScore($id, $body, $actor);
+            } else {
+                notFound();
+            }
+            break;
+
+        // --- Sponsor logos (FEATURE_TRACKER item 20) ---
+        // The bracket response carries the list, so the public page needs no call of its own;
+        // GET /sponsors/{tournamentId} is for the manage screen.
+        case 'sponsors':
+            $db = getDB();
+            $ctrl = new SponsorController($db);
+            if ($method === 'GET' && $id && $action === 'image') {
+                $ctrl->image($id, (string)($_GET['t'] ?? '')); // public: the token is the access check
+            } elseif ($method === 'GET' && $id && !$action) {
+                requireTournamentVisible($db, $id, currentUserOrNull($db));
+                $ctrl->list($id);
+            } elseif ($method === 'POST' && !$id && !$action) {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->create($body);
+            } elseif ($method === 'PUT' && !$id && $action === 'reorder') {
+                requireTournamentRole($db, (int)($body['tournament_id'] ?? 0), ['owner', 'manager']);
+                $ctrl->reorder($body);
+            } elseif ($method === 'PUT' && $id && !$action) {
+                requireTournamentRole($db, tournamentIdFor($db, 'tournament_sponsors', $id), ['owner', 'manager']);
+                $ctrl->update($id, $body);
+            } elseif ($method === 'DELETE' && $id && !$action) {
+                requireTournamentRole($db, tournamentIdFor($db, 'tournament_sponsors', $id), ['owner', 'manager']);
+                $ctrl->delete($id);
             } else {
                 notFound();
             }

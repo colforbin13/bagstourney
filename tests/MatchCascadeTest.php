@@ -7,6 +7,7 @@ require_once __DIR__ . '/../api/controllers/TeamController.php';
 require_once __DIR__ . '/../api/controllers/MatchController.php';
 require_once __DIR__ . '/../api/controllers/PoolController.php';
 require_once __DIR__ . '/../api/controllers/BoardController.php';
+require_once __DIR__ . '/../api/controllers/SponsorController.php';
 
 /**
  * Exercises the match-state machine — cascadePropagate(), cascadeClearDownstream() and
@@ -85,6 +86,9 @@ final class MatchCascadeTest extends TestCase
         // query actually selects are needed.
         $this->db->exec('CREATE TABLE teams (id INTEGER PRIMARY KEY, name TEXT, participant1_id INTEGER, participant2_id INTEGER)');
         $this->db->exec('CREATE TABLE participants (id INTEGER PRIMARY KEY, name TEXT)');
+        // bracket() also lists sponsor logos (item 20, migration 024); none here.
+        $this->db->exec('CREATE TABLE tournament_sponsors (id INTEGER PRIMARY KEY, tournament_id INTEGER, name TEXT,
+            url TEXT, mime TEXT, image BLOB, width INTEGER, height INTEGER, token TEXT, position INTEGER)');
         $this->db->exec('INSERT INTO tournaments (id, name, status) VALUES (1, "Verification", "active")');
 
         $this->matches = new MatchController($this->db);

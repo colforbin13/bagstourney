@@ -88,7 +88,9 @@ import { RouterLink } from '@angular/router';
           </li>
           <li>
             <strong>Board sponsors.</strong> Each set of boards is a natural sponsor spot. Sell a
-            sign on every set, plus a name on the flyer and a thank-you at the trophy.
+            sign on every set, plus a name on the flyer and a thank-you at the trophy. With
+            <a routerLink="/pricing">Pro</a>, their logos also run along the bottom of the bracket
+            and the TV all day, each linking to the sponsor's site.
           </li>
           <li>
             <strong>Food and drink.</strong> Venues often give back a share of sales on the day,

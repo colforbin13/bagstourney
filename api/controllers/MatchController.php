@@ -87,6 +87,8 @@ class MatchController {
         $payload['pool'] = (new PoolController($this->db))->payload($tournamentId);
         // Board assignments (item 8): the count and the up-next order. Null when boards are off.
         $payload['boards'] = (new BoardController($this->db))->summary($tournamentId);
+        // Sponsor logos (item 20): names, links and image URLs, no image bytes. Empty when none.
+        $payload['sponsors'] = (new SponsorController($this->db))->listFor($tournamentId);
 
         if ($format !== 'double') {
             // Legacy shape, for a client cached before the two-tree response existed. It is

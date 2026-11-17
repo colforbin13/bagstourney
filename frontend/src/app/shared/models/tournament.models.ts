@@ -237,6 +237,19 @@ export interface BracketData {
   pool?: PoolData | null;
   /** Board assignments (item 8). Null, or absent from an older API, when boards are off. */
   boards?: BoardsData | null;
+  /** Sponsor logos (item 20), in display order. Empty, or absent from an older API, when none. */
+  sponsors?: Sponsor[];
+}
+
+/** A sponsor logo (FEATURE_TRACKER item 20). `image_url` is relative to the API root. */
+export interface Sponsor {
+  id: number;
+  name: string;
+  /** Opens in a new tab from the bracket page. Null when the organizer gave none. */
+  url: string | null;
+  width: number;
+  height: number;
+  image_url: string;
 }
 
 /** Keys name a game across both tables: 'b' + match id, or 'p' + pool match id. */

@@ -361,6 +361,12 @@
     }
     </div>
 
+    <!-- Sponsors (item 20): the same spot on the page and the TV. On the page it is fixed to
+         the bottom of the window; on the TV it is the bottom band. -->
+    @if (!loading()) {
+    <app-sponsor-bar class="sponsor-slot" [class.sponsor-slot-page]="!kiosk()" [sponsors]="sponsors()" [tv]="kiosk()" />
+    }
+
     @if (error()) {
         <div class="toast toast-error">{{ error() }}</div>
     }

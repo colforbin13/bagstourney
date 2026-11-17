@@ -8,6 +8,7 @@ import { AuthService } from '../shared/services/auth.service';
 import { Tournament, Match, BracketData } from '../shared/models/tournament.models';
 import { PoolStandingsComponent } from '../shared/components/pool-standings.component';
 import { BoardsPanelComponent } from '../shared/components/boards-panel.component';
+import { SponsorBarComponent } from '../shared/components/sponsor-bar.component';
 import { boardWord } from '../shared/board-labels';
 import { isExampleTournament } from '../shared/examples';
 import { SITE_URL, setCanonicalLink } from '../shared/seo';
@@ -69,7 +70,7 @@ interface MirrorLayout {
 @Component({
   selector: 'app-bracket-view',
   standalone: true,
-  imports: [RouterLink, FormsModule, NgTemplateOutlet, PoolStandingsComponent, BoardsPanelComponent],
+  imports: [RouterLink, FormsModule, NgTemplateOutlet, PoolStandingsComponent, BoardsPanelComponent, SponsorBarComponent],
   templateUrl: './bracket-view.component.html',
   styleUrl: './bracket-view.component.css'
 })
@@ -164,6 +165,14 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
   soloNotice = computed(() => {
     if (this.tournament()?.status !== 'active') return '';
     return soloRuleFor(this.tournament(), [...soloTeams(this.bracketData()).values()]);
+  });
+
+  // Sponsor logos (item 20): a bar along the bottom of the page and the TV, in every state of
+  // the tournament, finished included.
+  sponsors = computed(() => this.bracketData()?.sponsors ?? []);
+  // The page's bar is fixed to the window, so the body keeps room for it (global.scss).
+  private sponsorBodyClass = effect(() => {
+    document.body.classList.toggle('has-sponsor-bar', this.sponsors().length > 0 && !this.kiosk());
   });
 
   // Board assignments (FEATURE_TRACKER item 8): shown only while games are being played.
@@ -590,6 +599,7 @@ export class BracketViewComponent implements OnInit, AfterViewInit, OnDestroy {
     window.removeEventListener('keydown', this.onKeydown);
     this.narrowMedia.removeEventListener('change', this.onNarrowChange);
     document.body.classList.remove('kiosk-mode');
+    document.body.classList.remove('has-sponsor-bar');
     this.stopAutoReload();
     this.stopRotation();
   }

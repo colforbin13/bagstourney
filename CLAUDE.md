@@ -147,6 +147,12 @@ With no keys configured billing is simply off: the endpoints 503, the UI hides i
 buttons, and the app behaves exactly as it did before. `docs/stripe-setup.md` is the
 dashboard walkthrough and the go-live checklist.
 
+### Sponsor logos
+
+`FEATURE_TRACKER.md` item 20. Organizers add up to 8 logos (Pro, checked only when one is added; edit, reorder and remove stay open on any plan, and logos keep showing if the plan lapses). They show in `shared/components/sponsor-bar.component.ts`, a bar fixed to the bottom of the window on the public bracket page (the view toggles `body.has-sponsor-bar`, which pads the page and lifts toasts above it) and a band along the bottom of TV mode, where logos are plain images and take turns in groups if more than five are up. On the page a logo with a link opens it in a new tab.
+
+This is the app's only file upload. Images are stored in the `tournament_sponsors` table (migration `024`), not on disk, because `deploy.ps1` mirrors the web root and would delete uploaded files. Uploads arrive as base64 in JSON so the router needs no multipart handling. `api/lib/SponsorImage.php` (`tests/SponsorImageTest.php`) decides the type from the bytes, allows only PNG, JPEG and WebP (never SVG), caps size at 1 MB, and only ever stores an http(s) link. `GET /sponsors/{id}/image?t={token}` serves a logo with that sniffed type, `nosniff` and `default-src 'none'`, cached for a year; the random token is the access check and the cache key, since a logo is never replaced in place. The bracket response carries `sponsors` (without image bytes), so the public page needs no extra request.
+
 ### Link previews
 
 `/bracket/...` is rewritten to `api/preview.php` (see the rewrite in `frontend/src/.htaccess`), which serves the built app shell (`index.csr.html`, see Prerendering below) with per-tournament Open Graph and Twitter Card tags injected, and replaces the generic `<title>`. Messaging apps don't run JavaScript, so a single-page app's tags have to be in the HTML as served — otherwise every shared bracket previews identically as "Bracketway".

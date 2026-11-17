@@ -1444,6 +1444,122 @@ describe('TournamentManageComponent', () => {
     });
   });
 
+  describe('sponsor logos', () => {
+    const logo = (id: number, url: string | null = null) =>
+      ({ id, name: `Sponsor ${id}`, url, width: 200, height: 80, image_url: `sponsors/${id}/image?t=t${id}` });
+
+    function boot(over: Record<string, unknown> = {}) {
+      fixture.detectChanges();
+      httpMock.expectOne(`${environment.apiUrl}/tournaments/${tournamentId}`).flush({
+        id: tournamentId, uuid: 'test-uuid-1234', name: 'Bags Night', status: 'active',
+        visibility: 'public', seeding_mode: 'automatic', team_entry_mode: 'auto_draft',
+        created_at: '2026-01-01', paid_override: true, capabilities: ownerCapabilities, ...over,
+      });
+      httpMock.expectOne(`${environment.apiUrl}/participants/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/teams/${tournamentId}`).flush([]);
+      httpMock.expectOne(`${environment.apiUrl}/tournament-members/${tournamentId}`).flush(mockMembers);
+      fixture.detectChanges();
+    }
+
+    it('loads the logos only when the section is opened', () => {
+      boot();
+      httpMock.expectNone(`${environment.apiUrl}/sponsors/${tournamentId}`);
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([logo(1, 'https://joespub.com'), logo(2)]);
+      fixture.detectChanges();
+      expect(component.sponsorsSummary()).toBe('2 logos');
+      const rows = fixture.nativeElement.querySelectorAll('.sponsor-item');
+      expect(rows.length).toBe(2);
+      expect(rows[1].textContent).toContain('Add a link');
+
+      component.onSponsorsToggle(true);   // opening again does not reload
+      httpMock.expectNone(`${environment.apiUrl}/sponsors/${tournamentId}`);
+    });
+
+    it('adds a logo with its name and link', () => {
+      boot();
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([]);
+      component.sponsorImage.set('data:image/png;base64,AAAA');
+      component.sponsorName = " Joe's Pub ";
+      component.sponsorUrl = 'joespub.com';
+      component.addSponsor();
+
+      const req = httpMock.expectOne(`${environment.apiUrl}/sponsors`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ tournament_id: tournamentId, name: "Joe's Pub", url: 'joespub.com', image: 'data:image/png;base64,AAAA' });
+      req.flush([logo(1, 'https://joespub.com')]);
+      expect(component.sponsors().length).toBe(1);
+      expect(component.sponsorImage()).toBeNull();
+      expect(component.sponsorName).toBe('');
+    });
+
+    it('shows the server\'s reason when a logo is refused', () => {
+      boot();
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([]);
+      component.sponsorImage.set('data:image/png;base64,AAAA');
+      component.sponsorName = 'X';
+      component.addSponsor();
+      httpMock.expectOne(`${environment.apiUrl}/sponsors`).flush({ error: 'Use a PNG, JPEG or WebP image' }, { status: 400, statusText: 'Bad Request' });
+      expect(component.sponsorError()).toBe('Use a PNG, JPEG or WebP image');
+    });
+
+    it('refuses a file that is not an allowed image before uploading it', () => {
+      boot();
+      const input = document.createElement('input');
+      const file = new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' });
+      Object.defineProperty(input, 'files', { value: [file] });
+      component.onSponsorFile({ target: input } as unknown as Event);
+      expect(component.sponsorError()).toContain('PNG, JPEG or WebP');
+      expect(component.sponsorImage()).toBeNull();
+    });
+
+    it('moves a logo and saves the new order', () => {
+      boot();
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([logo(1), logo(2), logo(3)]);
+      component.moveSponsor(component.sponsors()[2], -1);
+      expect(component.sponsors().map(s => s.id)).toEqual([1, 3, 2]);
+      const req = httpMock.expectOne(`${environment.apiUrl}/sponsors/reorder`);
+      expect(req.request.body).toEqual({ tournament_id: tournamentId, sponsor_ids: [1, 3, 2] });
+      req.flush([logo(1), logo(3), logo(2)]);
+    });
+
+    it('clears a link when its field is emptied', () => {
+      boot();
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([logo(1, 'https://joespub.com')]);
+      component.startEditSponsor(component.sponsors()[0]);
+      component.editingSponsorUrl = '  ';
+      component.saveSponsorUrl(component.sponsors()[0]);
+      const req = httpMock.expectOne(`${environment.apiUrl}/sponsors/1`);
+      expect(req.request.body).toEqual({ url: null });
+      req.flush([logo(1)]);
+      expect(component.editingSponsorId).toBeNull();
+    });
+
+    it('offers no upload on the free plan, but still lists and removes logos', () => {
+      boot({ paid_override: false });
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([logo(1)]);
+      fixture.detectChanges();
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.sponsor-add')).toBeNull();
+      expect(el.textContent).toContain('Sponsor logos are a Pro feature');
+      expect(el.querySelector('.sponsor-item .btn-danger')).not.toBeNull();
+    });
+
+    it('stops offering uploads at the limit', () => {
+      boot();
+      component.onSponsorsToggle(true);
+      httpMock.expectOne(`${environment.apiUrl}/sponsors/${tournamentId}`).flush([1, 2, 3, 4, 5, 6, 7, 8].map(i => logo(i)));
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.sponsor-add')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain("That's the most a tournament can show (8)");
+    });
+  });
+
   describe('odd player out (ghost partner)', () => {
     const player = (id: number, name: string) =>
       ({ id, tournament_id: tournamentId, name, registration_status: 'approved' }) as Participant;

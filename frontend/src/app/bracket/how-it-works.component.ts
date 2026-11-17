@@ -101,7 +101,9 @@ import { EXAMPLE_BRACKETS } from '../shared/examples';
           </p>
           <p>
             Self sign-ups land as <em>pending</em> and don't join the roster until you approve
-            them, so a stray scan or a made-up name never ends up in your bracket. You'll want an even number of players, four at minimum.
+            them, so a stray scan or a made-up name never ends up in your bracket. You need three
+            players at minimum. With an odd number, the odd player out gets a "ghost" partner and
+            plays solo, usually throwing both turns.
           </p>
         </li>
 
@@ -168,6 +170,11 @@ import { EXAMPLE_BRACKETS } from '../shared/examples';
             bracket scales up to fill the display, refreshing itself as scores land. No app,
             no cast, nothing to install. It's a web page, so bookmark it once and the screen
             looks after itself for the rest of the day.
+          </p>
+          <p>
+            Got sponsors? Add their logos and they run in a bar along the bottom of the TV and
+            of the bracket page, where each one links to the sponsor's own site.
+            <strong>Sponsor logos are a <a routerLink="/pricing">Pro feature</a>.</strong>
           </p>
           <p>
             For everyone not standing in front of that screen, print a sign. Bracketway makes

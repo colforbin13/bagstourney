@@ -211,20 +211,6 @@ Priority note: sequenced right after item 12 since it reuses item 12's gating me
 rather than introducing new feature gates of its own, and shares the same
 organizer-pays-you billing model that's now the priority entry point for monetization.
 
-### 20. Sponsor logos on the bracket and TV view (Pro)
-
-Board sponsors are how fundraisers raise money, and the fundraiser guide
-(`/cornhole-fundraiser`) tells organizers to sell them. Show sponsor logos on the public
-bracket and in TV mode, so a sponsor's sign is on the screen everyone watches.
-
-- Upload a few images per tournament (size and type limits; stored on disk or in the DB,
-  to decide), shown in a strip on the bracket and rotating in TV mode.
-- Scoreholio gives one logo free and unlimited on its top plan. A Pro feature here, with
-  maybe one logo free, fits our tiers.
-- "Powered by Bracketway" stays regardless (decided 2026-10-15).
-
-Status: Planned — added 2026-10-23. Small, apart from the first image upload in the app.
-
 ### 21. Best-of-3 finals
 
 Scoreholio offers best-of 3/5/7 brackets. The common ask is narrower: play the final (or
@@ -521,6 +507,15 @@ display).
 Built and verified. Everything below is live in production as of the 2026-11-17 `deploy.ps1`
 run, which shipped the whole current build. New entries go at the top, marked **not yet
 deployed** until the next deploy carries them.
+
+- **20. Sponsor logos** (2026-11-17) — Pro organizers add up to 8 logos, each with an
+  optional link, from a Sponsors fold on the manage screen. They show in a bar fixed to the
+  bottom of the public bracket page (a link opens in a new tab) and a band along the bottom of
+  TV mode (no links; more than five take turns in groups), in every state of the tournament.
+  The app's first upload: images stored in the database, type taken from the bytes (PNG, JPEG
+  or WebP only), served from a tokenized, immutable URL. Pricing, How it works, the fundraiser
+  guide and the Scoreholio comparison mention it. Migration `024`.
+  [Full notes](FEATURE_ARCHIVE.md#sponsor-logos)
 
 - **19. Odd player handling (ghost partner)** (2026-11-17) — an odd blind draw no longer
   fails: once the organizer confirms, the odd player out gets a ghost partner, a team with no

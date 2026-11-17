@@ -85,6 +85,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
             <li>Double elimination</li>
             <li>Pool play to seed the bracket</li>
             <li>Board assignments with an up-next queue</li>
+            <li>Sponsor logos on the bracket and TV</li>
             <li>Cancel anytime</li>
           </ul>
         </section>
@@ -103,6 +104,7 @@ const FALLBACK_PLANS: BillingPlanOption[] = [
             <li>Double elimination</li>
             <li>Pool play to seed the bracket</li>
             <li>Board assignments with an up-next queue</li>
+            <li>Sponsor logos on the bracket and TV</li>
             <li>Buy it from the tournament's own page</li>
           </ul>
         </section>

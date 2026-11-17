@@ -473,6 +473,12 @@ Double elimination: the two trees stacked
 }
 .kiosk-dots { display: inline-flex; gap: 6px; }
 
+/* Sponsors (item 20). On the page the bar is fixed to the bottom of the window, however long
+   or short the bracket (body.has-sponsor-bar in global.scss leaves room for it); on the TV it
+   is the last row of the fixed layout and never shrinks. */
+.sponsor-slot { display: block; flex-shrink: 0; }
+.sponsor-slot-page { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; }
+
 /* Odd player out (item 19): how the solo team plays, one line, on the page and the TV. */
 .solo-note { max-width: 680px; margin: -12px auto 20px; font-size: .9rem; color: var(--text-dim); }
 .kiosk-solo {

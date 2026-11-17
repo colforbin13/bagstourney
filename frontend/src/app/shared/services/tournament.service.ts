@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
-import { Tournament, Participant, BulkAddResult, PoolData, BoardsData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse, TrafficSummary } from '../models/tournament.models';
+import { Tournament, Participant, BulkAddResult, PoolData, BoardsData, Team, BracketData, TournamentMember, UserAccount, UserSearchResult, NotificationPreferences, AuditLogResponse, TrafficSummary, Sponsor } from '../models/tournament.models';
 
 @Injectable({ providedIn: 'root' })
 export class TournamentService {
@@ -204,6 +204,28 @@ export class TournamentService {
   // `allowSolo` confirms an odd field: the odd player out gets a ghost partner (item 19).
   drawTeams(tournamentId: number, allowSolo = false) {
     return this.http.post<Team[]>(`${this.api}/teams`, { tournament_id: tournamentId, ...(allowSolo ? { allow_solo: true } : {}) });
+  }
+
+  // Sponsor logos (item 20). Each call answers with the tournament's whole list, in order.
+  getSponsors(tournamentId: number) {
+    return this.http.get<Sponsor[]>(`${this.api}/sponsors/${tournamentId}`);
+  }
+
+  /** `image` is a data: URL from FileReader; the server checks the bytes, not the label. */
+  addSponsor(tournamentId: number, name: string, url: string, image: string) {
+    return this.http.post<Sponsor[]>(`${this.api}/sponsors`, { tournament_id: tournamentId, name, url, image });
+  }
+
+  updateSponsor(id: number, data: { name?: string; url?: string | null }) {
+    return this.http.put<Sponsor[]>(`${this.api}/sponsors/${id}`, data);
+  }
+
+  reorderSponsors(tournamentId: number, sponsorIds: number[]) {
+    return this.http.put<Sponsor[]>(`${this.api}/sponsors/reorder`, { tournament_id: tournamentId, sponsor_ids: sponsorIds });
+  }
+
+  deleteSponsor(id: number) {
+    return this.http.delete<Sponsor[]>(`${this.api}/sponsors/${id}`);
   }
 
   /** Swap a latecomer in for a solo team's ghost; the team becomes an ordinary pair. */
